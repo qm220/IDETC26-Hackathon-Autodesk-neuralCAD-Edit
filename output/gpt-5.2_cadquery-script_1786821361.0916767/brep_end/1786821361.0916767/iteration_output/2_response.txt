@@ -1,0 +1,229 @@
+Thinking text:
+**Evaluating chamfer function**
+
+I need to produce a new function to chamfer hole edges by 0.2mm. My previous attempt included too many edges, causing a chamfer failure. I’m considering a more robust selection method and possibly applying the chamfer in smaller batches or using a fillet. It looks like I should focus on the edges where the cylindrical hole meets the planar face. I also need to reevaluate the OCP mapping attempt that failed due to missing elements, exploring alternative approaches, like CQ selectors.
+**Filtering edges for chamfering**
+
+I can filter edges based on their length being close to their circumference but without using adjacency mapping. I’ll check the edge’s length and curvature for radius retrieval. In the CQ, there's a method to determine the geometry type with `e.geomType()`, returning values like 'CIRCLE'. I want to classify full circles by checking if the edge's geometry type is 'CIRCLE' and its length approximates \(2\pi \times \text{radius}\). This should help identify the required hole edges while considering whether to chamfer outer cylinders, keeping safety in mind.
+**Determining hole edges**
+
+For identifying hole edges, the edge must be shared by both a cylindrical and a planar face. However, external cylinder edges share this feature too. I could check the orientation normal or determine if the edge lies within a non-outermost planar face. A simpler approach might involve selecting cylindrical faces with negative volume since internal cylinder faces have inward normals. In CQ, `Face.normalAt` gives the outward normal. For hole walls, I need to ensure that the outward normal points into the cavity, which is the opposite of the radial direction.
+**Assessing edge materials and convexity**
+
+I realize that for internal holes, the face is part of the boundary and points inward, where the outward normal actually goes into the void, not solid material. Meanwhile, for external cylinders, the outward normal points away from the axis. It’s tricky to distinguish between these. I could check the curvature sign or concavity: a hole edge is concave if the angle of the material inside exceeds 180 degrees. At the hole mouth, the edge is concave, while the external cylinder edge is convex. I can use the edge curvature to help with this detection.
+**Establishing selection criteria for chamfering**
+
+I’m setting selection criteria for edges to chamfer. The edges need to be circular (GeomAbs_Circle) and full circles, meaning the edge length should be approximately \(2\pi \times \text{radius}\). Adjacent faces should include a reversed cylinder and a plane or possibly a cone for countersinks. I want to ensure that when I apply a 0.2mm chamfer, it’s only on suitable hole edges with a plane involved. If holes already have fillets, those edges might not work well for chamfering. 
+
+Additionally, I plan to handle through-holes on curved faces, although the focus is mainly on planar surfaces. As I implement the chamfer, I’ll attempt to apply it in batches first, and if that fails due to too many edges, I’ll do them one by one. It’s crucial to find the right edge in the updated shape using the center point and radius for accurate targeting. Let’s proceed with these implementations, ensuring I keep track of debug information along the way.
+
+Generated script:
+def my_cad_function(args):
+    import os, math
+    import cadquery as cq
+
+    if "input_file" not in args:
+        print("No input_file provided.")
+        return None
+
+    input_file = os.path.expanduser(args["input_file"])
+    model = cq.importers.importStep(input_file)
+    base = model.val() if hasattr(model, "val") else model
+
+    print(f"Loaded STEP: {input_file}")
+    try:
+        print(f"Is Valid: {base.isValid()}")
+        print(f"Faces: {len(base.Faces())}, Edges: {len(base.Edges())}, Solids: {len(base.Solids())}")
+    except Exception as e:
+        print(f"Basic shape stats failed: {e}")
+
+    # --- Find hole mouth edges (circle edges bordering a plane + an INTERNAL cylinder) ---
+    targets = []  # list of dicts: {"center": cq.Vector, "r": float}
+
+    try:
+        from OCP.TopExp import TopExp_MapShapesAndAncestors
+        from OCP.TopAbs import TopAbs_EDGE, TopAbs_FACE, TopAbs_REVERSED
+        from OCP.TopTools import TopTools_IndexedDataMapOfShapeListOfShape
+        from OCP.BRepAdaptor import BRepAdaptor_Curve, BRepAdaptor_Surface
+        from OCP.GeomAbs import GeomAbs_Circle, GeomAbs_Cylinder, GeomAbs_Plane
+
+        occ_shape = base.wrapped if hasattr(base, "wrapped") else base
+
+        e2f = TopTools_IndexedDataMapOfShapeListOfShape()
+        TopExp_MapShapesAndAncestors(occ_shape, TopAbs_EDGE, TopAbs_FACE, e2f)
+
+        circ_any = 0
+        circ_full = 0
+        hole_mouth = 0
+
+        for e in base.Edges():
+            occ_e = e.wrapped
+            try:
+                c_ad = BRepAdaptor_Curve(occ_e)
+                if c_ad.GetType() != GeomAbs_Circle:
+                    continue
+                circ_any += 1
+
+                r = float(c_ad.Circle().Radius())
+                if r <= 1e-9:
+                    continue
+
+                L = float(e.Length())
+                if abs(L - 2.0 * math.pi * r) > 0.05:  # full circle check (mm)
+                    continue
+                circ_full += 1
+
+                if not e2f.Contains(occ_e):
+                    continue
+
+                faces = e2f.FindFromKey(occ_e)
+                has_plane = False
+                has_internal_cyl = False
+
+                # OCP list supports cbegin()/More()/Next() in most builds
+                it = faces.cbegin()
+                while it.More():
+                    f = it.Value()
+                    s_ad = BRepAdaptor_Surface(f, True)
+                    st = s_ad.GetType()
+                    if st == GeomAbs_Plane:
+                        has_plane = True
+                    elif st == GeomAbs_Cylinder:
+                        # internal cylindrical faces of holes are typically REVERSED
+                        try:
+                            if f.Orientation() == TopAbs_REVERSED:
+                                has_internal_cyl = True
+                        except Exception:
+                            pass
+                    it.Next()
+
+                if has_plane and has_internal_cyl:
+                    # store target by geometric signature
+                    try:
+                        c = e.Center()  # for circles this is the circle center
+                    except Exception:
+                        c = e.CenterOfMass()
+                    targets.append({"center": cq.Vector(c.x, c.y, c.z), "r": r})
+                    hole_mouth += 1
+
+            except Exception:
+                continue
+
+        print(f"Circular edges (any): {circ_any}")
+        print(f"Circular edges (full): {circ_full}")
+        print(f"Hole-mouth edge candidates (plane + internal cyl): {hole_mouth}")
+
+    except Exception as e:
+        print(f"OCP adjacency classification failed: {e}")
+        targets = []
+
+    if not targets:
+        # Fallback: chamfer full-circle edges only (more conservative than %CYLINDER->%CIRCLE)
+        fb = []
+        for e in base.Edges():
+            try:
+                if str(getattr(e, "geomType", lambda: "")()).upper() != "CIRCLE":
+                    continue
+                r = float(e.radius())
+                if r <= 1e-9:
+                    continue
+                L = float(e.Length())
+                if abs(L - 2.0 * math.pi * r) > 0.05:
+                    continue
+                try:
+                    c = e.Center()
+                except Exception:
+                    c = e.CenterOfMass()
+                fb.append({"center": cq.Vector(c.x, c.y, c.z), "r": r})
+            except Exception:
+                pass
+        targets = fb
+        print(f"Fallback targets (all full circles): {len(targets)}")
+
+    if not targets:
+        print("No hole edges found to chamfer; returning original model.")
+        return cq.Workplane(obj=base)
+
+    # --- Apply chamfer: try all-at-once; if it fails, do sequential edge-by-edge ---
+    def find_matching_edge(shape, center_vec, r, r_tol=0.02, c_tol=0.5):
+        """Find a full-circle edge in 'shape' matching radius and center."""
+        best = None
+        best_d = 1e99
+        for ed in shape.Edges():
+            try:
+                gt = str(getattr(ed, "geomType", lambda: "")()).upper()
+                if gt != "CIRCLE":
+                    continue
+                rr = float(ed.radius())
+                if abs(rr - r) > r_tol:
+                    continue
+                # full circle check
+                if abs(float(ed.Length()) - 2.0 * math.pi * rr) > 0.05:
+                    continue
+                try:
+                    cc = ed.Center()
+                except Exception:
+                    cc = ed.CenterOfMass()
+                cv = cq.Vector(cc.x, cc.y, cc.z)
+                d = (cv - center_vec).Length
+                if d < best_d and d <= c_tol:
+                    best = ed
+                    best_d = d
+            except Exception:
+                continue
+        return best
+
+    # Build initial edge objects to attempt all-at-once chamfer
+    initial_edges = []
+    for t in targets:
+        ed = find_matching_edge(base, t["center"], t["r"], r_tol=0.02, c_tol=0.75)
+        if ed is not None:
+            initial_edges.append(ed)
+
+    print(f"Matched edges in original shape: {len(initial_edges)}")
+
+    # Attempt a single chamfer operation first
+    if initial_edges:
+        try:
+            res = cq.Workplane(obj=base).newObject(initial_edges).chamfer(0.2)
+            print(f"Applied 0.2 mm chamfer in one pass on {len(initial_edges)} edges.")
+            return res
+        except Exception as e:
+            print(f"One-pass chamfer failed: {e}")
+
+    # Sequential chamfer (more robust)
+    current = base
+    success = 0
+    for t in targets:
+        ed = find_matching_edge(current, t["center"], t["r"], r_tol=0.03, c_tol=1.0)
+        if ed is None:
+            continue
+        try:
+            current = cq.Workplane(obj=current).newObject([ed]).chamfer(0.2).val()
+            success += 1
+        except Exception:
+            # skip edges that refuse chamfer
+            continue
+
+    print(f"Sequential chamfer successes: {success} / {len(targets)}")
+    return cq.Workplane(obj=current)
+
+
+Program output:
+stdout: Loading function from: /home/adml/Research/Hackathon2026/IDETC26-Hackathon-Autodesk-neuralCAD-Edit/output/gpt-5.2_cadquery-script_1786821361.0916767/brep_end/1786821361.0916767/temp_script.py
+Loaded STEP: /home/adml/Research/Hackathon2026/IDETC26-Hackathon-Autodesk-neuralCAD-Edit/data/edit_192_external/breps/ZK22J6VYRKQ2RTFD_1758875194.249227.step
+Is Valid: True
+Faces: 266, Edges: 625, Solids: 1
+OCP adjacency classification failed: cannot import name 'TopExp_MapShapesAndAncestors' from 'OCP.TopExp' (/home/adml/Research/Hackathon2026/IDETC26-Hackathon-Autodesk-neuralCAD-Edit/.venv/lib/python3.12/site-packages/OCP/TopExp/__init__.py)
+Fallback targets (all full circles): 12
+Matched edges in original shape: 12
+Applied 0.2 mm chamfer in one pass on 12 edges.
+Exported shape to: /home/adml/Research/Hackathon2026/IDETC26-Hackathon-Autodesk-neuralCAD-Edit/output/gpt-5.2_cadquery-script_1786821361.0916767/brep_end/1786821361.0916767/tmp.step
+Exported STL to: /home/adml/Research/Hackathon2026/IDETC26-Hackathon-Autodesk-neuralCAD-Edit/output/gpt-5.2_cadquery-script_1786821361.0916767/brep_end/1786821361.0916767/tmp.stl
+Exported PNG image to: /home/adml/Research/Hackathon2026/IDETC26-Hackathon-Autodesk-neuralCAD-Edit/output/gpt-5.2_cadquery-script_1786821361.0916767/brep_end/1786821361.0916767/tmp.png
+Script completed.
+
+stderr: 
+
+Exported this iteration:
+tmp.step, tmp.stl, tmp.png

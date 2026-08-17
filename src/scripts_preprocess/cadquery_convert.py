@@ -17,7 +17,9 @@ from cadquery import exporters
 
 from src.utils.cadquery_rendering import render_to_png, VIEW_PROJECTIONS
 
-EXPORT_VIEWS = list(VIEW_PROJECTIONS.keys())
+# Keep the original seven eval views. VIEW_PROJECTIONS also includes
+# experiment-only angles such as bottomleftiso.
+EXPORT_VIEWS = ["toprightiso", "front", "back", "left", "right", "top", "bottom"]
 
 
 def load_step_file(step_path):

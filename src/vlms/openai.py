@@ -39,6 +39,10 @@ class VLM(BaseVLM):
         # make user message
         user_message = {"role": "user", "content": []}
         for i, part in enumerate(inputs):
+            if part is None:
+                continue
+            if not isinstance(part, str):
+                part = str(part)
             if part.endswith(".png"):
                 image = self.load_image(part)
                 user_message["content"].append({

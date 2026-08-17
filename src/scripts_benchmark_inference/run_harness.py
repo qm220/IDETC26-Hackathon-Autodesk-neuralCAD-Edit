@@ -87,6 +87,7 @@ def run_single_task(vlm, row, args):
 
     sample_output_folder = os.path.join(args.output_folder, edit_id, "brep_end", str(start))
     os.makedirs(sample_output_folder, exist_ok=True)
+    print(f"Writing outputs to: {os.path.abspath(sample_output_folder)}")
     settings_output_fn = os.path.join(sample_output_folder, "settings.json")
     
     vlm_call_func = getattr(vlm, vlm.config["function"])
@@ -144,8 +145,10 @@ def process_parquet(args, config, model, required_extensions=[]):
     db_base_path = config["storage_dir"]["path"]
     # set args.db_base_path
     args.db_base_path = db_base_path
-    output_folder = osp.join(args.output_dir, osp.splitext(osp.basename(args.harness))[0], args.userId, osp.splitext(osp.basename(args.input))[0])
+    output_folder = osp.abspath(args.output_dir)
+    os.makedirs(output_folder, exist_ok=True)
     args.output_folder = output_folder
+    print(f"Output root: {output_folder}")
 
     parquet = pd.read_parquet(args.input)
     # rows = [x[1] for x in parquet.iterrows()]

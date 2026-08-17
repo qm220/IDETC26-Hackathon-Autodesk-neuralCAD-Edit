@@ -7,6 +7,44 @@ import json
 import shutil
 import sys
 
+IMAGE_EXTS = (".png", ".jpg", ".jpeg")
+CAD_ARTIFACTS = (
+    ("tmp.step", "{i}_output.step"),
+    ("tmp.stl", "{i}_output.stl"),
+    ("tmp.png", "{i}_output.png"),
+    ("tmp.svg", "{i}_output.svg"),
+)
+
+
+def _is_image_path(part):
+    return isinstance(part, str) and part.lower().endswith(IMAGE_EXTS) and os.path.exists(part)
+
+
+def _json_safe(obj):
+    if isinstance(obj, dict):
+        return {str(k): _json_safe(v) for k, v in obj.items()}
+    if isinstance(obj, (list, tuple)):
+        return [_json_safe(v) for v in obj]
+    if isinstance(obj, (str, int, float, bool)) or obj is None:
+        return obj
+    return str(obj)
+
+
+def _sanitize_api_messages(obj):
+    if isinstance(obj, dict):
+        out = {}
+        for key, value in obj.items():
+            if key in ("image_url", "url") and isinstance(value, str) and value.startswith("data:"):
+                out[key] = f"[omitted data URL, {len(value)} chars]"
+            else:
+                out[key] = _sanitize_api_messages(value)
+        return out
+    if isinstance(obj, (list, tuple)):
+        return [_sanitize_api_messages(v) for v in obj]
+    if isinstance(obj, (str, int, float, bool)) or obj is None:
+        return obj
+    return str(obj)
+
 class GenerateResponseResult:
     def __init__(self, response_json=None, response_text=None, token_counts=None, thinking_text=None):
         self.response_json = response_json
@@ -360,14 +398,96 @@ class BaseVLM(ABC):
                 messages.append(v)
 
         return messages
-    
-    def visual_update_loop(self, instruction_text, task_info_dict, harness_script_file, output_dir, max_iters=10, run_function=None, conversation_instruction="", output_script_key=None, input_file=None):
+
+    def _write_iteration_prompt_log(self, iteration_dir, iter_count, max_iters, prompt_parts, api_messages):
+        prompt_records = []
+        prompt_text_chunks = []
+        image_index = 0
+        for part in prompt_parts:
+            if _is_image_path(part):
+                dest_name = f"{iter_count}_prompt_image_{image_index}{osp.splitext(part)[1].lower()}"
+                shutil.copy(part, os.path.join(iteration_dir, dest_name))
+                prompt_records.append({"type": "image", "path": os.path.abspath(part), "copied_as": dest_name})
+                prompt_text_chunks.append(f"[IMAGE {image_index}: {os.path.abspath(part)}]")
+                image_index += 1
+            else:
+                text = part if isinstance(part, str) else str(part)
+                prompt_records.append({"type": "text", "text": text})
+                prompt_text_chunks.append(text)
+
+        prompt_json_path = os.path.join(iteration_dir, f"{iter_count}_prompt.json")
+        with open(prompt_json_path, "w", encoding="utf-8") as f:
+            json.dump(
+                {
+                    "iteration": iter_count,
+                    "max_iters": max_iters,
+                    "part_count": len(prompt_records),
+                    "parts": prompt_records,
+                },
+                f,
+                indent=2,
+                ensure_ascii=False,
+            )
+
+        prompt_txt_path = os.path.join(iteration_dir, f"{iter_count}_prompt.txt")
+        with open(prompt_txt_path, "w", encoding="utf-8") as f:
+            f.write("\n\n".join(prompt_text_chunks))
+
+        api_path = os.path.join(iteration_dir, f"{iter_count}_api_messages.json")
+        with open(api_path, "w", encoding="utf-8") as f:
+            json.dump(_sanitize_api_messages(api_messages), f, indent=2, ensure_ascii=False)
+
+        print(f"Logged prompt to {prompt_txt_path}")
+        return prompt_json_path
+
+    def _write_iteration_vlm_log(self, iteration_dir, iter_count, whole_response, parsed_response):
+        response_json_path = os.path.join(iteration_dir, f"{iter_count}_vlm_response.json")
+        payload = {
+            "iteration": iter_count,
+            "response_text": whole_response.response_text,
+            "thinking_text": whole_response.thinking_text,
+            "response_json": _json_safe(whole_response.response_json),
+            "parsed_response": _json_safe(parsed_response),
+            "token_counts": whole_response.token_counts or {},
+        }
+        with open(response_json_path, "w", encoding="utf-8") as f:
+            json.dump(payload, f, indent=2, ensure_ascii=False)
+
+        response_txt_path = os.path.join(iteration_dir, f"{iter_count}_vlm_response.txt")
+        with open(response_txt_path, "w", encoding="utf-8") as f:
+            f.write("=== thinking_text ===\n")
+            f.write(whole_response.thinking_text or "")
+            f.write("\n\n=== response_text ===\n")
+            if isinstance(whole_response.response_text, str):
+                f.write(whole_response.response_text)
+            else:
+                f.write(json.dumps(_json_safe(whole_response.response_text), indent=2, ensure_ascii=False))
+        print(f"Logged VLM response to {response_txt_path}")
+
+    def _copy_iteration_cad_artifacts(self, output_dir, iteration_dir, iter_count):
+        copied = []
+        missing = []
+        for src_name, dest_template in CAD_ARTIFACTS:
+            src = os.path.join(output_dir, src_name)
+            dest = os.path.join(iteration_dir, dest_template.format(i=iter_count))
+            if os.path.exists(src):
+                shutil.copy(src, dest)
+                copied.append(src_name)
+            else:
+                missing.append(src_name)
+        print(f"CadQuery artifacts this iteration: exported={copied or ['none']} missing={missing}")
+        return copied
+
+    def visual_update_loop(self, instruction_text, task_info_dict, harness_script_file, output_dir, max_iters=10, run_function=None, conversation_instruction="", output_script_key=None, input_file=None, planning=None):
         if run_function is None:
             raise ValueError("run_function must be provided to visual_update_loop")
         
         messages = []
 
         messages.append(conversation_instruction)
+        if planning:
+            from .task_analysis import planning_message_parts
+            messages.extend(planning_message_parts(planning))
 
         harness_script = self.read_text_file(harness_script_file)
 
@@ -385,13 +505,22 @@ class BaseVLM(ABC):
         }
 
         iter_count = 0
+        script = ""
         while iters_remaining > 0:
+            print(f"\n========== Iteration {iter_count + 1}/{max_iters} ==========")
             messages.append(f"Iterations remaining: {iters_remaining}")
-            whole_response = self.generate_response(self.create_messages(messages, sys=self.config["system_prompt"]), return_token_counts=True)
+            iteration_dir = os.path.join(output_dir, "iteration_output")
+            os.makedirs(iteration_dir, exist_ok=True)
+
+            api_messages = self.create_messages(messages, sys=self.config["system_prompt"])
+            self._write_iteration_prompt_log(
+                iteration_dir, iter_count, max_iters, messages, api_messages
+            )
+
+            whole_response = self.generate_response(api_messages, return_token_counts=True)
 
             response = whole_response.response_json
-            token_counts = whole_response.token_counts            
-
+            token_counts = whole_response.token_counts or {}
 
             for k in token_counts.keys():
                 token_count_accumulator[k] = token_count_accumulator.get(k, 0) + token_counts[k]
@@ -406,41 +535,55 @@ class BaseVLM(ABC):
                     print(f"Error parsing response as json: {e}")
                     response = {}
 
-            script = response.get("my_cad_function", "")
+            if not isinstance(response, dict):
+                print(f"VLM response was not a JSON object: {type(response)}")
+                response = {}
+
+            self._write_iteration_vlm_log(iteration_dir, iter_count, whole_response, response)
+
+            script = response.get("my_cad_function", "") or ""
             complete = response.get("complete", False)
 
+            function_path = os.path.join(iteration_dir, f"{iter_count}_function.py")
+            with open(function_path, "w", encoding="utf-8") as f:
+                f.write(script)
+
             if complete:
-                print("Task completed.")
+                print("Task completed (model set complete=true); CadQuery will not run this iteration.")
+                with open(os.path.join(iteration_dir, f"{iter_count}_response.txt"), "w", encoding="utf-8") as f:
+                    f.write("Thinking text:\n")
+                    f.write(whole_response.thinking_text or "")
+                    f.write("\n\nGenerated script:\n")
+                    f.write(script)
+                    f.write("\n\nProgram output:\nCadQuery skipped because complete=true.\n")
                 break
 
-            # run the script in FreeCAD
+            print("Running CadQuery...")
             program_output = run_function(script, harness_script_file, output_dir, input_file=input_file)
+            print(program_output)
 
-            # Logging iteration outputs
-            iteration_dir = os.path.join(output_dir, "iteration_output")
-            os.makedirs(iteration_dir, exist_ok=True)
+            copied = self._copy_iteration_cad_artifacts(output_dir, iteration_dir, iter_count)
+            cadquery_ok = bool(copied)
+
             iteration_text_file = os.path.join(iteration_dir, f"{iter_count}_response.txt")
-
-            with open(iteration_text_file, 'w', encoding='utf-8') as f:
+            with open(iteration_text_file, "w", encoding="utf-8") as f:
                 f.write("Thinking text:\n")
-                f.write(whole_response.thinking_text)
+                f.write(whole_response.thinking_text or "")
                 f.write("\n\n")
-                # write the script with correct indentation
                 f.write("Generated script:\n")
                 f.write(script)
-                # write the program output
                 f.write("\n\nProgram output:\n")
                 f.write(program_output)
-                # copy the output image with the correct index in the filename
-                image_fn = osp.join(output_dir, "tmp.png")
-                if os.path.exists(image_fn):
-                    shutil.copy(image_fn, osp.join(iteration_dir, f"{iter_count}_output.png"))
+                f.write("\n\nExported this iteration:\n")
+                f.write(", ".join(copied) if copied else "none (CadQuery failed or returned no shape)")
 
+            with open(os.path.join(iteration_dir, f"{iter_count}_cadquery.txt"), "w", encoding="utf-8") as f:
+                f.write(program_output)
 
             messages.append("Program output from last iteration:")
             messages.append(program_output)
             messages.append("Visual output from last iteration:")
-            
+
             image_fn = osp.join(output_dir, "tmp.png")
             if os.path.exists(image_fn):
                 messages.append(image_fn)
@@ -449,12 +592,12 @@ class BaseVLM(ABC):
             messages.append("The function that you produced from the last iteration:")
             messages.append(script)
 
-            # print(messages)
+            print(f"Iteration {iter_count + 1} CadQuery export {'succeeded' if cadquery_ok else 'failed'}.")
             iters_remaining -= 1
             iter_count += 1
 
-        input_tokens = float(token_count_accumulator["input_tokens"])
-        output_tokens = float(token_count_accumulator["output_tokens"]) + float(token_count_accumulator.get("thinking_tokens", 0))
+        input_tokens = float(token_count_accumulator.get("input_tokens", 0) or 0)
+        output_tokens = float(token_count_accumulator.get("output_tokens", 0) or 0) + float(token_count_accumulator.get("thinking_tokens", 0) or 0)
         token_count_accumulator["cost_estimate"] = self.config["1m_token_cost_input"] * input_tokens / 1e6 + self.config["1m_token_cost_output"] * output_tokens / 1e6
 
         return_dict = {
@@ -522,7 +665,12 @@ class BaseVLM(ABC):
                 input_file = task_info_dict[key]
                 break
 
-        return self.visual_update_loop(
+        planning = None
+        if self.config.get("run_planning", True):
+            from .task_analysis import run_task_analysis
+            planning = run_task_analysis(self, task_info_dict, output_dir)
+
+        result = self.visual_update_loop(
             instruction_text=instruction_text,
             task_info_dict=task_info_dict,
             harness_script_file=harness_script_file,
@@ -530,6 +678,19 @@ class BaseVLM(ABC):
             max_iters=max_iters,
             run_function=self.run_cadquery_script,
             conversation_instruction=conversation_instruction,
-            input_file=input_file
+            input_file=input_file,
+            planning=planning,
         )
+        if planning and planning.get("token_counts"):
+            acc = result.setdefault("token_counts", {})
+            for key, value in planning["token_counts"].items():
+                try:
+                    acc[key] = acc.get(key, 0) + (value or 0)
+                except TypeError:
+                    acc[key] = value
+            if "cost_estimate" in acc:
+                input_tokens = float(acc.get("input_tokens", 0) or 0)
+                output_tokens = float(acc.get("output_tokens", 0) or 0) + float(acc.get("thinking_tokens", 0) or 0)
+                acc["cost_estimate"] = self.config["1m_token_cost_input"] * input_tokens / 1e6 + self.config["1m_token_cost_output"] * output_tokens / 1e6
+        return result
     

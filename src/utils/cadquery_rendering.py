@@ -16,6 +16,7 @@ from cadquery import exporters
 
 VIEW_PROJECTIONS = {
     'toprightiso': (1, -1, 1),
+    'bottomleftiso': (-1, 1, -1),
     'front': (0, 0, 1),
     'back': (0, 0, -1),
     'left': (-1, 0, 0),
