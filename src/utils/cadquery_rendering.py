@@ -25,6 +25,19 @@ VIEW_PROJECTIONS = {
     'bottom': (0, -1, 0),
 }
 
+# RGB in [0, 1] for PNG face coloring by CadQuery geomType(). Not written to STEP.
+FACE_TYPE_COLORS = {
+    "PLANE": (0.72, 0.72, 0.72),
+    "CYLINDER": (0.20, 0.45, 0.85),
+    "CONE": (0.95, 0.55, 0.15),
+    "SPHERE": (0.20, 0.70, 0.35),
+    "TORUS": (0.85, 0.20, 0.25),
+    "BSPLINE": (0.55, 0.30, 0.80),
+    "BEZIER": (0.70, 0.40, 0.85),
+    "OTHER": (0.90, 0.80, 0.20),
+}
+DEFAULT_FACE_COLOR = (0.55, 0.55, 0.55)
+
 
 def _render_to_png_vtk(occ_shape, png_path, proj=(1, -1, 1), width=1024, height=1024):
     """Render using CadQuery's VTK-based vis.show (Windows)."""
@@ -48,7 +61,20 @@ def _render_to_png_vtk(occ_shape, png_path, proj=(1, -1, 1), width=1024, height=
     )
 
 
-def render_to_png(occ_shape, png_path, proj=(1, -1, 1), width=1024, height=1024):
+def _cq_shape(occ_shape):
+    if hasattr(occ_shape, "val"):
+        return occ_shape.val()
+    return occ_shape
+
+
+def _geom_type_name(face) -> str:
+    try:
+        return str(face.geomType()).upper()
+    except Exception:
+        return "OTHER"
+
+
+def render_to_png(occ_shape, png_path, proj=(1, -1, 1), width=1024, height=1024, color_by=None):
     """Render an OCP shape to a PNG file from a given projection direction.
 
     Args:
@@ -57,12 +83,14 @@ def render_to_png(occ_shape, png_path, proj=(1, -1, 1), width=1024, height=1024)
         proj: (Vx, Vy, Vz) camera projection direction tuple.
         width: Image width in pixels.
         height: Image height in pixels.
+        color_by: None for uniform gray, or "geomType" to color each face
+            by CadQuery surface type (PNG only; STEP is unchanged).
     """
     if sys.platform == "win32":
         _render_to_png_vtk(occ_shape, png_path, proj=proj, width=width, height=height)
         return
 
-    from OCP.AIS import AIS_InteractiveContext, AIS_Shape, AIS_Shaded
+    from OCP.AIS import AIS_ColoredShape, AIS_InteractiveContext, AIS_Shape, AIS_Shaded
     from OCP.Aspect import Aspect_DisplayConnection, Aspect_TypeOfLine
     from OCP.OpenGl import OpenGl_GraphicDriver
     from OCP.Prs3d import Prs3d_LineAspect
@@ -97,13 +125,30 @@ def render_to_png(occ_shape, png_path, proj=(1, -1, 1), width=1024, height=1024)
 
     from OCP.Graphic3d import Graphic3d_MaterialAspect
 
-    ais_shape = AIS_Shape(wrapped)
-
     mat = Graphic3d_MaterialAspect()
     mat.SetSpecularColor(Quantity_Color(0.15, 0.15, 0.15, Quantity_TOC_RGB))
     mat.SetShininess(0.3)
-    ais_shape.SetMaterial(mat)
-    ais_shape.SetColor(Quantity_Color(0.6, 0.6, 0.6, Quantity_TOC_RGB))
+
+    if color_by == "geomType":
+        ais_shape = AIS_ColoredShape(wrapped)
+        ais_shape.SetMaterial(mat)
+        cq_shape = _cq_shape(occ_shape)
+        try:
+            faces = cq_shape.Faces()
+        except Exception:
+            faces = []
+        for face in faces:
+            rgb = FACE_TYPE_COLORS.get(_geom_type_name(face), DEFAULT_FACE_COLOR)
+            try:
+                ais_shape.SetCustomColor(
+                    face.wrapped, Quantity_Color(rgb[0], rgb[1], rgb[2], Quantity_TOC_RGB)
+                )
+            except Exception:
+                pass
+    else:
+        ais_shape = AIS_Shape(wrapped)
+        ais_shape.SetMaterial(mat)
+        ais_shape.SetColor(Quantity_Color(0.6, 0.6, 0.6, Quantity_TOC_RGB))
 
     drawer = ais_shape.Attributes()
     edge_aspect = Prs3d_LineAspect(
