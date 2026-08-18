@@ -1,0 +1,284 @@
+Thinking text:
+**Identifying parts of a coffeepot**
+
+I see that there are 20 solids to consider like the housing, handle, and cord, and I'm thinking the coffeepot might be one of them, possibly solid 8 or 9. It seems to have a cylindrical shape based on various views, especially the front view where there’s a large cylinder that looks like it could be a coffeepot. However, the distance from the handle is concerning and may affect how they collide. I need to clarify that more.
+**Analyzing potential collisions**
+
+I'm considering that the handle might intersect with the coffeepot when it's moved for removal. Right now, in the static assembly, there seems to be no collision, but the requirement calls for clearance during insertion or removal. They likely need to eliminate any current collisions, but my earlier check only measured distance, not actual intersection. I think I should compute the intersection volume using a specific method to properly identify any collisions and find the solid with the maximum overlap. Let's implement that!
+**Reassessing collision detection**
+
+It seems that my last iteration didn’t yield any results, which might indicate an error in identifying collisions. I need to refine the code: first, I’ll identify the handle accurately. Then, I’ll look for solids that have intersection volumes greater than 1e-3 or those that are too close. If no collisions are detected, I might still create a 2mm clearance around the pot. I should be cautious and base any cuts on the regions of interest to ensure everything fits properly. Let's adjust my approach accordingly!
+**Building an intersection around the pot**
+
+I’m thinking we can create a bounding box around the intersection to help limit the cut area. If there’s no intersection but the minimum distance is less than the clearance gap, I can still perform the cut using an offset. If those checks don’t trigger any changes, it’s likely that a collision occurs, but I need to identify the right pot. I want to compute the intersection volume for each solid, excluding the handle and housing, and determine the candidate with the largest volume.
+**Implementing collision checks and cuts**
+
+I’m looking at a solid that might be part of the pot, and if there's a collision, I'll create a keep-out tool by offsetting the colliding solid. I need to check for overlapping solids and ensure there's enough clearance when cutting around the handle. My algorithm will list collisions based on volume, distance checks, and if none are found, select the nearest candidate. I'll define cutting areas to prevent affecting fasteners and allow enough space around the handle. Let’s implement this robustly!
+**Creating my CAD function**
+
+I'm working on drafting a function that will import CAD tools and handle solid geometry. First, I’ll load the STEP file and identify key solids like the housing and handle. Then, I’ll compute collision volumes among solids. If a collision is detected, I'll create a tool body from the solids and set up offsets for cutting. I'll also validate the cut against the tool body and check that everything aligns properly. I need to make sure to manage error responses correctly if collisions weren't resolved. Let's get to crafting this function!
+
+Generated script:
+def my_cad_function(args):
+    import cadquery as cq
+    import os
+
+    # --- Parameters ---
+    clearance_gap = 2.0  # mm desired minimum separation
+    safety = 0.2         # mm extra margin
+    inter_vol_tol = 1e-2 # mm^3 intersection volume tolerance for 'collision'
+    near_tol = 0.05      # mm treat as contact/near-collision
+
+    input_file = os.path.expanduser(args.get("input_file", ""))
+
+    # --- Load STEP ---
+    wp = cq.importers.importStep(input_file)
+    root = wp.val() if hasattr(wp, "val") else wp
+    if root is None:
+        raise ValueError("Failed to import STEP (empty shape)")
+
+    solids = list(root.Solids())
+    print(f"Loaded STEP: {input_file}")
+    print(f"Root valid: {root.isValid()}")
+    print(f"Solids found: {len(solids)}")
+
+    if len(solids) < 2:
+        print("<2 solids; nothing to edit.")
+        return wp
+
+    def bbinfo(s):
+        bb = s.BoundingBox()
+        return bb, float(s.Volume())
+
+    for i, s in enumerate(solids):
+        bb, vol = bbinfo(s)
+        print(
+            f"Solid[{i}]: vol={vol:.3f} mm^3, "
+            f"bbox=({bb.xlen:.2f},{bb.ylen:.2f},{bb.zlen:.2f}), "
+            f"center=({bb.center.x:.2f},{bb.center.y:.2f},{bb.center.z:.2f})"
+        )
+
+    # --- Identify housing (largest volume) ---
+    vols = [float(s.Volume()) for s in solids]
+    housing_idx = max(range(len(solids)), key=lambda k: vols[k])
+
+    # --- Identify handle (U-bracket) candidate ---
+    handle_candidates = []
+    for i, s in enumerate(solids):
+        if i == housing_idx:
+            continue
+        bb, vol = bbinfo(s)
+        # Handle is a long X-span U frame with modest Y thickness and substantial Z span
+        if bb.xlen > 220 and 8 < bb.ylen < 90 and bb.zlen > 140 and vol > 5e4:
+            handle_candidates.append(i)
+
+    # Fallback: choose best score non-housing
+    if not handle_candidates:
+        best = None
+        for i, s in enumerate(solids):
+            if i == housing_idx:
+                continue
+            bb, vol = bbinfo(s)
+            score = bb.xlen
+            if 8 < bb.ylen < 90:
+                score += 200
+            if bb.zlen > 140:
+                score += 50
+            score += min(vol / 1e5, 50)  # small volume preference without dominating
+            if best is None or score > best[0]:
+                best = (score, i)
+        if best:
+            handle_candidates = [best[1]]
+
+    print(f"Handle candidate indices: {handle_candidates}")
+    if not handle_candidates:
+        print("WARNING: Could not identify handle; returning original.")
+        return wp
+
+    handle_idx = handle_candidates[0]
+    handle = solids[handle_idx]
+
+    # --- OCP tools ---
+    try:
+        from OCP.BRepAlgoAPI import BRepAlgoAPI_Common
+        from OCP.BRepExtrema import BRepExtrema_DistShapeShape
+    except Exception as e:
+        raise ImportError(f"Required OCP modules unavailable: {e}")
+
+    def common_volume(a: cq.Shape, b: cq.Shape) -> float:
+        com = BRepAlgoAPI_Common(a.wrapped, b.wrapped)
+        com.Build()
+        if not com.IsDone():
+            return 0.0
+        shp = cq.Shape(com.Shape())
+        try:
+            return float(shp.Volume())
+        except Exception:
+            return 0.0
+
+    def min_dist(a: cq.Shape, b: cq.Shape) -> float:
+        dss = BRepExtrema_DistShapeShape(a.wrapped, b.wrapped)
+        dss.Perform()
+        if not dss.IsDone():
+            return float("inf")
+        return float(dss.Value())
+
+    # --- Find actual colliding solids with handle (by intersection volume) ---
+    collisions = []
+    for j, s in enumerate(solids):
+        if j in (housing_idx, handle_idx):
+            continue
+        vol = float(s.Volume())
+        # Skip tiny hardware-ish solids for speed (but keep medium/large ones)
+        if vol < 2e3:
+            continue
+        iv = common_volume(handle, s)
+        if iv > inter_vol_tol:
+            collisions.append((iv, j))
+
+    collisions.sort(reverse=True, key=lambda t: t[0])
+    print("Handle collision candidates (intersection volume mm^3):")
+    for iv, j in collisions[:10]:
+        bb, v = bbinfo(solids[j])
+        print(f"  idx={j}  interVol={iv:.3f}  vol={v:.1f}  bb=({bb.xlen:.1f},{bb.ylen:.1f},{bb.zlen:.1f})")
+
+    # If nothing intersects, look for too-close solids (min distance)
+    pot_tool_parts = []
+    if collisions:
+        pot_tool_parts = [solids[j] for _, j in collisions]
+        print(f"Detected {len(pot_tool_parts)} intersecting solid(s) with handle.")
+    else:
+        # Find nearest substantial solid in handle Y band
+        handle_bb = handle.BoundingBox()
+
+        def overlap_len(a0, a1, b0, b1):
+            return max(0.0, min(a1, b1) - max(a0, b0))
+
+        best = None  # (dist, -vol, idx)
+        for j, s in enumerate(solids):
+            if j in (housing_idx, handle_idx):
+                continue
+            bb, vol = bbinfo(s)
+            if vol < 2e4:
+                continue
+            # must overlap in Y with handle span somewhat
+            if overlap_len(handle_bb.ymin, handle_bb.ymax, bb.ymin, bb.ymax) < 1.0:
+                continue
+            d = min_dist(handle, s)
+            key = (d, -vol, j)
+            if best is None or key < best:
+                best = key
+
+        if best is None:
+            print("WARNING: No nearby coffeepot candidate found; returning original.")
+            return wp
+
+        d, negv, pot_idx = best
+        print(f"No intersection detected. Nearest candidate idx={pot_idx} dist={d:.6f}mm")
+        if d >= clearance_gap:
+            print(f"Clearance already >= {clearance_gap}mm and no intersection; no modification applied.")
+            return wp
+        pot_tool_parts = [solids[pot_idx]]
+
+    # Build tool body (compound of all colliding parts)
+    tool_body = cq.Compound.makeCompound(pot_tool_parts)
+
+    # --- Create keep-out tool (offset outward) ---
+    needed = clearance_gap + safety
+    keepout = None
+
+    try:
+        from OCP.BRepOffsetAPI import BRepOffsetAPI_MakeOffsetShape
+        mk = BRepOffsetAPI_MakeOffsetShape(tool_body.wrapped, float(needed), 1.0e-3)
+        mk.Perform()
+        keepout = cq.Shape(mk.Shape())
+        print(f"Created keep-out by 3D offset: {needed:.3f}mm")
+    except Exception as e:
+        print(f"Offset keep-out failed; falling back to scaling. Reason: {e}")
+
+    if keepout is None:
+        bb = tool_body.BoundingBox()
+        c = bb.center
+        r = 0.5 * max(bb.xlen, bb.ylen, bb.zlen)
+        if r < 1e-6:
+            print("WARNING: Tool bbox degenerate; returning original.")
+            return wp
+        scale = 1.0 + (needed / r)
+        keepout = tool_body.translate((-c.x, -c.y, -c.z)).scale(scale).translate((c.x, c.y, c.z))
+        print(f"Created keep-out by scaling: scale={scale:.6f} (approx)")
+
+    # --- Cut handle with keep-out ---
+    # (This is the most robust way to guarantee clearance without needing face IDs)
+    try:
+        handle_cut_raw = handle.cut(keepout)
+    except Exception as e:
+        raise RuntimeError(f"Handle cut failed: {e}")
+
+    # Keep largest resulting solid as handle
+    cand = list(handle_cut_raw.Solids()) if hasattr(handle_cut_raw, "Solids") else []
+    if not cand:
+        handle_cut = handle_cut_raw
+    else:
+        handle_cut = max(cand, key=lambda s: float(s.Volume()))
+        if len(cand) > 1:
+            print(f"Cut produced {len(cand)} solids; keeping largest as handle.")
+
+    # --- Validate: no intersection + min clearance ---
+    post_iv = common_volume(handle_cut, tool_body)
+    post_d = min_dist(handle_cut, tool_body)
+    print(f"Post-edit intersection volume(handle, coffeepot_tool) = {post_iv:.6f} mm^3")
+    print(f"Post-edit min distance(handle, coffeepot_tool) = {post_d:.6f} mm")
+
+    if post_iv > inter_vol_tol:
+        print("WARNING: Still intersecting after cut; consider increasing safety or using larger tool set.")
+    if post_d < (clearance_gap - 1e-3):
+        print("WARNING: Clearance still below target after cut; consider larger offset.")
+
+    # --- Rebuild compound with updated handle ---
+    new_solids = []
+    for k, s in enumerate(solids):
+        new_solids.append(handle_cut if k == handle_idx else s)
+
+    result = cq.Compound.makeCompound(new_solids)
+    print("Updated handle to remove collision / enforce clearance.")
+    return result
+
+
+Program output:
+stdout: Loading function from: /home/adml/Research/Hackathon2026/IDETC26-Hackathon-Autodesk-neuralCAD-Edit/output/gpt-5.2-ours-full48/gpt-5.2-ours_cadquery-script_1787051007.4581766/brep_end/1787051007.4581766/temp_script.py
+Loaded STEP: /home/adml/Research/Hackathon2026/IDETC26-Hackathon-Autodesk-neuralCAD-Edit/data/edit_192_external/breps/3YH2WFSRM22W7DKT_1769783424.5735083.step
+Root valid: True
+Solids found: 20
+Solid[0]: vol=6519959.271 mm^3, bbox=(203.20,355.60,254.00), center=(0.00,177.80,0.00)
+Solid[1]: vol=283249.276 mm^3, bbox=(152.40,12.70,165.10), center=(0.00,32.71,44.45)
+Solid[2]: vol=258216.959 mm^3, bbox=(190.50,6.35,245.12), center=(0.03,359.50,6.14)
+Solid[3]: vol=52563.292 mm^3, bbox=(165.10,6.35,107.95), center=(0.50,350.66,-55.95)
+Solid[4]: vol=196.645 mm^3, bbox=(10.16,3.81,5.08), center=(0.50,355.74,-60.40)
+Solid[5]: vol=45348.634 mm^3, bbox=(165.10,6.35,107.95), center=(0.50,350.66,-55.95)
+Solid[6]: vol=113222.134 mm^3, bbox=(177.80,5.08,228.60), center=(-0.00,345.44,0.00)
+Solid[7]: vol=119603.947 mm^3, bbox=(120.65,8.89,198.90), center=(-6.53,337.20,-21.99)
+Solid[8]: vol=189558.701 mm^3, bbox=(177.80,104.14,139.70), center=(-5.55,276.37,13.80)
+Solid[9]: vol=79857.519 mm^3, bbox=(136.83,76.20,136.83), center=(-5.55,272.56,13.80)
+Solid[10]: vol=1209.815 mm^3, bbox=(120.65,2.54,120.65), center=(0.00,37.15,25.40)
+Solid[11]: vol=102147.875 mm^3, bbox=(124.46,139.70,125.73), center=(0.00,108.27,24.77)
+Solid[12]: vol=41068.593 mm^3, bbox=(20.32,91.44,38.10), center=(0.00,93.98,102.87)
+Solid[13]: vol=279030.963 mm^3, bbox=(121.93,25.40,121.93), center=(0.00,190.82,25.40)
+Solid[14]: vol=22321.929 mm^3, bbox=(25.40,101.60,25.40), center=(0.00,279.40,-82.55)
+Solid[15]: vol=4349.388 mm^3, bbox=(17.78,17.78,25.40), center=(-19.05,11.43,-130.16)
+Solid[16]: vol=4349.388 mm^3, bbox=(17.78,17.78,25.40), center=(19.05,11.43,-130.16)
+Solid[17]: vol=295929.467 mm^3, bbox=(254.00,25.40,190.50), center=(0.00,292.10,-57.15)
+Solid[18]: vol=7873.625 mm^3, bbox=(171.63,3.30,229.37), center=(-69.77,31.75,-152.79)
+Solid[19]: vol=1845.825 mm^3, bbox=(24.80,5.08,27.74), center=(-157.56,33.02,-276.85)
+Handle candidate indices: [17]
+Handle collision candidates (intersection volume mm^3):
+No intersection detected. Nearest candidate idx=8 dist=18.547669mm
+Clearance already >= 2.0mm and no intersection; no modification applied.
+Exported shape to: /home/adml/Research/Hackathon2026/IDETC26-Hackathon-Autodesk-neuralCAD-Edit/output/gpt-5.2-ours-full48/gpt-5.2-ours_cadquery-script_1787051007.4581766/brep_end/1787051007.4581766/tmp.step
+Exported STL to: /home/adml/Research/Hackathon2026/IDETC26-Hackathon-Autodesk-neuralCAD-Edit/output/gpt-5.2-ours-full48/gpt-5.2-ours_cadquery-script_1787051007.4581766/brep_end/1787051007.4581766/tmp.stl
+Exported PNG image to: /home/adml/Research/Hackathon2026/IDETC26-Hackathon-Autodesk-neuralCAD-Edit/output/gpt-5.2-ours-full48/gpt-5.2-ours_cadquery-script_1787051007.4581766/brep_end/1787051007.4581766/tmp.png
+Script completed.
+
+stderr: 
+
+Exported this iteration:
+tmp.step, tmp.stl, tmp.png, tmp_front.png, tmp_back.png, tmp_left.png, tmp_right.png, tmp_top.png, tmp_bottom.png, tmp_toprightiso.png

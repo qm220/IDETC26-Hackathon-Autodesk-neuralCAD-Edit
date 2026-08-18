@@ -8,8 +8,7 @@ The code file should define:
         return shape   # Workplane, Shape, or Assembly
 
 Writes result.step, result.stl, cadquery_output.txt (stdout/stderr from
-my_cad_function), and one PNG per view (front, back, left, right, top,
-bottom, toprightiso, bottomleftiso).
+my_cad_function), and one PNG per view (+Z, -Z, -X, +X, +Y, -Y, iso1, iso2).
 
     uv run python experiment/run_cadquery.py \\
       --input path/to/model.step \\
@@ -33,18 +32,9 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
-from src.utils.cadquery_rendering import VIEW_PROJECTIONS, render_to_png
+from src.utils.cadquery_rendering import STANDARD_VIEWS, projection_for_view, render_to_png
 
-VIEWS = (
-    "front",
-    "back",
-    "left",
-    "right",
-    "top",
-    "bottom",
-    "toprightiso",
-    "bottomleftiso",
-)
+VIEWS = STANDARD_VIEWS
 CADQUERY_LOG_NAME = "cadquery_output.txt"
 
 
@@ -86,6 +76,8 @@ def _load_function(code_path: Path):
         "os": os,
         "sys": sys,
         "__builtins__": __builtins__,
+        "__name__": "__main__",
+        "__file__": str(code_path),
     }
     exec(source, exec_globals)
     if "my_cad_function" not in exec_globals:
@@ -109,7 +101,7 @@ def _export_views(result, output_dir: Path, stem: str = "result") -> list[Path]:
     written = []
     for view_name in VIEWS:
         png_path = output_dir / f"{stem}_{view_name}.png"
-        render_to_png(shape, png_path, proj=VIEW_PROJECTIONS[view_name], width=1024, height=1024)
+        render_to_png(shape, png_path, proj=projection_for_view(view_name), width=1024, height=1024)
         written.append(png_path)
         print(f"Wrote {png_path}")
     return written

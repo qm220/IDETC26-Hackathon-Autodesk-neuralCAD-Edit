@@ -1,0 +1,302 @@
+Thinking text:
+**Analyzing Pocket Geometry**
+
+I'm working with coordinates: x ±10, y ±30, and z ±7.5, and noting pocket walls at x=±8 and y=±28. This suggests that any edge with |x|<8, |y|<28, and z between the bottom and top likely belongs to the pocket interior, although it’s not definite. There are also holes at (0,±15) with a radius of 1.5, leading me to think that edges around these holes would be considered concave internal. I'll classify edges based on whether they’re on the outer boundary or the boss perimeter.
+**Defining Edge Classifications**
+
+I'm categorizing edges based on their midpoints. An edge is considered outer if the midpoint has |x| >= xMax - tolerance or |y| >= yMax - tolerance, indicating it's part of the outer shell. Additionally, if the midpoint is near the boss's cylinder perimeter, I can calculate the distance in the XY plane. For inner edges, I'm focusing on pocket edges near |x| 8 or |y| 28, hole edges near inner radius 1.5, and intersection edges with pocket ceilings. After that, I’ll apply fillets based on specified radii while excluding bottom plane edges.
+**Identifying Face Normals**
+
+I'm working on identifying faces where the normal at the center has an absolute z-component of less than 0.2. For cylindrical faces, the normal typically points radially, allowing for a small z-component if the face isn't drafted, which can be around zero. I'll avoid selecting the top saddle cylindrical face since its normal varies; it points upwards with a positive z-component, so that’s out. The pocket ceiling normal faces downward, also excluded, while curved vertical faces like the boss sides are selected since their n.z equals zero. Then, there's the draft hinge plane on the bottom face at zmin, with the pull direction in the +Z axis.
+**Considering Face Geometry After Additions**
+
+After scaling and adding bosses, the bottom face may remain with unions adding circular faces. The bases of the bosses merge with this bottom face, so edges will stay. However, the hinge plane should still be planar at zmin. I’m thinking of defining a neutral plane using `cq.Face.makePlane` which takes a `Face`, likely using the largest planar face at minZ. This would be the bottom face excluding openings, despite possibly having multiple planar faces. I'll exclude bottom edges from the fillet while ensuring the largest face for the hinge is the outer frame. Drafting vertical faces after the union and cut might be tricky, but I think it’s manageable.
+**Planning Bosses and Extrusion**
+
+I need to scale the shape 10x first before processing actions like drafting and adding cylinders. After scaling, I’ll ensure dimensions stay in mm since the original units might have been in inches. The fillet radii of 1 and 3 will be in mm. The cylinders should start at the flat bottom surface and reach the part wall; however, it’s crucial they don’t exceed the saddle surface. I can’t extrude too high; instead, I should use an intersection method to ensure the bosses are flush with the top saddle while not protruding above it. Using a boolean intersection is the plan here, ensuring we’re just adding material inside the existing geometry. If bosses occupy an empty pocket, I’ll need to adjust my approach accordingly.
+**Defining Boss Extensions in the Shape**
+
+We need the bosses to extend from the bottom plane through the window cavity up to the top region, hitting the internal boundary without exceeding it. These bosses should start flush with the outer bottom across the opening. They won't be within the original solid, so I need to ensure they only occupy the cavity. 
+
+I’ll create long cylinders from the bottom upward and trim them using a boolean intersection with the solid to maintain the external shape. To accurately compute the height of the bosses, I’ll find the intersection of a vertical line with the solid using CadQuery's methods. My approach ensures they meet the top surface without protruding, while also being robust enough to handle various geometries.
+**Calculating Boss Heights and Drafting**
+
+I’m figuring out the intersection of the line with the solid to ensure the bosses start from the bottom plane and extend up through the window cavity. I’ll use `solid.intersect(lineEdge)` to find the segment where the edge lies inside the solid. 
+
+I'll compute the maximum z-coordinate from the intersection and fallback to the top if necessary. Drafting will be applied after adding the bosses, but I need to ensure that the changes won’t affect the bottom plane. I'll also need to manage how fillets are applied to different features to maintain the integrity of the design.
+**Creating Boss Functions and Drafting Edges**
+
+I’m working on a `z_top_at(x,y)` function to determine the height for bosses by creating a line and checking the intersection with the solid. If there's no valid intersection, I'll adjust accordingly. Once I have the height, I’ll extrude the bosses and union them with the solid.
+
+After that, I need to find the bottom face for drafting vertical faces. I’ll also classify edges for filleting and ensure I'm excluding the right edges, especially those on the bottom. Lastly, I’ll implement error handling and ensure the geometries are properly combined.
+**Implementing Union and Cut Operations**
+
+I need to implement the union and cut operations for my shapes. To do this, I’ll wrap the `scaled_solid` into a Workplane and perform the union with the bosses. It might be simpler to use the `.fuse()` method on shapes themselves, which could help maintain robustness during operations. 
+
+For creating the boss solid, I’ll use a circle extrusion, and then I’ll fuse it with my scaled solid. Similarly, for holes, I can cut them out in the same way. Finally, for drafting and filleting, I’ll use Workplane methods to ensure I get the right results.
+
+Generated script:
+def my_cad_function(args):
+    import cadquery as cq
+    import os, math
+
+    if "input_file" not in args:
+        raise ValueError("Missing args['input_file']")
+
+    input_file = os.path.expanduser(args["input_file"])
+    wp_in = cq.importers.importStep(input_file)
+    shp_in = wp_in.val()
+
+    # Try to ensure we are working with a single solid when possible
+    try:
+        shp_in = cq.Workplane(obj=shp_in).combineSolids().val()
+    except Exception:
+        pass
+
+    print(f"[DBG] Imported shape type: {type(shp_in)}")
+
+    # --- 1) Scale entire part uniformly 10x about origin ---
+    if hasattr(shp_in, "scale"):
+        solid = shp_in.scale(10.0)
+    else:
+        # Fallback using Workplane/Assembly transform if Shape.scale is unavailable
+        # (rare in CQ2, but keep a guard)
+        tr = cq.Matrix(
+            [[10.0, 0.0, 0.0, 0.0],
+             [0.0, 10.0, 0.0, 0.0],
+             [0.0, 0.0, 10.0, 0.0],
+             [0.0, 0.0, 0.0, 1.0]]
+        )
+        solid = shp_in.transformGeometry(tr)
+
+    bb = solid.BoundingBox()
+    print(f"[DBG] After scale bbox: x=({bb.xmin:.3f},{bb.xmax:.3f}) y=({bb.ymin:.3f},{bb.ymax:.3f}) z=({bb.zmin:.3f},{bb.zmax:.3f})")
+
+    bottom_z = bb.zmin
+    top_z = bb.zmax
+
+    # Helpers
+    def _is_planar_face(f):
+        try:
+            return f.geomType() == "PLANE"
+        except Exception:
+            return False
+
+    def _face_normal_at_center(f):
+        c = f.Center()
+        try:
+            return f.normalAt(c)
+        except Exception:
+            return f.normalAt()
+
+    def _find_bottom_hinge_face(s):
+        zmin = s.BoundingBox().zmin
+        cands = []
+        for f in s.Faces():
+            if not _is_planar_face(f):
+                continue
+            fbb = f.BoundingBox()
+            if abs(fbb.zmin - zmin) < 1e-3 and abs(fbb.zmax - zmin) < 1e-3:
+                n = _face_normal_at_center(f)
+                if n.z < -0.9:
+                    cands.append(f)
+        if not cands:
+            return None
+        return max(cands, key=lambda ff: ff.Area())
+
+    def _edge_on_bottom(e, zmin_ref, t=1e-3):
+        ebb = e.BoundingBox()
+        return abs(ebb.zmin - zmin_ref) < t and abs(ebb.zmax - zmin_ref) < t
+
+    def _edge_mid(e):
+        try:
+            return e.Center()
+        except Exception:
+            ebb = e.BoundingBox()
+            return cq.Vector((ebb.xmin + ebb.xmax) / 2.0, (ebb.ymin + ebb.ymax) / 2.0, (ebb.zmin + ebb.zmax) / 2.0)
+
+    # --- 5) Add two cylinder features (OD=6, ID=3), spaced 30mm, centered ---
+    # Interpreting spacing along Y (symmetric): (0, ±15)
+    pts = [(0.0, 15.0), (0.0, -15.0)]
+    boss_r = 3.0
+    hole_r = 1.5
+
+    # Determine boss height by intersecting a vertical line at each center with the (scaled) solid.
+    # This yields the top surface z at that XY, so boss reaches the top wall without protruding.
+    def _top_z_at_xy(s, x, y, z_lo, z_hi):
+        line = cq.Edge.makeLine(cq.Vector(x, y, z_lo), cq.Vector(x, y, z_hi))
+        try:
+            common = s.intersect(line)
+            # common is the portion of the line inside the solid; its zmax corresponds to exit at top.
+            cbb = common.BoundingBox()
+            if (cbb.zmax - cbb.zmin) < 1e-6 and abs(cbb.zmax) < 1e-9:
+                # heuristic for empty-ish result
+                return None
+            return cbb.zmax
+        except Exception:
+            return None
+
+    z_lo = bottom_z - 5.0
+    z_hi = top_z + 5.0
+
+    for (x, y) in pts:
+        zt = _top_z_at_xy(solid, x, y, z_lo, z_hi)
+        if zt is None:
+            zt = top_z
+            print(f"[DBG] WARN: Could not ray-intersect top at ({x},{y}); using top_z={top_z:.3f}")
+        height = max(0.1, zt - bottom_z)
+
+        base_plane = cq.Plane(origin=(0, 0, bottom_z), normal=(0, 0, 1), xDir=(1, 0, 0))
+
+        boss = cq.Workplane(base_plane).center(x, y).circle(boss_r).extrude(height).val()
+        solid = solid.fuse(boss)
+
+        hole = cq.Workplane(base_plane).center(x, y).circle(hole_r).extrude(height).val()
+        solid = solid.cut(hole)
+
+        print(f"[DBG] Boss at ({x:.1f},{y:.1f}) height={height:.3f} (bottom_z={bottom_z:.3f} -> z_top={zt:.3f})")
+
+    # --- 2) Apply 2° draft to all vertical surfaces, hinge = bottom face, pull +Z ---
+    hinge_face = _find_bottom_hinge_face(solid)
+    if hinge_face is None:
+        print("[DBG] WARN: bottom hinge face not found; skipping draft")
+    else:
+        vertical_faces = []
+        for f in solid.Faces():
+            # Identify vertical-ish faces by normal at center (works for planar and cylindrical)
+            try:
+                n = _face_normal_at_center(f)
+            except Exception:
+                continue
+            if abs(n.z) < 0.2:
+                vertical_faces.append(f)
+
+        print(f"[DBG] Vertical faces selected for draft: {len(vertical_faces)}")
+
+        if vertical_faces:
+            try:
+                solid = (
+                    cq.Workplane(obj=solid)
+                    .newObject(vertical_faces)
+                    .draft(2.0, hinge_face, cq.Vector(0, 0, 1))
+                    .val()
+                )
+                print("[DBG] Draft applied")
+            except Exception as e:
+                print(f"[DBG] WARN: Draft failed; continuing without draft. Error: {e}")
+
+    # --- 3 & 4) Fillets: inner R=1, outer R=3; exclude any edges on the flat bottom surface ---
+    bb2 = solid.BoundingBox()
+    xMax = max(abs(bb2.xmin), abs(bb2.xmax))
+    yMax = max(abs(bb2.ymin), abs(bb2.ymax))
+    zmin2 = bb2.zmin
+
+    # Classify edges with simple geometric heuristics + boss perimeter detection
+    all_edges = list(solid.Edges())
+    non_bottom_edges = [e for e in all_edges if not _edge_on_bottom(e, zmin2, t=1e-3)]
+
+    # Tolerances for classification
+    shell_tol = 0.35  # mm
+    boss_tol = 0.60
+
+    outer_shell_edges = []
+    outer_boss_edges = []
+    inner_edges = []
+
+    for e in non_bottom_edges:
+        m = _edge_mid(e)
+        # Outer shell proximity (by x/y extremes)
+        near_shell = (abs(abs(m.x) - xMax) < shell_tol) or (abs(abs(m.y) - yMax) < shell_tol)
+
+        # Boss outer perimeter proximity in XY
+        near_boss_outer = False
+        for (cx, cy) in pts:
+            d = math.hypot(m.x - cx, m.y - cy)
+            if abs(d - boss_r) < boss_tol:
+                near_boss_outer = True
+                break
+
+        if near_shell:
+            outer_shell_edges.append(e)
+        elif near_boss_outer:
+            outer_boss_edges.append(e)
+        else:
+            inner_edges.append(e)
+
+    print(
+        f"[DBG] Edge counts (excluding bottom edges): total={len(non_bottom_edges)} "
+        f"outer_shell={len(outer_shell_edges)} outer_boss={len(outer_boss_edges)} inner={len(inner_edges)}"
+    )
+
+    # Apply outer fillets first (R=3)
+    if outer_shell_edges:
+        try:
+            solid = cq.Workplane(obj=solid).newObject(outer_shell_edges).fillet(3.0).val()
+            print("[DBG] Outer fillet R=3 applied (shell)")
+        except Exception as e:
+            print(f"[DBG] WARN: Outer shell fillet R=3 failed. Error: {e}")
+
+    if outer_boss_edges:
+        try:
+            solid = cq.Workplane(obj=solid).newObject(outer_boss_edges).fillet(3.0).val()
+            print("[DBG] Outer fillet R=3 applied (bosses)")
+        except Exception as e:
+            print(f"[DBG] WARN: Outer boss fillet R=3 failed. Error: {e}")
+
+    # Recompute bottom z (fillet doesn't touch it, but keep consistent)
+    zmin3 = solid.BoundingBox().zmin
+
+    # Apply inner fillets (R=1), excluding bottom edges again
+    inner_edges2 = [e for e in solid.Edges() if not _edge_on_bottom(e, zmin3, t=1e-3)]
+
+    # Reduce the inner set: avoid re-fillet obvious outer boundaries (x/y extremes, bosses outer)
+    filtered_inner = []
+    bb3 = solid.BoundingBox()
+    xMax3 = max(abs(bb3.xmin), abs(bb3.xmax))
+    yMax3 = max(abs(bb3.ymin), abs(bb3.ymax))
+    for e in inner_edges2:
+        m = _edge_mid(e)
+        near_shell = (abs(abs(m.x) - xMax3) < shell_tol) or (abs(abs(m.y) - yMax3) < shell_tol)
+        near_boss_outer = False
+        for (cx, cy) in pts:
+            d = math.hypot(m.x - cx, m.y - cy)
+            if abs(d - boss_r) < boss_tol:
+                near_boss_outer = True
+                break
+        if not near_shell and not near_boss_outer:
+            filtered_inner.append(e)
+
+    print(f"[DBG] Inner-edge candidates for R=1 (excluding bottom & likely-outer): {len(filtered_inner)}")
+
+    if filtered_inner:
+        try:
+            solid = cq.Workplane(obj=solid).newObject(filtered_inner).fillet(1.0).val()
+            print("[DBG] Inner fillet R=1 applied")
+        except Exception as e:
+            print(f"[DBG] WARN: Inner fillet R=1 failed. Error: {e}")
+
+    return cq.Workplane(obj=solid)
+
+
+Program output:
+stdout: Loading function from: /home/adml/Research/Hackathon2026/IDETC26-Hackathon-Autodesk-neuralCAD-Edit/output/gpt-5.2-ours-full48/gpt-5.2-ours_cadquery-script_1787034171.768457/brep_end/1787034171.768457/temp_script.py
+[DBG] Imported shape type: <class 'cadquery.occ_impl.shapes.Solid'>
+[DBG] After scale bbox: x=(-10.000,10.000) y=(-30.000,30.000) z=(-7.500,7.500)
+[DBG] Boss at (0.0,15.0) height=10.259 (bottom_z=-7.500 -> z_top=2.759)
+[DBG] Boss at (0.0,-15.0) height=10.259 (bottom_z=-7.500 -> z_top=2.759)
+[DBG] Vertical faces selected for draft: 14
+[DBG] WARN: Draft failed; continuing without draft. Error: 'Workplane' object has no attribute 'draft'
+[DBG] Edge counts (excluding bottom edges): total=48 outer_shell=12 outer_boss=2 inner=34
+[DBG] Outer fillet R=3 applied (shell)
+[DBG] WARN: Outer boss fillet R=3 failed. Error: There are no suitable edges for chamfer or fillet
+[DBG] Inner-edge candidates for R=1 (excluding bottom & likely-outer): 58
+[DBG] WARN: Inner fillet R=1 failed. Error: BRep_API: command not done
+Exported shape to: /home/adml/Research/Hackathon2026/IDETC26-Hackathon-Autodesk-neuralCAD-Edit/output/gpt-5.2-ours-full48/gpt-5.2-ours_cadquery-script_1787034171.768457/brep_end/1787034171.768457/tmp.step
+Exported STL to: /home/adml/Research/Hackathon2026/IDETC26-Hackathon-Autodesk-neuralCAD-Edit/output/gpt-5.2-ours-full48/gpt-5.2-ours_cadquery-script_1787034171.768457/brep_end/1787034171.768457/tmp.stl
+Exported PNG image to: /home/adml/Research/Hackathon2026/IDETC26-Hackathon-Autodesk-neuralCAD-Edit/output/gpt-5.2-ours-full48/gpt-5.2-ours_cadquery-script_1787034171.768457/brep_end/1787034171.768457/tmp.png
+Script completed.
+
+stderr: 
+
+Exported this iteration:
+tmp.step, tmp.stl, tmp.png, tmp_front.png, tmp_back.png, tmp_left.png, tmp_right.png, tmp_top.png, tmp_bottom.png, tmp_toprightiso.png

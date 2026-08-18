@@ -1,0 +1,843 @@
+Now use all the given information:
+1. model.json file
+2. operation.json file
+3. Multiview images
+
+Decide which sections of the original model should be modified, removed, interacted with or if new sections should be created. Use as much information from the Multiview images, model.json files and operation.json as possible.
+
+Make this decision from several perspectives. If target clearly identify geometry, locate the corresponding section(s) and face(s) in model.json. If there is no clear geometry identified, use the referenced features and relational_constraint to identify potential sections and features. Additionally, consider the intention of the edit. Based on the function and behavior associated with each section and features, decide which section require the action the most. Then, find the corresponding section and face code from model.json.
+
+Plan out the modeling procedure needed to perform each action. Describe them in professional CAD modelling languages from choosing the plane, draw sketches to extrusion, add chamfers. Be thorough and detailed.
+
+face_code values in model.json are visual labels from shaded renders. Brep_id is the CadQuery Faces() index from the STEP analysis report (for example FACE 0).
+
+Edit operation.json accordingly. Keep the previous request_wording and actions, and add localization plus steps.
+
+OUTPUT FORMAT (JSON, operation.json, no markdown fences, use this schema):
+{
+  "request": "",
+  "request_wording": {
+    "action_words": ["..."],
+    "referenced_feature_words": ["..."],
+    "intention_words": ["..."],
+    "grammatical_words": ["..."]
+  },
+  "actions": [
+    {
+      "operation": "...",
+      "parameters": {
+        "parameter_name": "..."
+      },
+      "target": "...",
+      "relational_constraint": "...",
+      "unresolved_reference": "...",
+      "target section code": ["..."],
+      "target face code": ["..."],
+      "steps": [
+        "...",
+        "..."
+      ]
+    }
+  ],
+  "intention": ["..."]
+}
+
+The model.json, operation.json, and labeled multi-view images follow.
+
+
+model.json:
+
+{
+  "part": {
+    "name": "Dual-fan radiator and heat-exchanger assembly",
+    "description": "Rectangular finned heat exchanger with upper and lower structural tanks/rails, two axial cooling fans with protective guards, two coolant hose fittings, external mounting pads, and a top fill/bleed cap. The STEP report describes a non-valid multi-solid model containing 20 solids and 799 faces; consequently, several visually complex components are represented as separate or single-face solids.",
+    "source_views": [
+      "front",
+      "back",
+      "left",
+      "right",
+      "top",
+      "bottom",
+      "toprightiso"
+    ],
+    "symmetry_note": "The two fan stations are approximately mirror-symmetric about the central vertical plane of the rectangular radiator. The fan guards, hubs, and seven-blade rotors repeat at STEP z coordinates near -133.35 mm and +133.35 mm. Coolant fittings and several mounting/cap features break the overall symmetry."
+  },
+  "Section": [
+    {
+      "id": "S01",
+      "name": "Radiator core and perimeter frame",
+      "features included": [
+        "rectangular finned heat-exchange core",
+        "upper tank or rail",
+        "lower tank or rail",
+        "left and right end plates",
+        "rounded and chamfered outer corners",
+        "central bridge between fan stations",
+        "interfaces supporting both fan assemblies"
+      ],
+      "function intent": "Contain and support the heat-exchange core, provide a stiff rectangular installation envelope, route thermal-fluid loads through the radiator body, and provide the base interface for both fan assemblies.",
+      "physical behavior": "The broad core region transfers heat to air passing through the fins. The upper and lower rails resist bending and distribute fan vibration and mounting loads. End plates close the core envelope and react coolant pressure and handling loads. Rounded transitions reduce local stress concentration and improve impact resistance.",
+      "geometry": "A wide, thin rectangular body with broad front and rear core planes, long upper and lower rails, planar end closures, shallow side walls, rounded lower corners, chamfered upper corners, and a narrow central bridge. The visible heat-transfer field contains a dense horizontal fin matrix.",
+      "location": "Central rectangular body spanning the full width and height of the assembly, behind both fans.",
+      "colour": {
+        "R": 130,
+        "G": 170,
+        "B": 210
+      },
+      "major_faces": [
+        {
+          "face_code": "0000",
+          "name": "Primary core-side plane",
+          "Brep_id": "FACE 0",
+          "description": "Large planar core-side surface containing multiple internal wire boundaries for attached or penetrating features."
+        },
+        {
+          "face_code": "0001",
+          "name": "Forward core sheet",
+          "Brep_id": "FACE 5",
+          "description": "Large rectangular plane covering the principal heat-exchanger field at one depth level."
+        },
+        {
+          "face_code": "0002",
+          "name": "Rear core sheet",
+          "Brep_id": "FACE 12",
+          "description": "Opposed large rectangular plane defining the other principal depth side of the core."
+        },
+        {
+          "face_code": "0003",
+          "name": "Lower outer rail wall",
+          "Brep_id": "FACE 22",
+          "description": "Long planar wall on the rounded lower tank or perimeter rail."
+        },
+        {
+          "face_code": "0004",
+          "name": "Lower left corner band",
+          "Brep_id": "FACE 21",
+          "description": "Cylindrical quarter-round transition joining the lower rail to one end of the frame."
+        },
+        {
+          "face_code": "0005",
+          "name": "Positive-end closure",
+          "Brep_id": "FACE 24",
+          "description": "Broad planar end surface closing one side of the radiator perimeter."
+        },
+        {
+          "face_code": "0006",
+          "name": "Upper positive corner blend",
+          "Brep_id": "FACE 49",
+          "description": "Cylindrical blend joining the upper rail to the positive-end closure."
+        },
+        {
+          "face_code": "0007",
+          "name": "Upper outer rail wall",
+          "Brep_id": "FACE 46",
+          "description": "Long planar exterior wall of the upper tank or structural rail."
+        },
+        {
+          "face_code": "0008",
+          "name": "Upper negative corner blend",
+          "Brep_id": "FACE 43",
+          "description": "Cylindrical blend at the opposite upper end of the frame."
+        },
+        {
+          "face_code": "0009",
+          "name": "Negative-end closure",
+          "Brep_id": "FACE 42",
+          "description": "Broad planar end surface closing the opposite side of the radiator perimeter."
+        },
+        {
+          "face_code": "0010",
+          "name": "Rear lower rail face",
+          "Brep_id": "FACE 30",
+          "description": "Large planar depth-facing surface associated with the lower perimeter rail."
+        },
+        {
+          "face_code": "0011",
+          "name": "Forward upper rail face",
+          "Brep_id": "FACE 60",
+          "description": "Large planar depth-facing surface associated with the upper perimeter rail and its end transitions."
+        }
+      ],
+      "minor_faces_Brep_id": [
+        "FACE 1-FACE 4",
+        "FACE 6-FACE 11",
+        "FACE 13-FACE 20",
+        "FACE 23",
+        "FACE 25-FACE 29",
+        "FACE 31-FACE 41",
+        "FACE 44-FACE 45",
+        "FACE 47-FACE 48",
+        "FACE 50-FACE 59",
+        "FACE 61-FACE 71"
+      ],
+      "relationships": [
+        {
+          "source id": "S01",
+          "target id": "S02",
+          "function relationship": "supports; locates_mating_part; distributes_stress",
+          "structural relationship": "attached_to; adjacent_to; supports"
+        },
+        {
+          "source id": "S01",
+          "target id": "S03",
+          "function relationship": "supports; locates_mating_part; distributes_stress",
+          "structural relationship": "attached_to; adjacent_to; supports"
+        },
+        {
+          "source id": "S01",
+          "target id": "S06",
+          "function relationship": "routes_fluid; locates_mating_part; seals_against",
+          "structural relationship": "attached_to; blends_into"
+        },
+        {
+          "source id": "S01",
+          "target id": "S07",
+          "function relationship": "mounts_to; transmits_load; constrains_dof",
+          "structural relationship": "attached_to; supports"
+        },
+        {
+          "source id": "S01",
+          "target id": "S08",
+          "function relationship": "locates_mating_part; seals_against; provides_service_access",
+          "structural relationship": "attached_to; contained_in"
+        }
+      ]
+    },
+    {
+      "id": "S02",
+      "name": "Left fan guard and hub",
+      "features included": [
+        "left circular protective guard",
+        "concentric guard rings",
+        "radial guard spokes",
+        "outer shroud ring",
+        "central motor or bearing hub",
+        "hub bezel and annular steps",
+        "rotor clearance cavity"
+      ],
+      "function intent": "Protect the left rotating fan, locate the rotor and motor axis relative to the radiator core, guide airflow through the left core region, and prevent accidental contact with the blades.",
+      "physical behavior": "Concentric rings and radial spokes form a stiff open cage that resists finger or debris intrusion while allowing airflow. The central hub reacts rotor thrust, torque, imbalance, and vibration. Annular transitions distribute load between the hub and guard structure, while the surrounding cavity maintains blade-tip clearance.",
+      "geometry": "A shallow circular cage centered on one half of the radiator. It contains multiple concentric rings, curved radial spokes, a large outer cylindrical ring, and a stepped central cylindrical/toric hub. This fan station corresponds primarily to the STEP region centered near z=-133.35 mm.",
+      "location": "One half of the fan-facing side of the radiator, centered near STEP z=-133.35 mm.",
+      "colour": {
+        "R": 45,
+        "G": 120,
+        "B": 190
+      },
+      "major_faces": [
+        {
+          "face_code": "0012",
+          "name": "Outer rear shroud cylinder",
+          "Brep_id": "FACE 72",
+          "description": "Large cylindrical patch defining the rear outer boundary of the left fan station."
+        },
+        {
+          "face_code": "0013",
+          "name": "Rear guard web",
+          "Brep_id": "FACE 77",
+          "description": "Large multiply-trimmed B-spline surface representing a principal left guard or shroud web."
+        },
+        {
+          "face_code": "0014",
+          "name": "Front guard web",
+          "Brep_id": "FACE 139",
+          "description": "Opposed large B-spline guard surface containing numerous openings from rings and spokes."
+        },
+        {
+          "face_code": "0015",
+          "name": "Central hub barrel",
+          "Brep_id": "FACE 161",
+          "description": "Cylindrical central hub surface coaxial with the left fan rotor."
+        },
+        {
+          "face_code": "0016",
+          "name": "Hub front annulus",
+          "Brep_id": "FACE 324",
+          "description": "Planar annular hub face containing the central opening and surrounding stepped boundary."
+        },
+        {
+          "face_code": "0017",
+          "name": "Hub outer bezel",
+          "Brep_id": "FACE 327",
+          "description": "Broad toroidal transition around the left fan hub."
+        },
+        {
+          "face_code": "0018",
+          "name": "Outer guard ring cylinder",
+          "Brep_id": "FACE 334",
+          "description": "Large cylindrical surface forming the outer circular guard ring adjacent to the radiator."
+        },
+        {
+          "face_code": "0019",
+          "name": "Hub bore wall",
+          "Brep_id": "FACE 335",
+          "description": "Inner cylindrical wall of the central hub opening."
+        },
+        {
+          "face_code": "0020",
+          "name": "Hub rear disk",
+          "Brep_id": "FACE 336",
+          "description": "Planar rear-facing disk surface within the left hub."
+        },
+        {
+          "face_code": "0021",
+          "name": "Front guard torus",
+          "Brep_id": "FACE 339",
+          "description": "Large toroidal front rim surrounding the left hub and spoke terminations."
+        },
+        {
+          "face_code": "0022",
+          "name": "Inner hub fillet",
+          "Brep_id": "FACE 387",
+          "description": "Toroidal blend between the hub face and central cylindrical region."
+        },
+        {
+          "face_code": "0023",
+          "name": "Hub outer face",
+          "Brep_id": "FACE 389",
+          "description": "Planar front-facing annular surface at the outermost hub depth."
+        },
+        {
+          "face_code": "0024",
+          "name": "Hub center face",
+          "Brep_id": "FACE 390",
+          "description": "Planar circular center surface closing the visible left fan hub."
+        }
+      ],
+      "minor_faces_Brep_id": [
+        "FACE 73-FACE 76",
+        "FACE 78-FACE 138",
+        "FACE 140-FACE 160",
+        "FACE 162-FACE 323",
+        "FACE 325-FACE 326",
+        "FACE 328-FACE 333",
+        "FACE 337-FACE 338",
+        "FACE 340-FACE 386",
+        "FACE 388"
+      ],
+      "relationships": [
+        {
+          "source id": "S02",
+          "target id": "S01",
+          "function relationship": "mounts_to; transmits_load; guides_airflow",
+          "structural relationship": "attached_to; supported_by; adjacent_to"
+        },
+        {
+          "source id": "S02",
+          "target id": "S04",
+          "function relationship": "locates_mating_part; constrains_dof; provides_clearance; protects",
+          "structural relationship": "coaxial_with; contains; supports"
+        },
+        {
+          "source id": "S02",
+          "target id": "S03",
+          "function relationship": "shares_airflow_duty; distributes_cooling",
+          "structural relationship": "adjacent_to; offset_from"
+        }
+      ]
+    },
+    {
+      "id": "S03",
+      "name": "Right fan guard and hub",
+      "features included": [
+        "right circular protective guard",
+        "concentric guard rings",
+        "radial guard spokes",
+        "outer shroud ring",
+        "central motor or bearing hub",
+        "hub bezel and annular steps",
+        "rotor clearance cavity"
+      ],
+      "function intent": "Protect the right rotating fan, locate its rotor and motor axis relative to the radiator core, and guide airflow through the second half of the heat exchanger.",
+      "physical behavior": "The open ring-and-spoke cage carries impact and handling loads around the rotor without greatly obstructing airflow. The central stepped hub supports rotor thrust and radial loads. Cylindrical and toroidal transitions maintain concentricity and reduce stress concentration.",
+      "geometry": "A repeated shallow circular cage with concentric rings, radial spokes, an outer cylindrical shroud, and a stepped toric/cylindrical hub. This station corresponds primarily to the STEP region centered near z=+133.35 mm.",
+      "location": "The opposite half of the fan-facing side of the radiator, centered near STEP z=+133.35 mm.",
+      "colour": {
+        "R": 35,
+        "G": 175,
+        "B": 150
+      },
+      "major_faces": [
+        {
+          "face_code": "0025",
+          "name": "Outer rear shroud cylinder",
+          "Brep_id": "FACE 656",
+          "description": "Large cylindrical patch defining the rear outer boundary of the right fan station."
+        },
+        {
+          "face_code": "0026",
+          "name": "Rear guard web",
+          "Brep_id": "FACE 395",
+          "description": "Large multiply-trimmed B-spline surface representing a principal right guard or shroud web."
+        },
+        {
+          "face_code": "0027",
+          "name": "Front guard web",
+          "Brep_id": "FACE 457",
+          "description": "Opposed large B-spline guard surface containing numerous openings from rings and spokes."
+        },
+        {
+          "face_code": "0028",
+          "name": "Central hub barrel",
+          "Brep_id": "FACE 479",
+          "description": "Cylindrical central hub surface coaxial with the right fan rotor."
+        },
+        {
+          "face_code": "0029",
+          "name": "Hub front annulus",
+          "Brep_id": "FACE 642",
+          "description": "Planar annular hub face containing the central opening and surrounding stepped boundary."
+        },
+        {
+          "face_code": "0030",
+          "name": "Hub outer bezel",
+          "Brep_id": "FACE 645",
+          "description": "Broad toroidal transition around the right fan hub."
+        },
+        {
+          "face_code": "0031",
+          "name": "Outer guard ring cylinder",
+          "Brep_id": "FACE 652",
+          "description": "Large cylindrical surface forming the outer circular guard ring adjacent to the radiator."
+        },
+        {
+          "face_code": "0032",
+          "name": "Hub bore wall",
+          "Brep_id": "FACE 653",
+          "description": "Inner cylindrical wall of the central hub opening."
+        },
+        {
+          "face_code": "0033",
+          "name": "Hub rear disk",
+          "Brep_id": "FACE 654",
+          "description": "Planar rear-facing disk surface within the right hub."
+        },
+        {
+          "face_code": "0034",
+          "name": "Front guard torus",
+          "Brep_id": "FACE 658",
+          "description": "Large toroidal front rim surrounding the right hub and spoke terminations."
+        },
+        {
+          "face_code": "0035",
+          "name": "Inner hub fillet",
+          "Brep_id": "FACE 706",
+          "description": "Toroidal blend between the hub face and central cylindrical region."
+        },
+        {
+          "face_code": "0036",
+          "name": "Hub outer face",
+          "Brep_id": "FACE 708",
+          "description": "Planar front-facing annular surface at the outermost hub depth."
+        },
+        {
+          "face_code": "0037",
+          "name": "Hub center face",
+          "Brep_id": "FACE 709",
+          "description": "Planar circular center surface closing the visible right fan hub."
+        }
+      ],
+      "minor_faces_Brep_id": [
+        "FACE 391-FACE 394",
+        "FACE 396-FACE 456",
+        "FACE 458-FACE 478",
+        "FACE 480-FACE 633",
+        "FACE 634-FACE 641",
+        "FACE 643-FACE 644",
+        "FACE 646-FACE 651",
+        "FACE 655",
+        "FACE 657",
+        "FACE 659-FACE 705",
+        "FACE 707"
+      ],
+      "relationships": [
+        {
+          "source id": "S03",
+          "target id": "S01",
+          "function relationship": "mounts_to; transmits_load; guides_airflow",
+          "structural relationship": "attached_to; supported_by; adjacent_to"
+        },
+        {
+          "source id": "S03",
+          "target id": "S05",
+          "function relationship": "locates_mating_part; constrains_dof; provides_clearance; protects",
+          "structural relationship": "coaxial_with; contains; supports"
+        },
+        {
+          "source id": "S03",
+          "target id": "S02",
+          "function relationship": "shares_airflow_duty; distributes_cooling",
+          "structural relationship": "adjacent_to; offset_from"
+        }
+      ]
+    },
+    {
+      "id": "S04",
+      "name": "Left seven-blade rotor",
+      "features included": [
+        "seven curved axial-fan blades",
+        "blade roots",
+        "blade tips",
+        "pressure-side blade surfaces",
+        "suction-side blade surfaces"
+      ],
+      "function intent": "Generate forced airflow through the left half of the radiator core.",
+      "physical behavior": "Rotation of the swept blades creates an axial pressure difference. The curved B-spline blade surfaces impart momentum to the air, while the roots transmit centrifugal and aerodynamic loads into the hub. Blade-tip clearance prevents contact with the guard and limits rubbing during vibration.",
+      "geometry": "Seven disconnected, repeated, swept B-spline blade solids distributed circumferentially around the left fan axis. Each blade has two broad aerodynamic sides plus root, tip, leading-edge, and trailing-edge transition faces.",
+      "location": "Contained inside the left fan guard, centered near STEP z=-133.35 mm.",
+      "colour": {
+        "R": 245,
+        "G": 175,
+        "B": 45
+      },
+      "major_faces": [
+        {
+          "face_code": "0038",
+          "name": "Left blade 1 broad surface",
+          "Brep_id": "FACE 752",
+          "description": "Primary broad B-spline aerodynamic surface of the first left-fan blade."
+        },
+        {
+          "face_code": "0039",
+          "name": "Left blade 2 broad surface",
+          "Brep_id": "FACE 758",
+          "description": "Primary broad B-spline aerodynamic surface of the second left-fan blade."
+        },
+        {
+          "face_code": "0040",
+          "name": "Left blade 3 broad surface",
+          "Brep_id": "FACE 764",
+          "description": "Primary broad B-spline aerodynamic surface of the third left-fan blade."
+        },
+        {
+          "face_code": "0041",
+          "name": "Left blade 4 broad surface",
+          "Brep_id": "FACE 770",
+          "description": "Primary broad B-spline aerodynamic surface of the fourth left-fan blade."
+        },
+        {
+          "face_code": "0042",
+          "name": "Left blade 5 broad surface",
+          "Brep_id": "FACE 776",
+          "description": "Primary broad B-spline aerodynamic surface of the fifth left-fan blade."
+        },
+        {
+          "face_code": "0043",
+          "name": "Left blade 6 broad surface",
+          "Brep_id": "FACE 782",
+          "description": "Primary broad B-spline aerodynamic surface of the sixth left-fan blade."
+        },
+        {
+          "face_code": "0044",
+          "name": "Left blade 7 broad surface",
+          "Brep_id": "FACE 788",
+          "description": "Primary broad B-spline aerodynamic surface of the seventh left-fan blade."
+        }
+      ],
+      "minor_faces_Brep_id": [
+        "FACE 753-FACE 757",
+        "FACE 759-FACE 763",
+        "FACE 765-FACE 769",
+        "FACE 771-FACE 775",
+        "FACE 777-FACE 781",
+        "FACE 783-FACE 787",
+        "FACE 789-FACE 793"
+      ],
+      "relationships": [
+        {
+          "source id": "S04",
+          "target id": "S02",
+          "function relationship": "rotates_within; constrains_dof; provides_clearance; transmits_load",
+          "structural relationship": "contained_in; coaxial_with; supported_by"
+        },
+        {
+          "source id": "S04",
+          "target id": "S01",
+          "function relationship": "guides_airflow; transfers_heat_indirectly",
+          "structural relationship": "offset_from; adjacent_to"
+        }
+      ]
+    },
+    {
+      "id": "S05",
+      "name": "Right seven-blade rotor",
+      "features included": [
+        "seven curved axial-fan blades",
+        "blade roots",
+        "blade tips",
+        "pressure-side blade surfaces",
+        "suction-side blade surfaces"
+      ],
+      "function intent": "Generate forced airflow through the right half of the radiator core.",
+      "physical behavior": "The seven swept blades create an axial pressure rise and move air through the radiator. Aerodynamic, centrifugal, and imbalance loads pass from the blade roots to the central hub. The surrounding guard preserves blade-tip clearance and protects the rotor.",
+      "geometry": "Seven disconnected, repeated, swept B-spline blade solids distributed circumferentially around the right fan axis. Each blade consists of broad aerodynamic surfaces and narrower edge, root, and tip patches.",
+      "location": "Contained inside the right fan guard, centered near STEP z=+133.35 mm.",
+      "colour": {
+        "R": 255,
+        "G": 205,
+        "B": 70
+      },
+      "major_faces": [
+        {
+          "face_code": "0045",
+          "name": "Right blade 1 broad surface",
+          "Brep_id": "FACE 710",
+          "description": "Primary broad B-spline aerodynamic surface of the first right-fan blade."
+        },
+        {
+          "face_code": "0046",
+          "name": "Right blade 2 broad surface",
+          "Brep_id": "FACE 716",
+          "description": "Primary broad B-spline aerodynamic surface of the second right-fan blade."
+        },
+        {
+          "face_code": "0047",
+          "name": "Right blade 3 broad surface",
+          "Brep_id": "FACE 722",
+          "description": "Primary broad B-spline aerodynamic surface of the third right-fan blade."
+        },
+        {
+          "face_code": "0048",
+          "name": "Right blade 4 broad surface",
+          "Brep_id": "FACE 728",
+          "description": "Primary broad B-spline aerodynamic surface of the fourth right-fan blade."
+        },
+        {
+          "face_code": "0049",
+          "name": "Right blade 5 broad surface",
+          "Brep_id": "FACE 734",
+          "description": "Primary broad B-spline aerodynamic surface of the fifth right-fan blade."
+        },
+        {
+          "face_code": "0050",
+          "name": "Right blade 6 broad surface",
+          "Brep_id": "FACE 740",
+          "description": "Primary broad B-spline aerodynamic surface of the sixth right-fan blade."
+        },
+        {
+          "face_code": "0051",
+          "name": "Right blade 7 broad surface",
+          "Brep_id": "FACE 746",
+          "description": "Primary broad B-spline aerodynamic surface of the seventh right-fan blade."
+        }
+      ],
+      "minor_faces_Brep_id": [
+        "FACE 711-FACE 715",
+        "FACE 717-FACE 721",
+        "FACE 723-FACE 727",
+        "FACE 729-FACE 733",
+        "FACE 735-FACE 739",
+        "FACE 741-FACE 745",
+        "FACE 747-FACE 751"
+      ],
+      "relationships": [
+        {
+          "source id": "S05",
+          "target id": "S03",
+          "function relationship": "rotates_within; constrains_dof; provides_clearance; transmits_load",
+          "structural relationship": "contained_in; coaxial_with; supported_by"
+        },
+        {
+          "source id": "S05",
+          "target id": "S01",
+          "function relationship": "guides_airflow; transfers_heat_indirectly",
+          "structural relationship": "offset_from; adjacent_to"
+        }
+      ]
+    },
+    {
+      "id": "S06",
+      "name": "Coolant hose fittings",
+      "features included": [
+        "two parallel coolant ports",
+        "hose-retention bulb or barb profiles",
+        "fluid inlet and outlet interfaces"
+      ],
+      "function intent": "Connect external coolant hoses to the radiator and provide separate inlet and outlet flow paths.",
+      "physical behavior": "The protruding fittings guide coolant into and out of the radiator. Their enlarged or barbed outer profiles resist hose pull-off and provide sealing compression when used with flexible hose and clamps. The paired ports experience internal pressure, hose bending, and installation loads.",
+      "geometry": "Two closely spaced, curved or bulb-ended fitting bodies protruding from one end of the radiator. In the STEP report each fitting is represented as a separate single B-spline face/solid near z=267-310 mm.",
+      "location": "At one lower side/end of the radiator, visible as two gold-colored parallel protrusions.",
+      "colour": {
+        "R": 230,
+        "G": 120,
+        "B": 35
+      },
+      "major_faces": [
+        {
+          "face_code": "0052",
+          "name": "Upper coolant fitting skin",
+          "Brep_id": "FACE 794",
+          "description": "Single B-spline exterior skin describing one complete curved hose-fitting body."
+        },
+        {
+          "face_code": "0053",
+          "name": "Lower coolant fitting skin",
+          "Brep_id": "FACE 795",
+          "description": "Single B-spline exterior skin describing the second parallel hose-fitting body."
+        }
+      ],
+      "minor_faces_Brep_id": [],
+      "relationships": [
+        {
+          "source id": "S06",
+          "target id": "S01",
+          "function relationship": "mounts_to; routes_fluid; seals_against; transmits_load",
+          "structural relationship": "attached_to; blends_into"
+        }
+      ]
+    },
+    {
+      "id": "S07",
+      "name": "External mounting pads",
+      "features included": [
+        "upper corner mounting pad",
+        "opposed lower corner mounting pad",
+        "compliant or knob-shaped external mounting interfaces"
+      ],
+      "function intent": "Provide external attachment and vibration-isolation points for installing the radiator assembly in a surrounding chassis or enclosure.",
+      "physical behavior": "The projecting pads transfer static weight, fan vibration, and impact loads from the frame into external supports. Their rounded forms reduce edge stress and may permit compliant grommet-like seating or limited alignment during installation.",
+      "geometry": "Two separate rounded, knob-like B-spline bodies at diagonally opposed perimeter locations. Each is represented by a single STEP face/solid.",
+      "location": "At opposite perimeter corners of the radiator, one near the upper positive side and one near the lower negative side.",
+      "colour": {
+        "R": 155,
+        "G": 95,
+        "B": 190
+      },
+      "major_faces": [
+        {
+          "face_code": "0054",
+          "name": "Upper mounting-pad skin",
+          "Brep_id": "FACE 796",
+          "description": "Single B-spline exterior surface of the upper corner mounting pad."
+        },
+        {
+          "face_code": "0055",
+          "name": "Lower mounting-pad skin",
+          "Brep_id": "FACE 797",
+          "description": "Single B-spline exterior surface of the diagonally opposed lower mounting pad."
+        }
+      ],
+      "minor_faces_Brep_id": [],
+      "relationships": [
+        {
+          "source id": "S07",
+          "target id": "S01",
+          "function relationship": "mounts_to; transmits_load; constrains_dof; isolates_vibration",
+          "structural relationship": "attached_to; supports; offset_from"
+        }
+      ]
+    },
+    {
+      "id": "S08",
+      "name": "Top fill or bleed cap",
+      "features included": [
+        "top service cap",
+        "rounded grip flange",
+        "fill or bleed interface"
+      ],
+      "function intent": "Close a top service opening and permit filling, bleeding, venting, or inspection of the radiator fluid circuit.",
+      "physical behavior": "The cap is intended to resist internal pressure while remaining removable for service. Its rounded flange provides manual grip and spreads sealing force around the opening. The cap location at the uppermost region assists air bleeding.",
+      "geometry": "A small rounded, mushroom-like cap projecting from the upper rail near the center of the radiator. The STEP report represents it as a separate single B-spline face/solid.",
+      "location": "Near the center of the upper perimeter rail.",
+      "colour": {
+        "R": 210,
+        "G": 75,
+        "B": 95
+      },
+      "major_faces": [
+        {
+          "face_code": "0056",
+          "name": "Fill-cap exterior skin",
+          "Brep_id": "FACE 798",
+          "description": "Single B-spline exterior surface describing the complete rounded top cap."
+        }
+      ],
+      "minor_faces_Brep_id": [],
+      "relationships": [
+        {
+          "source id": "S08",
+          "target id": "S01",
+          "function relationship": "mounts_to; seals_against; provides_service_access; constrains_dof",
+          "structural relationship": "attached_to; contained_in; coaxial_with"
+        }
+      ]
+    }
+  ]
+}
+
+operation.json:
+
+{
+  "request": "Hi , Create a slot pattern across the plastic part surface on both the top and bottom sides.",
+  "request_wording": {
+    "action_words": [
+      "Create",
+      "slot",
+      "pattern",
+      "across",
+      "on",
+      "both"
+    ],
+    "referenced_feature_words": [
+      "plastic",
+      "part",
+      "surface",
+      "top",
+      "bottom",
+      "sides"
+    ],
+    "intention_words": [],
+    "grammatical_words": [
+      "Hi",
+      "a",
+      "the",
+      "the",
+      "and"
+    ]
+  },
+  "actions": [
+    {
+      "operation": "Create a slot pattern",
+      "parameters": {},
+      "target": "Top-side surface of the plastic part",
+      "relational_constraint": "The slot pattern must lie on and extend across the top-side surface.",
+      "unresolved_reference": "Identify the top-side face in the CAD model. No seed slot, slot dimensions, pattern direction, count, spacing, or extent is specified."
+    },
+    {
+      "operation": "Create a slot pattern",
+      "parameters": {},
+      "target": "Bottom-side surface of the plastic part",
+      "relational_constraint": "The slot pattern must lie on and extend across the bottom-side surface.",
+      "unresolved_reference": "Identify the bottom-side face in the CAD model. No seed slot, slot dimensions, pattern direction, count, spacing, or extent is specified."
+    }
+  ],
+  "intention": []
+}
+
+View: front
+
+[IMAGE 0: /home/adml/Research/Hackathon2026/IDETC26-Hackathon-Autodesk-neuralCAD-Edit/data/edit_192_external/breps/SUJ2G2UMJQR7PMBX_1759203719.3361144_front.jpg]
+
+View: back
+
+[IMAGE 1: /home/adml/Research/Hackathon2026/IDETC26-Hackathon-Autodesk-neuralCAD-Edit/data/edit_192_external/breps/SUJ2G2UMJQR7PMBX_1759203719.3361144_back.jpg]
+
+View: left
+
+[IMAGE 2: /home/adml/Research/Hackathon2026/IDETC26-Hackathon-Autodesk-neuralCAD-Edit/data/edit_192_external/breps/SUJ2G2UMJQR7PMBX_1759203719.3361144_left.jpg]
+
+View: right
+
+[IMAGE 3: /home/adml/Research/Hackathon2026/IDETC26-Hackathon-Autodesk-neuralCAD-Edit/data/edit_192_external/breps/SUJ2G2UMJQR7PMBX_1759203719.3361144_right.jpg]
+
+View: top
+
+[IMAGE 4: /home/adml/Research/Hackathon2026/IDETC26-Hackathon-Autodesk-neuralCAD-Edit/data/edit_192_external/breps/SUJ2G2UMJQR7PMBX_1759203719.3361144_top.jpg]
+
+View: bottom
+
+[IMAGE 5: /home/adml/Research/Hackathon2026/IDETC26-Hackathon-Autodesk-neuralCAD-Edit/data/edit_192_external/breps/SUJ2G2UMJQR7PMBX_1759203719.3361144_bottom.jpg]
+
+View: toprightiso
+
+[IMAGE 6: /home/adml/Research/Hackathon2026/IDETC26-Hackathon-Autodesk-neuralCAD-Edit/data/edit_192_external/breps/SUJ2G2UMJQR7PMBX_1759203719.3361144_toprightiso.jpg]

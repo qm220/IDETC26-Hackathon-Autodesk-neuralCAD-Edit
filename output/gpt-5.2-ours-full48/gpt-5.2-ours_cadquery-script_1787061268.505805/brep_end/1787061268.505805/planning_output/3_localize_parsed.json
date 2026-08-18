@@ -1,0 +1,111 @@
+{
+  "request": "Change mounting system at the back of Cyclops Plus Heatsink from 3-point mounting version to 4-points, similar to that which is found at the back of Cyclops Aqua Block.",
+  "request_wording": {
+    "action_words": [
+      "Change",
+      "from",
+      "to",
+      "3-point",
+      "4-points",
+      "similar",
+      "found"
+    ],
+    "referenced_feature_words": [
+      "mounting",
+      "system",
+      "back",
+      "Cyclops",
+      "Plus",
+      "Heatsink",
+      "mounting",
+      "version",
+      "back",
+      "Cyclops",
+      "Aqua",
+      "Block"
+    ],
+    "intention_words": [
+      "similar"
+    ],
+    "grammatical_words": [
+      "at",
+      "the",
+      "of",
+      "from",
+      "to",
+      "to",
+      "that",
+      "which",
+      "is",
+      "at",
+      "the",
+      "of"
+    ]
+  },
+  "actions": [
+    {
+      "operation": "Modify/replace the existing back-side mounting system from a 3-point configuration to a 4-point configuration",
+      "parameters": {
+        "existing_mount_point_count": "3",
+        "new_mount_point_count": "4",
+        "mounting_hole_style": "clearance through-holes with counterbore/countersink on back face (match existing fastener standard if present)",
+        "pattern_style": "rectangular 2x2 (symmetric about heatsink center planes)"
+      },
+      "target": "Mounting system at the back of Cyclops Plus Heatsink (current 3-point mounting version)",
+      "relational_constraint": "Mounting system is located at the back of the Cyclops Plus Heatsink; final configuration must be 4-point; maintain adequate edge distance and avoid interference with existing large vertical bores and fin geometry",
+      "unresolved_reference": "Exact definition of the current 3 mounting points on the heatsink back face is not explicitly enumerated in model.json (holes are likely in S2 minor faces). Exact hole diameter, counterbore diameter/depth, and the exact 4-hole spacing must be confirmed from the reference design/fastener spec. If the existing 3 holes are to be fully removed (plugged) versus left unused must be confirmed.",
+      "target section code": [
+        "S2"
+      ],
+      "target face code": [
+        "0015"
+      ],
+      "steps": [
+        "Identify the heatsink 'back' datum face as S2 Back face (face_code 0015, Brep_id FACE 504, plane y=-18). Confirm orientation by matching the multi-view 'back' image showing the heatsink rear plate with mounting holes.",
+        "Locate the existing 3-point mounting holes on this back face by selecting the cylindrical hole walls that terminate on face_code 0015 (these are expected among S2 minor_faces_Brep_id FACE 462-475 or FACE 505-555). Tag these as existing mount holes for potential delete/replace operations.",
+        "Decide treatment of the legacy 3-hole pattern from functional/manufacturing perspectives: (a) preferred: remove/patch the legacy holes to preserve stiffness and sealing/mating surface integrity; (b) alternate: keep legacy holes but suppress their use and add the missing fourth point (less ideal for standardization/appearance).",
+        "If removing legacy holes: On face_code 0015 create a sketch that captures each existing hole boundary (project the circular edges). Create solid plugs by Extrude-Add (Boss) from face_code 0015 inward by a depth sufficient to fully fill the hole volume (typically through the hole length), then Boolean Union with S2. Re-face/merge to restore a continuous back planar surface. Re-apply any needed edge breaks at the plug perimeter (small chamfer/fillet) to avoid knife edges.",
+        "Create the new 4-point layout: Start a sketch on face_code 0015 (y=-18 plane). Add construction centerlines representing the heatsink midplanes: X-midplane halfway between S2 left side face_code 0017 (x=24) and right side face_code 0014 (x=56), and Z-midplane halfway between S2 bottom face_code 0016 (z=0) and top face_code 0012 (z=30).",
+        "Place four sketch points (or circles) in a 2x2 rectangular pattern symmetric about the X and Z centerlines. Constrain horizontal spacing equal left/right and vertical spacing equal up/down. Add dimensional constraints using either: (a) edge offsets from x=24 and x=56 and from z=0 and z=30, or (b) center-to-center distances to match the Aqua Block reference (see next action). Ensure minimum edge distance (typically >= 2x hole diameter) and avoid intersecting the large bore regions (face_codes 0021/0023 represent vertical bores; avoid their projected footprints).",
+        "Cut the four mounting holes: Use Extrude-Cut (Through All) normal to face_code 0015 (along +Y into the part). Hole diameter: match existing fastener family used elsewhere in the assembly (S6 vertical fastener holes show radius ~1.5 -> Ø~3 as a likely baseline), unless Aqua Block requires different.",
+        "Add head seating features on the back face: For each hole, add Counterbore or Countersink on face_code 0015. If matching typical socket head cap screw: counterbore Ø≈2x clearance hole with a depth adequate for head height. If matching flat-head screw: countersink angle per standard (e.g., 82°/90°).",
+        "Add edge breaks: Apply a small chamfer (or fillet) to the hole entrance edges on face_code 0015 to reduce burrs and improve assembly (manufacturing intent). Optionally add a smaller chamfer at the opposite exit edges if the holes break into internal cavities.",
+        "Regenerate/validate: Check that the new hole pattern does not cut into fin steps (S2 fin faces are mostly on one side; ensure operations are confined to the back plate thickness), does not intersect the large vertical bores (face_codes 0021/0023), and maintains sufficient ligament thickness for stiffness and clamp load distribution."
+      ]
+    },
+    {
+      "operation": "Match the 4-point mounting configuration to be similar to the mounting system found at the back of the Cyclops Aqua Block",
+      "parameters": {
+        "similarity_criteria": [
+          "same hole count (4)",
+          "same hole type (through + counterbore/countersink)",
+          "same spacing (center-to-center X and Z distances or edge offsets)",
+          "same datum alignment (symmetry about block midplanes or same offset scheme)",
+          "same fastener size/standard"
+        ]
+      },
+      "target": "New/updated 4-point mounting system on Cyclops Plus Heatsink (result of previous action)",
+      "relational_constraint": "Geometry/layout should be similar to the mounting system at the back of the Cyclops Aqua Block; preserve heatsink functional constraints (do not weaken fin core, do not collide with internal bores), and keep mounting interface planar for good contact",
+      "unresolved_reference": "The Cyclops Aqua Block 'back mounting system' is not explicitly identified in model.json as a dedicated face/feature set; the water/manifold-like body is likely S1, but the exact back mounting hole faces and their spacing are not enumerated as major faces. Need confirmation which section corresponds to 'Cyclops Aqua Block' and which face is considered its 'back' for measurement transfer.",
+      "target section code": [
+        "S2",
+        "S1"
+      ],
+      "target face code": [
+        "0015",
+        "0005"
+      ],
+      "steps": [
+        "Identify the Aqua Block candidate section and back datum: Based on model.json function/geometry, use S1 (Left manifold / port block) as the 'Cyclops Aqua Block' analog. Use S1 Rear face (face_code 0005, Brep_id FACE 150, plane y=-21) as the most likely 'back' reference face for its mounting system.",
+        "On S1 face_code 0005, locate the Aqua Block mounting hole set by selecting cylindrical faces that open onto this rear face (expected in S1 minor_faces_Brep_id FACE 152-215 / FACE 243-264). Measure: hole diameter(s), counterbore/countersink diameter(s), and the 2x2 center-to-center spacing in X and Z (or edge-offset scheme from the outer envelope faces).",
+        "Translate the Aqua Block pattern onto the heatsink back face: On S2 face_code 0015, edit the 4-hole sketch constraints created in the previous action so that either (a) the center-to-center distances match S1’s measured spacing, and the pattern is centered to the same datum logic, or (b) the edge offsets from the outer rectangle match (e.g., same distance from left/right and top/bottom edges relative to each part’s envelope).",
+        "Match hole feature stack: Update S2 hole cut diameter and the counterbore/countersink dimensions to match S1. If S1 uses a specific seat type (counterbore vs countersink), revise S2 accordingly for fastener compatibility.",
+        "Confirm intent/behavior compatibility: From a structural perspective, ensure the 4 mounting points on S2 distribute clamp load similarly to S1 (avoid a pattern that lands over thin fin-web regions). From a manufacturing perspective, keep all four holes normal to the planar back face for straightforward drilling. From an assembly/compatibility perspective, ensure the pattern is not mirrored/rotated relative to S1’s datum (use consistent top/bottom orientation relative to the heatsink top face_code 0012 and bottom face_code 0016).",
+        "Final verification: Create an inspection sketch on both S1 face_code 0005 and S2 face_code 0015 showing hole centerpoints and primary datums (outer edges) and verify positional equivalence per the chosen similarity criteria."
+      ]
+    }
+  ],
+  "intention": [
+    "Update the Cyclops Plus Heatsink back mounting interface to a 4-point mounting system consistent with (similar to) the Cyclops Aqua Block back mounting design, for mounting compatibility, improved load distribution, and standardized assembly."
+  ]
+}

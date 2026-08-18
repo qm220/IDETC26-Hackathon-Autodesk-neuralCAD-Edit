@@ -1,0 +1,79 @@
+Thinking text:
+**Assessing geometry selection**
+
+I’m selecting by geomType with a circle of radius .75 and centering it around y and z, with x around it. It looks like there will be exactly four results. I’m wondering if the chamfer will fail all at the same time, but that seems likely fine. I should remember to print the post and return the result. I need to check if the os is imported, and I should ensure the function imports are done within the function for robustness. Also, I need to remember to escape JSON properly.
+
+Generated script:
+def my_cad_function(args):
+    import os
+    import cadquery as cq
+
+    input_file = os.path.expanduser(args["input_file"])
+    model = cq.importers.importStep(input_file)
+    shape = model.val()
+
+    # Select the four circular rims of the two coaxial clevis pin bores.
+    # The original bore radius is 0.75 mm and the bore axes are parallel to X.
+    target_edges = []
+    for edge in shape.Edges():
+        try:
+            if edge.geomType() != "CIRCLE":
+                continue
+            if abs(edge.radius() - 0.75) > 1.0e-4:
+                continue
+
+            center = edge.Center()
+            # Restrict selection to the raised clevis region, excluding all
+            # mounting-hole and unrelated circular edges.
+            if 4.6 < center.x < 7.7 and 3.4 < center.y < 3.7 and 2.8 < center.z < 3.1:
+                target_edges.append(edge)
+        except Exception:
+            pass
+
+    print(f"Selected clevis bore rim edges: {len(target_edges)}")
+    for i, edge in enumerate(target_edges):
+        c = edge.Center()
+        print(
+            f"target[{i}] radius={edge.radius():.6f} "
+            f"center=({c.x:.6f},{c.y:.6f},{c.z:.6f})"
+        )
+
+    if len(target_edges) != 4:
+        raise RuntimeError(
+            f"Expected exactly four clevis pin-bore rim edges, found {len(target_edges)}"
+        )
+
+    # Apply an equal-distance 0.2 mm chamfer to both ends of each ear bore.
+    result = cq.Workplane(obj=shape).newObject(target_edges).chamfer(0.2)
+    result_shape = result.val()
+
+    print(f"Result valid: {result_shape.isValid()}")
+    print(
+        f"Result solids: {len(result_shape.Solids())}, "
+        f"faces: {len(result_shape.Faces())}, edges: {len(result_shape.Edges())}"
+    )
+
+    if not result_shape.isValid() or len(result_shape.Solids()) != 1:
+        raise RuntimeError("Chamfer operation did not produce one valid solid")
+
+    return result
+
+
+Program output:
+stdout: Loading function from: /home/adml/Research/Hackathon2026/IDETC26-Hackathon-Autodesk-neuralCAD-Edit/output/gpt-5.6-sol-full48/gpt-5.6-sol_cadquery-script_1786999236.639671/brep_end/1786999236.639671/temp_script.py
+Selected clevis bore rim edges: 4
+target[0] radius=0.750000 center=(4.697641,3.510000,2.943179)
+target[1] radius=0.750000 center=(5.297640,3.510000,2.943179)
+target[2] radius=0.750000 center=(6.947640,3.510000,2.943179)
+target[3] radius=0.750000 center=(7.547638,3.510000,2.943179)
+Result valid: True
+Result solids: 1, faces: 270, edges: 633
+Exported shape to: /home/adml/Research/Hackathon2026/IDETC26-Hackathon-Autodesk-neuralCAD-Edit/output/gpt-5.6-sol-full48/gpt-5.6-sol_cadquery-script_1786999236.639671/brep_end/1786999236.639671/tmp.step
+Exported STL to: /home/adml/Research/Hackathon2026/IDETC26-Hackathon-Autodesk-neuralCAD-Edit/output/gpt-5.6-sol-full48/gpt-5.6-sol_cadquery-script_1786999236.639671/brep_end/1786999236.639671/tmp.stl
+Exported PNG image to: /home/adml/Research/Hackathon2026/IDETC26-Hackathon-Autodesk-neuralCAD-Edit/output/gpt-5.6-sol-full48/gpt-5.6-sol_cadquery-script_1786999236.639671/brep_end/1786999236.639671/tmp.png
+Script completed.
+
+stderr: 
+
+Exported this iteration:
+tmp.step, tmp.stl, tmp.png, tmp_front.png, tmp_back.png, tmp_left.png, tmp_right.png, tmp_top.png, tmp_bottom.png, tmp_toprightiso.png

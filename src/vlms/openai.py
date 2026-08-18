@@ -146,17 +146,30 @@ class VLM(BaseVLM):
         if return_token_counts:
         
             if full_response is not None:
+                usage = full_response.usage
+                cached = 0
+                details = getattr(usage, "input_tokens_details", None) or getattr(
+                    usage, "prompt_tokens_details", None
+                )
+                if details is None and isinstance(usage, dict):
+                    details = usage.get("input_tokens_details") or usage.get("prompt_tokens_details")
+                if isinstance(details, dict):
+                    cached = int(details.get("cached_tokens", 0) or 0)
+                elif details is not None:
+                    cached = int(getattr(details, "cached_tokens", 0) or 0)
                 token_count_dict = {
-                    "input_tokens": full_response.usage.input_tokens,
-                    "output_tokens": full_response.usage.output_tokens,
-                    "total_tokens": full_response.usage.total_tokens,
+                    "input_tokens": usage.input_tokens,
+                    "output_tokens": usage.output_tokens,
+                    "total_tokens": usage.total_tokens,
+                    "cached_tokens": cached,
                 }
             else:
-                # Return empty token counts if response was cached
+                # Return empty token counts if response was cached locally on disk
                 token_count_dict = {
                     "input_tokens": 0,
                     "output_tokens": 0,
                     "total_tokens": 0,
+                    "cached_tokens": 0,
                 }
             response_object.token_counts = token_count_dict
 

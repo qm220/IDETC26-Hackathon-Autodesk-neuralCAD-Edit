@@ -1,0 +1,116 @@
+def my_cad_function(args):
+    import os
+    import cadquery as cq
+
+    input_file = os.path.expanduser(args["input_file"])
+    imported = cq.importers.importStep(input_file)
+    base_shape = imported.val()
+
+    thickness = 2.54
+    nominal_radius = 7.62
+    tol = 0.10
+
+    model_bb = base_shape.BoundingBox()
+    front_y = model_bb.ymax
+    rear_y = model_bb.ymin
+
+    def find_outer_rim_bbox(y_position):
+        candidates = []
+        for face in base_shape.Faces():
+            bb = face.BoundingBox()
+            planar_at_target = (
+                abs(bb.ymin - y_position) <= tol and
+                abs(bb.ymax - y_position) <= tol
+            )
+            if planar_at_target and bb.xlen >= 30.0 and bb.zlen >= 30.0:
+                candidates.append((bb.xlen * bb.zlen, bb))
+        if not candidates:
+            return None
+        candidates.sort(key=lambda item: item[0], reverse=True)
+        return candidates[0][1]
+
+    front_rim_bb = find_outer_rim_bbox(front_y)
+    rear_rim_bb = find_outer_rim_bbox(rear_y)
+    reference_bb = front_rim_bb if front_rim_bb is not None else rear_rim_bb
+
+    if reference_bb is not None:
+        width = reference_bb.xlen
+        height = reference_bb.zlen
+        center_x = 0.5 * (reference_bb.xmin + reference_bb.xmax)
+        center_z = 0.5 * (reference_bb.zmin + reference_bb.zmax)
+    else:
+        # Nominal dimensions from the planned hub geometry.
+        width = 50.8
+        height = 50.8
+        center_x = 0.0
+        center_z = 0.0
+        front_y = 27.94
+        rear_y = -15.24
+
+    radius = min(nominal_radius, 0.5 * width - 0.01, 0.5 * height - 0.01)
+
+    def rounded_rectangle_prism(seating_y, outward_sign):
+        # Construct the rounded-square prism directly from two boxes and four
+        # cylinders. This avoids applying a 3D fillet to sketch vertices.
+        if outward_sign > 0:
+            y0 = seating_y
+            cylinder_base_y = seating_y
+            cylinder_axis = cq.Vector(0, 1, 0)
+        else:
+            y0 = seating_y - thickness
+            cylinder_base_y = seating_y
+            cylinder_axis = cq.Vector(0, -1, 0)
+
+        x_min = center_x - width / 2.0
+        z_min = center_z - height / 2.0
+
+        horizontal = cq.Solid.makeBox(
+            width,
+            thickness,
+            height - 2.0 * radius,
+            cq.Vector(x_min, y0, z_min + radius)
+        )
+        vertical = cq.Solid.makeBox(
+            width - 2.0 * radius,
+            thickness,
+            height,
+            cq.Vector(x_min + radius, y0, z_min)
+        )
+
+        cover = horizontal.fuse(vertical)
+        corner_centers = [
+            (x_min + radius, z_min + radius),
+            (x_min + width - radius, z_min + radius),
+            (x_min + width - radius, z_min + height - radius),
+            (x_min + radius, z_min + height - radius)
+        ]
+
+        for cx, cz in corner_centers:
+            corner = cq.Solid.makeCylinder(
+                radius,
+                thickness,
+                cq.Vector(cx, cylinder_base_y, cz),
+                cylinder_axis
+            )
+            cover = cover.fuse(corner)
+
+        return cover
+
+    front_cover = rounded_rectangle_prism(front_y, 1)
+    rear_cover = rounded_rectangle_prism(rear_y, -1)
+
+    print("Imported model valid:", base_shape.isValid())
+    print("Model y limits: rear=%.3f mm, front=%.3f mm" % (rear_y, front_y))
+    print("Cover outer profile: %.3f x %.3f mm, radius %.3f mm" %
+          (width, height, radius))
+    print("Front cover y range: %.3f to %.3f mm" %
+          (front_cover.BoundingBox().ymin, front_cover.BoundingBox().ymax))
+    print("Rear cover y range: %.3f to %.3f mm" %
+          (rear_cover.BoundingBox().ymin, rear_cover.BoundingBox().ymax))
+    print("Created two separate rounded-square cover solids of thickness %.3f mm" % thickness)
+
+    result = cq.Assembly(name="crossed_arm_with_covers")
+    result.add(base_shape, name="existing_model", color=cq.Color(0.72, 0.72, 0.76))
+    result.add(front_cover, name="front_cover", color=cq.Color(0.20, 0.65, 0.85))
+    result.add(rear_cover, name="rear_cover", color=cq.Color(0.20, 0.65, 0.85))
+    return result

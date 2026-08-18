@@ -228,7 +228,7 @@ class VLM(BaseVLM):
                 response_json=parsed,
                 response_text=answer,
                 thinking_text=thinking_text,
-                token_counts={"input_tokens": 0, "output_tokens": 0, "thinking_tokens": 0, "total_tokens": 0},
+                token_counts={"input_tokens": 0, "output_tokens": 0, "thinking_tokens": 0, "total_tokens": 0, "cached_tokens": 0},
             )
             return result
 
@@ -331,6 +331,9 @@ class VLM(BaseVLM):
             "output_tokens": getattr(usage, "completion_tokens", 0) or 0,
             "thinking_tokens": 0,
             "total_tokens": getattr(usage, "total_tokens", 0) or 0,
+            "cached_tokens": int(
+                getattr(getattr(usage, "prompt_tokens_details", None), "cached_tokens", 0) or 0
+            ),
         }
         return text, token_counts
 
@@ -391,5 +394,6 @@ class VLM(BaseVLM):
             "output_tokens": int(new_tokens.shape[1]),
             "thinking_tokens": 0,
             "total_tokens": int(input_len + new_tokens.shape[1]),
+            "cached_tokens": 0,
         }
         return text, token_counts

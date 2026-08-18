@@ -1,0 +1,47 @@
+def my_cad_function(args):
+    input_file = os.path.expanduser(args["input_file"])
+    model = cq.importers.importStep(input_file)
+    base = model.val()
+
+    bbox = base.BoundingBox()
+    original_volume = base.Volume()
+    print(f"Input valid: {base.isValid()}")
+    print(f"Input volume: {original_volume:.6f} mm^3")
+    print(f"Bounds: x=({bbox.xmin:.4f}, {bbox.xmax:.4f}), y=({bbox.ymin:.4f}, {bbox.ymax:.4f}), z=({bbox.zmin:.4f}, {bbox.zmax:.4f})")
+    print(f"Faces: {len(base.Faces())}, solids: {len(base.Solids())}")
+
+    # Three rounded, longitudinal lightweighting openings in the uninterrupted
+    # central arm. Their overall lengths include the semicircular ends.
+    slots = [
+        (-34.0, 7.5, 28.0, 5.0),
+        (-4.0,  7.5, 24.0, 4.6),
+        (22.0,  7.5, 20.0, 4.2),
+    ]
+
+    cut_depth = bbox.ylen + 6.0
+    cutters = None
+    for x_center, z_center, length, width in slots:
+        cutter = (
+            cq.Workplane("XZ")
+            .center(x_center, z_center)
+            .slot2D(length, width, angle=0)
+            .extrude(cut_depth, both=True)
+        )
+        cutters = cutter if cutters is None else cutters.union(cutter)
+
+    result = model.cut(cutters)
+    edited = result.val()
+    new_volume = edited.Volume()
+    removed_volume = original_volume - new_volume
+    reduction = 100.0 * removed_volume / original_volume
+
+    print(f"Output valid: {edited.isValid()}")
+    print(f"Output solids: {len(edited.Solids())}")
+    print(f"Output volume: {new_volume:.6f} mm^3")
+    print(f"Removed volume: {removed_volume:.6f} mm^3 ({reduction:.3f}%)")
+    print("Added three rounded-end through-cutouts to the tapered lever arm.")
+
+    if not edited.isValid() or len(edited.Solids()) != 1 or removed_volume <= 0:
+        raise ValueError("Lightweighting cut operation did not produce one valid, reduced-volume solid")
+
+    return result

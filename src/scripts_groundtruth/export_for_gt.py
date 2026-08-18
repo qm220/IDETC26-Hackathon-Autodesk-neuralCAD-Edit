@@ -147,10 +147,10 @@ def main():
 
     dbm.clean_db_single_edit_per_user_per_request()
 
-    all_views = ["toprightiso", "front", "back", "top", "bottom", "left", "right"]
+    all_views = ["iso1", "+Z", "-Z", "+Y", "-Y", "-X", "+X"]
 
     task_dict = {
-        "edit": {"count": 99999, "input_views": all_views, "output_views": all_views, "source-ref_view": "toprightiso"},
+        "edit": {"count": 99999, "input_views": all_views, "output_views": all_views, "source-ref_view": "iso1"},
     }
 
     models=[

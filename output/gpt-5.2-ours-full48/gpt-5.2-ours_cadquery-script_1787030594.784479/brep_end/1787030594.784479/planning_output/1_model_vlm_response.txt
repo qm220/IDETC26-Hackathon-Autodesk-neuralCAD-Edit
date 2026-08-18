@@ -1,0 +1,638 @@
+=== thinking_text ===
+**Analyzing radiator component**
+
+I'm looking to create a JSON description for what appears to be a radiator featuring twin fans. It resembles a radiator or heat exchanger with fan shrouds. There are 20 solid components and 799 faces, indicating it has an assembly-like structure. 
+
+I need to define sections like the core, tanks, side plates, and fans, as well as connectors and pipes. The images show a radiator with dual electric fans, black tanks, and grey side plates. I'll focus on extracting key faces and matching them to IDs.
+**Defining radiator structure**
+
+I'm trying to determine which faces, like 5 and 12, to use for the main plate of the radiator. Initially, faces 0 to 14 seem to represent a rectangular plate or side frame. For example, FACE 5 is a large plane, and FACE 12 mirrors that.
+
+These faces likely indicate the side planes of a block — possibly the radiator core. To clarify, I need to treat the coordinate system properly, with x as thickness, y as height, and z as length. We'll also need to outline relationships and assign a list for minor faces in each section, despite the report being invalid.
+**Defining radiator sections**
+
+I’m outlining sections of the radiator. For S1, the radiator core and fins may use large B-spline faces like FACE 77, 139, 395, and 457, representing the fin pattern. S2 focuses on the left end tank and side frame, which likely includes the grey side plate and two brass hose barbs, possibly matching FACE 0-7. For S3, I'll address the right end tank, which has the filler neck and outlet, showing two brass pipes on the left and a curved outlet on the right.
+**Detailing radiator components**
+
+I'm analyzing the structure in front and back views, noting one stub at the top and bottom on the left. S4 refers to the top tank, which includes the filler neck and possibly mounting pads. S5 pertains to the bottom tank, having a drain and outlet elbow. I’m separating the fan assemblies into S6 for the left and S7 for the right, both including the fan, motor hub, and guard grille. Regarding solids, I suspect those may be fan blades as individual solids, even though they seem like simple boxes—possibly the segments for the fan guard instead.
+**Clarifying radiator features**
+
+I'm identifying solids 15 and 16, which indicate a curved elbow for the outlet at the right end. Solids 17 and 18 might represent the inlet and outlet pipes on the side, possibly a corner cylinder around the coolant tank. Solid 19 seems to correspond to the filler cap, confirming its location for the filler neck. 
+
+I’ll create a section for the filler neck and include its face. I also need to detail hose barb ports, recognizing there might be some asymmetry from the images. So, I'll map approximate relationships and craft the JSON accordingly, assigning unique RGB colors to each section!
+
+=== response_text ===
+{
+  "part": {
+    "name": "Dual-fan radiator / heat-exchanger assembly",
+    "description": "Rectangular heat-exchanger core with top/bottom tanks, side frames, central filler neck/cap, dual electric axial fans with protective grilles/shrouds on one face, and multiple hose/pipe interfaces plus mounting bosses.",
+    "source_views": [
+      "front",
+      "back",
+      "left",
+      "right",
+      "top",
+      "bottom",
+      "toprightiso"
+    ],
+    "symmetry_note": "Largely symmetric about the longitudinal mid-plane splitting left/right fan bays (z≈0), but hose interfaces and filler/cap details make the assembly not perfectly symmetric."
+  },
+  "Section": [
+    {
+      "id": "S1",
+      "name": "Heat-exchanger core (fin matrix + core frame opening)",
+      "features included": [
+        "Primary heat transfer fin surface (front and rear faces)",
+        "Core perimeter frame opening for airflow",
+        "Central split between two fan bays (core face appears as two halves)"
+      ],
+      "function intent": "Provide large surface area to exchange heat between internal coolant passages and external airflow.",
+      "physical behavior": "Thin-walled fin matrix conducts heat from tubes to fins; airflow through the porous fin field convects heat away. Core frame maintains flatness and resists vibration/handling loads.",
+      "geometry": "Large rectangular porous/fin-like faces on both sides, split into two halves (left/right fan bays). The split suggests a central stiffener or interruption in fin field.",
+      "location": "Central body; spans most of the part’s height (y) and length (z); between the tank/frame structures and the fan side.",
+      "colour": { "R": 190, "G": 210, "B": 230 },
+      "major_faces": [
+        {
+          "face_code": "0000",
+          "name": "Core fin face (fan side) - left half",
+          "Brep_id": "FACE 139",
+          "description": "Large BSPLINE ‘textured’ surface representing fin matrix on one side for the left fan bay (z<0)."
+        },
+        {
+          "face_code": "0001",
+          "name": "Core fin face (fan side) - right half",
+          "Brep_id": "FACE 457",
+          "description": "Large BSPLINE ‘textured’ surface representing fin matrix on one side for the right fan bay (z>0)."
+        },
+        {
+          "face_code": "0002",
+          "name": "Core fin face (opposite side) - left half",
+          "Brep_id": "FACE 77",
+          "description": "Large BSPLINE ‘textured’ surface representing fin matrix on the opposite side for the left bay (z<0)."
+        },
+        {
+          "face_code": "0003",
+          "name": "Core fin face (opposite side) - right half",
+          "Brep_id": "FACE 395",
+          "description": "Large BSPLINE ‘textured’ surface representing fin matrix on the opposite side for the right bay (z>0)."
+        }
+      ],
+      "minor_faces_Brep_id": [
+        "FACE 334",
+        "FACE 652",
+        "FACE 72",
+        "FACE 656",
+        "FACE 63-71",
+        "FACE 64-70",
+        "FACE 710-793"
+      ],
+      "relationships": [
+        {
+          "source id": "S1",
+          "target id": "S2",
+          "function relationship": "transmits_load",
+          "structural relationship": "attached_to"
+        },
+        {
+          "source id": "S1",
+          "target id": "S3",
+          "function relationship": "transmits_load",
+          "structural relationship": "attached_to"
+        },
+        {
+          "source id": "S1",
+          "target id": "S4",
+          "function relationship": "distributes_stress",
+          "structural relationship": "attached_to"
+        },
+        {
+          "source id": "S1",
+          "target id": "S5",
+          "function relationship": "distributes_stress",
+          "structural relationship": "attached_to"
+        },
+        {
+          "source id": "S1",
+          "target id": "S6",
+          "function relationship": "provides_clearance",
+          "structural relationship": "adjacent_to"
+        },
+        {
+          "source id": "S1",
+          "target id": "S7",
+          "function relationship": "provides_clearance",
+          "structural relationship": "adjacent_to"
+        }
+      ]
+    },
+    {
+      "id": "S2",
+      "name": "Left side/end frame + tank sidewall (outer frame spine)",
+      "features included": [
+        "Left end plate / side frame",
+        "Edge flanges that capture/locate the core",
+        "Outer housing wall providing stiffness"
+      ],
+      "function intent": "Provide structural boundary, support the core and tanks, and offer mounting/attachment geometry for the assembly.",
+      "physical behavior": "Acts as a beam-like spine along the perimeter; resists bending from hose loads and fan-induced vibration; provides rigid datum-like outer faces for packaging.",
+      "geometry": "Tall rectangular sidewall planes at negative x with corner rounds/fillets and stepped wall thickness (multiple parallel planes).",
+      "location": "Negative-x side of the assembly (one long vertical end frame).",
+      "colour": { "R": 180, "G": 180, "B": 180 },
+      "major_faces": [
+        {
+          "face_code": "0004",
+          "name": "Left outer side plane (main)",
+          "Brep_id": "FACE 12",
+          "description": "Large planar outer side face at x≈-104.775 defining the main left-side housing wall."
+        },
+        {
+          "face_code": "0005",
+          "name": "Left stepped side plane (inner step)",
+          "Brep_id": "FACE 5",
+          "description": "Large planar face at x≈-73.025 indicating an inset/step relative to the main left outer wall."
+        },
+        {
+          "face_code": "0006",
+          "name": "Left intermediate plane (inner boundary)",
+          "Brep_id": "FACE 0",
+          "description": "Large planar face at x≈-69.85 with multiple inner wires, likely an internal boundary/opening plane."
+        }
+      ],
+      "minor_faces_Brep_id": [
+        "FACE 1-4",
+        "FACE 6-14",
+        "FACE 15-62",
+        "FACE 119-315",
+        "FACE 437-633"
+      ],
+      "relationships": [
+        {
+          "source id": "S2",
+          "target id": "S1",
+          "function relationship": "locates_mating_part",
+          "structural relationship": "supports"
+        },
+        {
+          "source id": "S2",
+          "target id": "S4",
+          "function relationship": "transmits_load",
+          "structural relationship": "attached_to"
+        },
+        {
+          "source id": "S2",
+          "target id": "S5",
+          "function relationship": "transmits_load",
+          "structural relationship": "attached_to"
+        },
+        {
+          "source id": "S2",
+          "target id": "S9",
+          "function relationship": "mounts_to",
+          "structural relationship": "supports"
+        }
+      ]
+    },
+    {
+      "id": "S3",
+      "name": "Right side/end frame + fan mounting face perimeter",
+      "features included": [
+        "Right-side boundary wall(s) and step faces",
+        "Fan-side perimeter frame that mates to shroud/grille ring features",
+        "Packaging boundary and stiffness features"
+      ],
+      "function intent": "Provide a rigid boundary on the fan side, support fan shrouds/guards, and maintain spacing between fans and core.",
+      "physical behavior": "Acts as a stiffened perimeter ring/plate; resists fan reaction loads; maintains airflow duct geometry.",
+      "geometry": "Planar and stepped planar faces near positive x around the fan hub/shroud interface region.",
+      "location": "Positive-x side around the fan openings; opposite side from the left frame planes.",
+      "colour": { "R": 120, "G": 120, "B": 120 },
+      "major_faces": [
+        {
+          "face_code": "0007",
+          "name": "Fan-side mounting plane (left fan bay) - plate",
+          "Brep_id": "FACE 324",
+          "description": "Planar face at x≈9.525 with inner/outer loops, forming a mounting/transition plane for the left fan bay duct."
+        },
+        {
+          "face_code": "0008",
+          "name": "Fan-side mounting plane (left fan bay) - outer boundary",
+          "Brep_id": "FACE 389",
+          "description": "Planar face at x≈12.7 serving as an outer boundary plane for the left fan bay duct/interface."
+        },
+        {
+          "face_code": "0009",
+          "name": "Fan-side mounting plane (right fan bay) - plate",
+          "Brep_id": "FACE 642",
+          "description": "Planar face at x≈9.525 with inner/outer loops, analogous to FACE 324 for the right fan bay."
+        },
+        {
+          "face_code": "0010",
+          "name": "Fan-side mounting plane (right fan bay) - outer boundary",
+          "Brep_id": "FACE 708",
+          "description": "Planar face at x≈12.7 analogous to FACE 389 for the right fan bay."
+        }
+      ],
+      "minor_faces_Brep_id": [
+        "FACE 316-390",
+        "FACE 634-709",
+        "FACE 387-388",
+        "FACE 706-707"
+      ],
+      "relationships": [
+        {
+          "source id": "S3",
+          "target id": "S6",
+          "function relationship": "mounts_to",
+          "structural relationship": "supports"
+        },
+        {
+          "source id": "S3",
+          "target id": "S7",
+          "function relationship": "mounts_to",
+          "structural relationship": "supports"
+        },
+        {
+          "source id": "S3",
+          "target id": "S1",
+          "function relationship": "provides_clearance",
+          "structural relationship": "adjacent_to"
+        },
+        {
+          "source id": "S3",
+          "target id": "S9",
+          "function relationship": "mounts_to",
+          "structural relationship": "attached_to"
+        }
+      ]
+    },
+    {
+      "id": "S4",
+      "name": "Top tank + filler neck/cap region",
+      "features included": [
+        "Top tank outer shell",
+        "Filler neck / cap boss",
+        "Upper edge of assembly (packaging face)"
+      ],
+      "function intent": "Provide upper coolant header volume and serviceable fill/bleed interface.",
+      "physical behavior": "Hollow tank distributes coolant across tube inlets; filler neck provides sealed access, resisting internal pressure while allowing service. Tank wall carries pressure loads and transfers them into the frame.",
+      "geometry": "Long top band/cover with planar outer surfaces; localized boss for filler/cap (distinct B-spline surface).",
+      "location": "Top edge of radiator (high y).",
+      "colour": { "R": 40, "G": 40, "B": 40 },
+      "major_faces": [
+        {
+          "face_code": "0011",
+          "name": "Top outer plane",
+          "Brep_id": "FACE 46",
+          "description": "Large planar top boundary face at y≈174.852 spanning between end frames."
+        },
+        {
+          "face_code": "0012",
+          "name": "Filler/cap exterior surface",
+          "Brep_id": "FACE 798",
+          "description": "Distinct BSPLINE exterior surface for the top filler neck/cap boss (localized protrusion near top center)."
+        }
+      ],
+      "minor_faces_Brep_id": [
+        "FACE 38-59",
+        "FACE 60",
+        "FACE 62",
+        "FACE 171-174",
+        "FACE 296-299"
+      ],
+      "relationships": [
+        {
+          "source id": "S4",
+          "target id": "S1",
+          "function relationship": "seals_against",
+          "structural relationship": "attached_to"
+        },
+        {
+          "source id": "S4",
+          "target id": "S2",
+          "function relationship": "transmits_load",
+          "structural relationship": "blends_into"
+        },
+        {
+          "source id": "S4",
+          "target id": "S3",
+          "function relationship": "transmits_load",
+          "structural relationship": "blends_into"
+        },
+        {
+          "source id": "S4",
+          "target id": "S8",
+          "function relationship": "distributes_stress",
+          "structural relationship": "supports"
+        }
+      ]
+    },
+    {
+      "id": "S5",
+      "name": "Bottom tank / lower header band",
+      "features included": [
+        "Bottom tank outer shell",
+        "Lower edge structural band",
+        "Potential drain/return interface adjacency"
+      ],
+      "function intent": "Provide lower coolant header volume and structural base for the radiator assembly.",
+      "physical behavior": "Hollow tank collects coolant from tubes; walls resist internal pressure and handling loads; bottom band also acts as a stiffener against bending and twisting.",
+      "geometry": "Long bottom band with planar outer surface; integrates with end frames.",
+      "location": "Bottom edge of radiator (low y).",
+      "colour": { "R": 30, "G": 30, "B": 30 },
+      "major_faces": [
+        {
+          "face_code": "0013",
+          "name": "Bottom outer plane",
+          "Brep_id": "FACE 22",
+          "description": "Large planar bottom boundary face at y≈-171.45 spanning between end frames."
+        }
+      ],
+      "minor_faces_Brep_id": [
+        "FACE 18-31",
+        "FACE 201-207",
+        "FACE 251-257",
+        "FACE 313-315",
+        "FACE 631-633"
+      ],
+      "relationships": [
+        {
+          "source id": "S5",
+          "target id": "S1",
+          "function relationship": "seals_against",
+          "structural relationship": "attached_to"
+        },
+        {
+          "source id": "S5",
+          "target id": "S2",
+          "function relationship": "transmits_load",
+          "structural relationship": "blends_into"
+        },
+        {
+          "source id": "S5",
+          "target id": "S3",
+          "function relationship": "transmits_load",
+          "structural relationship": "blends_into"
+        }
+      ]
+    },
+    {
+      "id": "S6",
+      "name": "Left fan module (axial fan + motor hub + shroud ring + guard)",
+      "features included": [
+        "Fan hub (motor housing)",
+        "Fan shroud/duct ring",
+        "Protective grille geometry (radial/circular ribs)",
+        "Blade set (not individually enumerated here)"
+      ],
+      "function intent": "Force airflow through the left half of the core at low vehicle speed or idle conditions.",
+      "physical behavior": "Motor hub drives blades to create pressure rise; shroud ring reduces recirculation and improves flow uniformity; grille protects blades and fingers while adding some stiffness.",
+      "geometry": "Concentric cylinders and tori around fan center (z≈-133.35), plus many small faces/ribs for the guard and blade geometry.",
+      "location": "Fan side (positive x), left bay (z<0).",
+      "colour": { "R": 70, "G": 70, "B": 70 },
+      "major_faces": [
+        {
+          "face_code": "0014",
+          "name": "Left fan hub outer cylinder",
+          "Brep_id": "FACE 161",
+          "description": "Cylindrical hub/motor housing surface (radius≈38.1) centered near the left fan bay."
+        },
+        {
+          "face_code": "0015",
+          "name": "Left fan shroud major torus ring",
+          "Brep_id": "FACE 339",
+          "description": "Large torus defining rounded shroud/guard ring transition (major radius≈28.575, minor≈9.525)."
+        },
+        {
+          "face_code": "0016",
+          "name": "Left fan shroud inner cylinder",
+          "Brep_id": "FACE 337",
+          "description": "Inner cylindrical duct surface (radius≈34.925) guiding airflow into the fan."
+        }
+      ],
+      "minor_faces_Brep_id": [
+        "FACE 316-388",
+        "FACE 327-387",
+        "FACE 340-386"
+      ],
+      "relationships": [
+        {
+          "source id": "S6",
+          "target id": "S3",
+          "function relationship": "mounts_to",
+          "structural relationship": "attached_to"
+        },
+        {
+          "source id": "S6",
+          "target id": "S1",
+          "function relationship": "guides_motion",
+          "structural relationship": "offset_from"
+        },
+        {
+          "source id": "S6",
+          "target id": "S8",
+          "function relationship": "distributes_stress",
+          "structural relationship": "adjacent_to"
+        }
+      ]
+    },
+    {
+      "id": "S7",
+      "name": "Right fan module (axial fan + motor hub + shroud ring + guard)",
+      "features included": [
+        "Fan hub (motor housing)",
+        "Fan shroud/duct ring",
+        "Protective grille geometry (radial/circular ribs)",
+        "Blade set (not individually enumerated here)"
+      ],
+      "function intent": "Force airflow through the right half of the core.",
+      "physical behavior": "Same as left module; provides redundancy/greater airflow by splitting across two bays.",
+      "geometry": "Concentric cylinders and tori around fan center (z≈+133.35), with many small guard/blade faces.",
+      "location": "Fan side (positive x), right bay (z>0).",
+      "colour": { "R": 80, "G": 80, "B": 80 },
+      "major_faces": [
+        {
+          "face_code": "0017",
+          "name": "Right fan hub outer cylinder",
+          "Brep_id": "FACE 479",
+          "description": "Cylindrical hub/motor housing surface (radius≈38.1) centered near the right fan bay."
+        },
+        {
+          "face_code": "0018",
+          "name": "Right fan shroud major torus ring",
+          "Brep_id": "FACE 658",
+          "description": "Large torus defining rounded shroud/guard ring transition (major radius≈28.575, minor≈9.525)."
+        },
+        {
+          "face_code": "0019",
+          "name": "Right fan shroud inner cylinder",
+          "Brep_id": "FACE 655",
+          "description": "Inner cylindrical duct surface (radius≈34.925) guiding airflow into the fan."
+        }
+      ],
+      "minor_faces_Brep_id": [
+        "FACE 634-707",
+        "FACE 645-706",
+        "FACE 659-705"
+      ],
+      "relationships": [
+        {
+          "source id": "S7",
+          "target id": "S3",
+          "function relationship": "mounts_to",
+          "structural relationship": "attached_to"
+        },
+        {
+          "source id": "S7",
+          "target id": "S1",
+          "function relationship": "guides_motion",
+          "structural relationship": "offset_from"
+        },
+        {
+          "source id": "S7",
+          "target id": "S8",
+          "function relationship": "distributes_stress",
+          "structural relationship": "adjacent_to"
+        }
+      ]
+    },
+    {
+      "id": "S8",
+      "name": "Central fan-divider / stiffening brace",
+      "features included": [
+        "Central web between fan bays (visual X/bridge in right view)",
+        "Stiffener tying top and bottom bands across midspan"
+      ],
+      "function intent": "Separate two fan flow paths and stiffen the fan mounting frame to reduce vibration/noise and prevent rubbing.",
+      "physical behavior": "Web/brace works in bending and shear, reducing frame deflection under fan loads and vehicle vibration; also reduces cross-flow short-circuit between fan bays.",
+      "geometry": "Thin web/brace element positioned at the midline between fans; likely composed of planar and small blend faces.",
+      "location": "Between the two fans around z≈0 on the fan side.",
+      "colour": { "R": 100, "G": 100, "B": 110 },
+      "major_faces": [
+        {
+          "face_code": "0020",
+          "name": "Mid-plane end wall (z+ end cap plane)",
+          "Brep_id": "FACE 24",
+          "description": "Large planar boundary at z≈+266.7; used here as a major visible planar boundary relevant to overall frame continuity (end cap plane)."
+        },
+        {
+          "face_code": "0021",
+          "name": "Mid-plane end wall (z- end cap plane)",
+          "Brep_id": "FACE 42",
+          "description": "Large planar boundary at z≈-266.7; used here as a major visible planar boundary relevant to overall frame continuity (end cap plane)."
+        }
+      ],
+      "minor_faces_Brep_id": [
+        "FACE 43-49",
+        "FACE 140-160",
+        "FACE 300-315",
+        "FACE 618-633"
+      ],
+      "relationships": [
+        {
+          "source id": "S8",
+          "target id": "S3",
+          "function relationship": "distributes_stress",
+          "structural relationship": "attached_to"
+        },
+        {
+          "source id": "S8",
+          "target id": "S6",
+          "function relationship": "constrains_dof",
+          "structural relationship": "adjacent_to"
+        },
+        {
+          "source id": "S8",
+          "target id": "S7",
+          "function relationship": "constrains_dof",
+          "structural relationship": "adjacent_to"
+        }
+      ]
+    },
+    {
+      "id": "S9",
+      "name": "Mounting bosses / corner pads + hose/port interfaces",
+      "features included": [
+        "Corner circular mounting pads/bosses",
+        "Hose barb / nipple interfaces",
+        "Outlet elbow/return interface (protruding end feature)"
+      ],
+      "function intent": "Provide interfaces for mounting the radiator in a vehicle and for connecting coolant hoses/lines.",
+      "physical behavior": "Bosses act as local stiffeners distributing clamp/fastener loads into the frame; hose ports provide sealing and load transfer from hose clamps; outlet elbow resists bending moments from attached hose routing.",
+      "geometry": "Localized cylindrical/boss features at corners and protruding tube/elbow surfaces beyond the main bounding box in z; includes a few distinct BSPLINE single-face solids for hoses/elbows/ports.",
+      "location": "Corners of the perimeter frame and at the ends where brass hose connections appear; one prominent protrusion beyond z≈+266.7.",
+      "colour": { "R": 200, "G": 170, "B": 80 },
+      "major_faces": [
+        {
+          "face_code": "0022",
+          "name": "Corner boss cylinder (upper corner feature)",
+          "Brep_id": "FACE 43",
+          "description": "Small cylindrical boss surface (radius≈6.35) near a top corner region; representative of mounting pad geometry."
+        },
+        {
+          "face_code": "0023",
+          "name": "Corner boss cylinder (opposite corner feature)",
+          "Brep_id": "FACE 49",
+          "description": "Small cylindrical boss surface (radius≈6.35) near the opposite top corner region; representative of mounting pad geometry."
+        },
+        {
+          "face_code": "0024",
+          "name": "Hose/port exterior surface A",
+          "Brep_id": "FACE 796",
+          "description": "BSPLINE surface (single-face solid) consistent with an external port/connection feature (one of the hose interfaces)."
+        },
+        {
+          "face_code": "0025",
+          "name": "Hose/port exterior surface B",
+          "Brep_id": "FACE 797",
+          "description": "BSPLINE surface (single-face solid) consistent with a second external port/connection feature."
+        },
+        {
+          "face_code": "0026",
+          "name": "Outlet elbow / protruding port surface A",
+          "Brep_id": "FACE 794",
+          "description": "Large BSPLINE surface on protruding end feature beyond z≈+266.7, consistent with an outlet elbow/pipe."
+        },
+        {
+          "face_code": "0027",
+          "name": "Outlet elbow / protruding port surface B",
+          "Brep_id": "FACE 795",
+          "description": "Second large BSPLINE surface on protruding end feature beyond z≈+266.7, consistent with a paired/adjacent outlet elbow surface."
+        }
+      ],
+      "minor_faces_Brep_id": [
+        "FACE 45-48",
+        "FACE 114-118",
+        "FACE 170-182",
+        "FACE 432-436",
+        "FACE 488-500",
+        "FACE 15-41",
+        "FACE 50-59"
+      ],
+      "relationships": [
+        {
+          "source id": "S9",
+          "target id": "S2",
+          "function relationship": "mounts_to",
+          "structural relationship": "attached_to"
+        },
+        {
+          "source id": "S9",
+          "target id": "S3",
+          "function relationship": "mounts_to",
+          "structural relationship": "attached_to"
+        },
+        {
+          "source id": "S9",
+          "target id": "S4",
+          "function relationship": "seals_against",
+          "structural relationship": "adjacent_to"
+        },
+        {
+          "source id": "S9",
+          "target id": "S5",
+          "function relationship": "seals_against",
+          "structural relationship": "adjacent_to"
+        }
+      ]
+    }
+  ]
+}

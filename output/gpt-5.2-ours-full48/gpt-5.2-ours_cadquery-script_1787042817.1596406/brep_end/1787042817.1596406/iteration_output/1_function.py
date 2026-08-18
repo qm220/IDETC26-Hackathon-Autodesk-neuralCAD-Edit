@@ -1,0 +1,419 @@
+def my_cad_function(args):
+    import os, math
+    import cadquery as cq
+
+    input_file = os.path.expanduser(args.get("input_file", ""))
+    if not input_file or not os.path.exists(input_file):
+        raise ValueError(f"input_file not found: {input_file}")
+
+    wp = cq.importers.importStep(input_file)
+    shape = wp.val() if hasattr(wp, "val") else wp
+
+    # ---------------- Vector helpers ----------------
+    def v_add(a, b):
+        return (a[0] + b[0], a[1] + b[1], a[2] + b[2])
+
+    def v_sub(a, b):
+        return (a[0] - b[0], a[1] - b[1], a[2] - b[2])
+
+    def v_mul(a, s):
+        return (a[0] * s, a[1] * s, a[2] * s)
+
+    def v_dot(a, b):
+        return a[0] * b[0] + a[1] * b[1] + a[2] * b[2]
+
+    def v_len(a):
+        return math.sqrt(max(0.0, v_dot(a, a)))
+
+    def v_unit(a):
+        L = v_len(a)
+        if L < 1e-12:
+            return (0.0, 0.0, 0.0)
+        return (a[0] / L, a[1] / L, a[2] / L)
+
+    def clamp(x, lo, hi):
+        return max(lo, min(hi, x))
+
+    def pt_tuple(p):
+        return (float(p.x), float(p.y), float(p.z))
+
+    def axis_from_smallest_bbox_dim(bb):
+        dx, dy, dz = bb.xlen, bb.ylen, bb.zlen
+        if dx <= dy and dx <= dz:
+            return (1.0, 0.0, 0.0)
+        if dy <= dx and dy <= dz:
+            return (0.0, 1.0, 0.0)
+        return (0.0, 0.0, 1.0)
+
+    def make_axis_workplane(axis_dir):
+        n = v_unit(axis_dir)
+        if v_len(n) < 1e-12:
+            n = (0.0, 1.0, 0.0)
+        x_guess = (1.0, 0.0, 0.0) if abs(n[0]) < 0.9 else (0.0, 0.0, 1.0)
+        x_proj = v_mul(n, v_dot(x_guess, n))
+        xdir = v_unit(v_sub(x_guess, x_proj))
+        if v_len(xdir) < 1e-12:
+            xdir = (1.0, 0.0, 0.0)
+        plane = cq.Plane(origin=(0, 0, 0), xDir=xdir, normal=n)
+        return cq.Workplane(plane)
+
+    def plane_basis(axis_dir):
+        n = v_unit(axis_dir)
+        if v_len(n) < 1e-12:
+            n = (0.0, 1.0, 0.0)
+        x_guess = (1.0, 0.0, 0.0) if abs(n[0]) < 0.9 else (0.0, 0.0, 1.0)
+        x_proj = v_mul(n, v_dot(x_guess, n))
+        u = v_unit(v_sub(x_guess, x_proj))
+        # v = n x u
+        v = (
+            n[1] * u[2] - n[2] * u[1],
+            n[2] * u[0] - n[0] * u[2],
+            n[0] * u[1] - n[1] * u[0],
+        )
+        v = v_unit(v)
+        return u, v, n
+
+    def project_to_plane(vec, axis_dir):
+        n = v_unit(axis_dir)
+        return v_sub(vec, v_mul(n, v_dot(vec, n)))
+
+    # ---------------- Hub axis/radius detection ----------------
+    def find_hub_radius_and_axis(solids, global_center, axis_guess):
+        try:
+            from OCP.BRepAdaptor import BRepAdaptor_Surface
+            from OCP.GeomAbs import GeomAbs_Cylinder
+        except Exception:
+            return None, axis_guess
+
+        best = None  # (score, r, axis)
+        ag = v_unit(axis_guess)
+
+        for s in solids:
+            for f in s.Faces():
+                try:
+                    ad = BRepAdaptor_Surface(f.wrapped)
+                    if ad.GetType() != GeomAbs_Cylinder:
+                        continue
+                    cyl = ad.Cylinder()
+                    r = float(cyl.Radius())
+                    # expect hub-ish cylinder in ~[4,15] mm range for this model
+                    if r < 3.0 or r > 20.0:
+                        continue
+
+                    ax_dir = cyl.Axis().Direction()
+                    ax = v_unit((float(ax_dir.X()), float(ax_dir.Y()), float(ax_dir.Z())))
+                    align = abs(v_dot(ax, ag))
+
+                    loc = cyl.Location()
+                    c = (float(loc.X()), float(loc.Y()), float(loc.Z()))
+                    dist = v_len(v_sub(c, global_center))
+
+                    # prefer: aligned, close to center, radius near ~6-7mm
+                    score = 10.0 * align - 0.10 * dist - 0.05 * abs(r - 6.5)
+                    if best is None or score > best[0]:
+                        best = (score, r, ax)
+                except Exception:
+                    continue
+
+        if best is None:
+            return None, axis_guess
+        return best[1], best[2]
+
+    # ---------------- Blade direction (in plane) ----------------
+    def blade_dir_from_vertices(blade_solid, global_center, axis_dir):
+        # Use farthest pair of projected vertices to estimate main length direction.
+        verts = blade_solid.Vertices()
+        pts = []
+        for vv in verts:
+            p = pt_tuple(vv.Center())
+            v = v_sub(p, global_center)
+            vp = project_to_plane(v, axis_dir)
+            if v_len(vp) > 1e-6:
+                pts.append(vp)
+        if len(pts) < 2:
+            # fallback to bbox
+            bb = blade_solid.BoundingBox()
+            # use XZ as fallback since axis is typically Y
+            if bb.xlen >= bb.zlen:
+                return v_unit((1.0, 0.0, 0.0))
+            return v_unit((0.0, 0.0, 1.0))
+
+        # brute-force farthest pair
+        max_d2 = -1.0
+        best = (pts[0], pts[1])
+        for i in range(len(pts)):
+            a = pts[i]
+            for j in range(i + 1, len(pts)):
+                b = pts[j]
+                d = v_sub(b, a)
+                d2 = v_dot(d, d)
+                if d2 > max_d2:
+                    max_d2 = d2
+                    best = (a, b)
+        d = v_sub(best[1], best[0])
+        d = v_unit(d)
+        if v_len(d) < 1e-9:
+            return v_unit((0.0, 0.0, 1.0))
+        return d
+
+    def dir_to_angle_deg(dir_in_plane, u, v):
+        # undirected angle in [0,180)
+        x = v_dot(dir_in_plane, u)
+        y = v_dot(dir_in_plane, v)
+        ang = math.degrees(math.atan2(y, x))
+        ang = ang % 180.0
+        return ang
+
+    def ang_dist_180(a, b):
+        d = abs(a - b) % 180.0
+        return min(d, 180.0 - d)
+
+    def best_new_angle(existing_angles, step_deg=0.5):
+        best_a = None
+        best_score = -1.0
+        a = 0.0
+        while a < 180.0 - 1e-9:
+            mind = min(ang_dist_180(a, ea) for ea in existing_angles)
+            if mind > best_score:
+                best_score = mind
+                best_a = a
+            a += step_deg
+        return best_a, best_score
+
+    # ---------------- Central thinning ----------------
+    def thin_central_portion(blade_solid, global_center, axis_dir, cut_radius, target_thickness=0.42):
+        axis_dir = v_unit(axis_dir)
+        if v_len(axis_dir) < 1e-12:
+            axis_dir = (0.0, 1.0, 0.0)
+
+        bb = blade_solid.BoundingBox()
+        # thickness along axis approximated by bbox axis component (works since axis aligns to world in this model)
+        # Use world Y if axis ~Y, otherwise estimate via bbox projection components.
+        # Here we do robust approximation via component-weighted bbox dims.
+        ax = (abs(axis_dir[0]), abs(axis_dir[1]), abs(axis_dir[2]))
+        t0 = ax[0] * bb.xlen + ax[1] * bb.ylen + ax[2] * bb.zlen
+        if t0 <= target_thickness + 1e-3:
+            return blade_solid
+
+        cutter_h = max(2.0 * t0, 20.0)
+        base_wp = make_axis_workplane(axis_dir)
+        cutter = base_wp.circle(cut_radius).extrude(cutter_h, both=True).val()
+
+        offset = (target_thickness / 2.0) + (cutter_h / 2.0)
+        top_cutter = cutter.translate(v_add(global_center, v_mul(axis_dir, offset)))
+        bot_cutter = cutter.translate(v_add(global_center, v_mul(axis_dir, -offset)))
+
+        return blade_solid.cut(top_cutter).cut(bot_cutter)
+
+    # ---------------- Fillet long edges ----------------
+    def pick_long_edges_for_fillet(blade_solid, global_center, axis_dir, hub_r, dir_len, min_len):
+        axis_dir = v_unit(axis_dir)
+        dir_len = v_unit(dir_len)
+        if v_len(dir_len) < 1e-9:
+            return []
+
+        def dist_to_axis(pt):
+            v = v_sub(pt, global_center)
+            vpar = v_mul(axis_dir, v_dot(v, axis_dir))
+            vper = v_sub(v, vpar)
+            return v_len(vper)
+
+        out = []
+        for e in blade_solid.Edges():
+            try:
+                L = float(e.Length())
+                if L < min_len:
+                    continue
+                vs = e.Vertices()
+                if len(vs) < 2:
+                    continue
+                p1 = pt_tuple(vs[0].Center())
+                p2 = pt_tuple(vs[-1].Center())
+                d = v_unit(v_sub(p2, p1))
+                if v_len(d) < 1e-12:
+                    continue
+                # accept both directions
+                if abs(v_dot(d, dir_len)) < 0.92:
+                    continue
+                mid = pt_tuple(e.Center())
+                if dist_to_axis(mid) < hub_r * 1.15:
+                    # avoid near-center/internal edges
+                    continue
+                out.append(e)
+            except Exception:
+                continue
+
+        # If we got too many, keep the longest ones; filleting multiple segments is OK.
+        out.sort(key=lambda ed: ed.Length(), reverse=True)
+        return out
+
+    def apply_fillet(blade_solid, edges, fillet_r):
+        if not edges:
+            return blade_solid
+        try:
+            return cq.Workplane(obj=blade_solid).newObject(edges).fillet(fillet_r).val()
+        except Exception as e:
+            print(f"Fillet failed: {e}")
+            return blade_solid
+
+    # ---------------- Main ----------------
+    solids = list(shape.Solids()) if hasattr(shape, "Solids") else []
+    print(f"Loaded STEP: {input_file}")
+    print(f"Solid count (input): {len(solids)}")
+
+    if len(solids) < 2:
+        print("Not enough solids to modify.")
+        return wp
+
+    bb_all = shape.BoundingBox()
+    global_center = pt_tuple(bb_all.center)
+    print(f"Overall bbox center: {global_center}")
+    print(f"Overall bbox dims: dx={bb_all.xlen:.3f} dy={bb_all.ylen:.3f} dz={bb_all.zlen:.3f}")
+
+    axis_guess = axis_from_smallest_bbox_dim(bb_all)
+    hub_r, axis_dir = find_hub_radius_and_axis(solids, global_center, axis_guess)
+    if hub_r is None:
+        hub_r = 6.5
+        axis_dir = axis_guess
+    axis_dir = v_unit(axis_dir)
+    if v_len(axis_dir) < 1e-12:
+        axis_dir = (0.0, 1.0, 0.0)
+
+    print(f"Axis dir (hub): {axis_dir}")
+    print(f"Hub radius (detected/assumed): {hub_r:.3f} mm")
+
+    # Identify blade solids: thin along axis_dir and long in plane.
+    blade_idxs = []
+    clamp_idxs = []
+    for i, s in enumerate(solids):
+        bb = s.BoundingBox()
+        ax = (abs(axis_dir[0]), abs(axis_dir[1]), abs(axis_dir[2]))
+        ax_ext = ax[0] * bb.xlen + ax[1] * bb.ylen + ax[2] * bb.zlen
+        planar_ext = max(bb.xlen, bb.ylen, bb.zlen)
+        # expect blades: axis extent ~12.7, long planar extent >> axis extent
+        ratio = planar_ext / max(ax_ext, 1e-6)
+        print(f"Solid[{i}] bb=({bb.xlen:.2f},{bb.ylen:.2f},{bb.zlen:.2f}) ax_ext≈{ax_ext:.2f} ratio≈{ratio:.2f}")
+        if ax_ext < 20.0 and ratio > 8.0:
+            blade_idxs.append(i)
+        else:
+            clamp_idxs.append(i)
+
+    # If heuristic fails, fall back to the two most elongated solids
+    if len(blade_idxs) < 2:
+        scored = []
+        for i, s in enumerate(solids):
+            bb = s.BoundingBox()
+            ax = (abs(axis_dir[0]), abs(axis_dir[1]), abs(axis_dir[2]))
+            ax_ext = ax[0] * bb.xlen + ax[1] * bb.ylen + ax[2] * bb.zlen
+            planar_ext = max(bb.xlen, bb.ylen, bb.zlen)
+            ratio = planar_ext / max(ax_ext, 1e-6)
+            scored.append((ratio, planar_ext, i))
+        scored.sort(reverse=True)
+        blade_idxs = [scored[0][2], scored[1][2]]
+        clamp_idxs = [i for i in range(len(solids)) if i not in blade_idxs]
+
+    blade_idxs = sorted(blade_idxs)
+    print(f"Blade solids selected: {blade_idxs}")
+    print(f"Non-blade solids: {clamp_idxs}")
+
+    # Parameters
+    target_t = 0.42
+    cut_radius = float(hub_r + 2.0)
+    fillet_r = 0.15  # must be <= ~0.21 due to 0.42mm thinned web
+
+    u, v, n = plane_basis(axis_dir)
+
+    modified = [None] * len(solids)
+    blade_dirs = {}
+    blade_angles = {}
+
+    # Modify existing blades
+    for i, s in enumerate(solids):
+        if i not in blade_idxs:
+            modified[i] = s
+            continue
+
+        b = s
+        # central thinning
+        try:
+            b = thin_central_portion(b, global_center, axis_dir, cut_radius, target_thickness=target_t)
+            print(f"Blade[{i}] thinned to ~{target_t}mm in central r={cut_radius:.3f}mm")
+        except Exception as e:
+            print(f"Blade[{i}] thinning failed: {e}")
+
+        # compute length direction
+        dlen = blade_dir_from_vertices(b, global_center, axis_dir)
+        dlen = v_unit(dlen)
+        blade_dirs[i] = dlen
+        ang = dir_to_angle_deg(dlen, u, v)
+        blade_angles[i] = ang
+        print(f"Blade[{i}] dir_in_plane={dlen}, angle≈{ang:.2f}° (mod 180)")
+
+        # select edges for fillet
+        bb = b.BoundingBox()
+        # approximate in-plane length
+        inplane_len = max(bb.xlen, bb.zlen, bb.ylen)
+        min_len = 0.12 * inplane_len
+        try:
+            edges = pick_long_edges_for_fillet(b, global_center, axis_dir, hub_r, dlen, min_len)
+            print(f"Blade[{i}] fillet edge candidates: {len(edges)} (min_len={min_len:.2f})")
+            b = apply_fillet(b, edges, fillet_r)
+        except Exception as e:
+            print(f"Blade[{i}] fillet selection/apply failed: {e}")
+
+        modified[i] = b
+
+    # Add third blade (duplicate design from one of the existing blades)
+    # Template: pick the longer of the selected blades
+    def inplane_span(sld):
+        bb = sld.BoundingBox()
+        return max(bb.xlen, bb.zlen)
+
+    template_idx = max(blade_idxs, key=lambda idx: inplane_span(modified[idx]))
+    template = modified[template_idx]
+    template_dir = blade_dir_from_vertices(template, global_center, axis_dir)
+    template_ang = dir_to_angle_deg(template_dir, u, v)
+
+    existing_angles = [blade_angles[idx] for idx in blade_idxs if idx in blade_angles]
+    if len(existing_angles) == 0:
+        existing_angles = [template_ang]
+
+    new_ang, gap = best_new_angle(existing_angles, step_deg=0.5)
+    delta = (new_ang - template_ang)
+
+    print(f"Template blade = Solid[{template_idx}], template_ang≈{template_ang:.2f}°; best new_ang≈{new_ang:.2f}° (gap≈{gap:.2f}°); rotate delta≈{delta:.2f}°")
+
+    # rotate about axis through global_center
+    p1 = v_add(global_center, v_mul(axis_dir, -1000.0))
+    p2 = v_add(global_center, v_mul(axis_dir, +1000.0))
+
+    new_blade = template.copy() if hasattr(template, "copy") else template
+    try:
+        new_blade = new_blade.rotate(p1, p2, delta)
+    except Exception as e:
+        print(f"Rotation failed, using 120° fallback: {e}")
+        new_blade = new_blade.rotate(p1, p2, 120.0)
+
+    # Ensure central thinning is present (template already should be) and fillets are applied
+    try:
+        new_blade = thin_central_portion(new_blade, global_center, axis_dir, cut_radius, target_thickness=target_t)
+    except Exception as e:
+        print(f"New blade thinning ensure failed: {e}")
+
+    try:
+        dlen_new = blade_dir_from_vertices(new_blade, global_center, axis_dir)
+        bb = new_blade.BoundingBox()
+        inplane_len = max(bb.xlen, bb.zlen, bb.ylen)
+        min_len = 0.12 * inplane_len
+        edges = pick_long_edges_for_fillet(new_blade, global_center, axis_dir, hub_r, dlen_new, min_len)
+        print(f"New blade fillet edge candidates: {len(edges)}")
+        new_blade = apply_fillet(new_blade, edges, fillet_r)
+    except Exception as e:
+        print(f"New blade fillet failed: {e}")
+
+    out_solids = [modified[i] for i in range(len(solids)) if modified[i] is not None]
+    out_solids.append(new_blade)
+
+    result = cq.Compound.makeCompound(out_solids)
+    print(f"Solid count (output): {len(out_solids)}")
+    return result

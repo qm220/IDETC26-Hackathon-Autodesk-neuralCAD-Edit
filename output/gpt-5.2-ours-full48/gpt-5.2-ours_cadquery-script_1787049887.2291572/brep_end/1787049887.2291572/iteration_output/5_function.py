@@ -1,0 +1,329 @@
+def my_cad_function(args):
+    import cadquery as cq
+    import os, math
+
+    input_file = os.path.expanduser(args.get("input_file", ""))
+    model = cq.importers.importStep(input_file)
+    shp = model.val() if hasattr(model, "val") else model
+
+    solids = list(shp.Solids())
+    print(f"Loaded STEP: {input_file}")
+    print(f"Total solids: {len(solids)}")
+
+    overall_bb = shp.BoundingBox()
+    overall_center = overall_bb.center
+    print(f"Overall bbox center: ({overall_center.x:.3f}, {overall_center.y:.3f}, {overall_center.z:.3f})")
+
+    def bb_dims(s):
+        bb = s.BoundingBox()
+        return bb, (bb.xlen, bb.ylen, bb.zlen)
+
+    def unit(v):
+        l = math.sqrt(v[0]*v[0] + v[1]*v[1] + v[2]*v[2])
+        if l < 1e-12:
+            return (1.0, 0.0, 0.0)
+        return (v[0]/l, v[1]/l, v[2]/l)
+
+    def dot(a, b):
+        return a[0]*b[0] + a[1]*b[1] + a[2]*b[2]
+
+    def cross(a, b):
+        return (
+            a[1]*b[2] - a[2]*b[1],
+            a[2]*b[0] - a[0]*b[2],
+            a[0]*b[1] - a[1]*b[0],
+        )
+
+    def add(a, b):
+        return (a[0] + b[0], a[1] + b[1], a[2] + b[2])
+
+    def sub(a, b):
+        return (a[0] - b[0], a[1] - b[1], a[2] - b[2])
+
+    def mul(a, s):
+        return (a[0]*s, a[1]*s, a[2]*s)
+
+    def axis_val(v, axis):
+        return {"X": v[0], "Y": v[1], "Z": v[2]}[axis]
+
+    def rr_sketch(w, h, r):
+        # returns a cq.Sketch
+        w = float(w); h = float(h); r = float(r)
+        rmax = max(0.0, min(w, h) * 0.5 - 0.05)
+        r = max(0.0, min(r, rmax))
+        return cq.Sketch().rect(w, h).vertices().fillet(r)
+
+    # --- pick a slender solid as a seed for cord group ---
+    best_i, best_s, best_score = None, None, -1.0
+    for i, s in enumerate(solids):
+        bb, (dx, dy, dz) = bb_dims(s)
+        dims = [dx, dy, dz]
+        mx = max(dims)
+        mn = max(1e-6, min(dims))
+        aspect = mx / mn
+        score = aspect
+        # prefer long, thin solids
+        if mx > 120 and mn < 20:
+            score *= 2.0
+        if mx < 60:
+            score *= 0.2
+        if mn > 40:
+            score *= 0.05
+        if score > best_score:
+            best_score = score
+            best_i, best_s = i, s
+
+    if best_s is None:
+        print("No solids found; returning original")
+        return model
+
+    seed_idx = best_i
+    seed_bb, (sdx, sdy, sdz) = bb_dims(best_s)
+    print(f"Seed cord-like solid index: {seed_idx}")
+    print(f"Seed bbox lens: dx={sdx:.3f}, dy={sdy:.3f}, dz={sdz:.3f}")
+
+    # Determine primary axis by seed bbox
+    dims = {"X": sdx, "Y": sdy, "Z": sdz}
+    axis = max(dims, key=dims.get)
+    print(f"Detected cord axis (bbox heuristic): {axis}")
+
+    # Build a 'cord group' = all nearby/small solids (cord may be split into multiple solids)
+    # Use axis-range + size filters to avoid capturing housing.
+    seed_ctr = (seed_bb.center.x, seed_bb.center.y, seed_bb.center.z)
+
+    if axis == "X":
+        a_min, a_max = seed_bb.xmin, seed_bb.xmax
+    elif axis == "Y":
+        a_min, a_max = seed_bb.ymin, seed_bb.ymax
+    else:
+        a_min, a_max = seed_bb.zmin, seed_bb.zmax
+
+    a_min -= 80.0
+    a_max += 80.0
+
+    cord_group_idx = []
+    for i, s in enumerate(solids):
+        bb, (dx, dy, dz) = bb_dims(s)
+        mx = max(dx, dy, dz)
+        mn = min(dx, dy, dz)
+        mid = sorted([dx, dy, dz])[1]
+
+        # size gate: cord/plug components are moderate sized; exclude big housing/cradle
+        if mx > 260:
+            continue
+        if mn > 60:
+            continue
+        if mid > 140:
+            continue
+
+        ctr = (bb.center.x, bb.center.y, bb.center.z)
+        a = axis_val(ctr, axis)
+        if a < a_min or a > a_max:
+            continue
+
+        # proximity in perpendicular space (avoid random small parts far away)
+        # use bbox center distance, but only in perpendicular directions
+        if axis == "X":
+            dperp = math.hypot(ctr[1]-seed_ctr[1], ctr[2]-seed_ctr[2])
+        elif axis == "Y":
+            dperp = math.hypot(ctr[0]-seed_ctr[0], ctr[2]-seed_ctr[2])
+        else:
+            dperp = math.hypot(ctr[0]-seed_ctr[0], ctr[1]-seed_ctr[1])
+
+        if dperp > 220:
+            continue
+
+        cord_group_idx.append(i)
+
+    cord_group_idx = sorted(set(cord_group_idx))
+    print(f"Cord-group candidate indices: {cord_group_idx}")
+
+    if not cord_group_idx:
+        cord_group_idx = [seed_idx]
+        print("WARNING: cord-group empty after filtering; using seed only")
+
+    # Fuse cord group into a single assembly solid/compound
+    cord_asm = None
+    for j, i in enumerate(cord_group_idx):
+        wp = cq.Workplane(obj=solids[i])
+        if cord_asm is None:
+            cord_asm = wp
+        else:
+            try:
+                cord_asm = cord_asm.union(wp)
+            except Exception as e:
+                print(f"WARNING: union failed for cord-group member {i}: {e}")
+                # fallback: keep as compound by just adding later (handled by union result anyway)
+                cord_asm = cord_asm.add(wp)
+
+    cord_asm_shape = cord_asm.val()
+    asm_bb = cord_asm_shape.BoundingBox()
+
+    # Determine plug end direction n using overall center vs asm extremes
+    if axis == "X":
+        end_max, end_min, c0 = asm_bb.xmax, asm_bb.xmin, overall_center.x
+        plug_end = end_max if abs(end_max - c0) >= abs(end_min - c0) else end_min
+        n = (1.0, 0.0, 0.0) if plug_end == end_max else (-1.0, 0.0, 0.0)
+        perp_dims = (asm_bb.ylen, asm_bb.zlen)
+    elif axis == "Y":
+        end_max, end_min, c0 = asm_bb.ymax, asm_bb.ymin, overall_center.y
+        plug_end = end_max if abs(end_max - c0) >= abs(end_min - c0) else end_min
+        n = (0.0, 1.0, 0.0) if plug_end == end_max else (0.0, -1.0, 0.0)
+        perp_dims = (asm_bb.xlen, asm_bb.zlen)
+    else:
+        end_max, end_min, c0 = asm_bb.zmax, asm_bb.zmin, overall_center.z
+        plug_end = end_max if abs(end_max - c0) >= abs(end_min - c0) else end_min
+        n = (0.0, 0.0, 1.0) if plug_end == end_max else (0.0, 0.0, -1.0)
+        perp_dims = (asm_bb.xlen, asm_bb.ylen)
+
+    # Estimate cord diameter from smallest perpendicular bbox span, clamped
+    cord_d = max(3.0, min(10.0, min(perp_dims)))
+    print(f"Cord assembly bbox: dx={asm_bb.xlen:.3f}, dy={asm_bb.ylen:.3f}, dz={asm_bb.zlen:.3f}")
+    print(f"Plug_end={plug_end:.3f}, n={n}, estimated cord_d={cord_d:.3f}")
+
+    # Build reference plane at cut location near plug end; remove last chunk and rebuild plug there
+    # Cut off enough length to remove old plug even if it was fused with the cord.
+    pin_d = 4.0
+    pin_len = 19.0
+    pin_spacing = 19.0
+    pin_tip_ch = 0.5
+
+    body_w = 35.0
+    body_h = 16.0
+    body_len = 14.0
+
+    # shaping
+    rear_r = 2.0
+    front_r = 6.0
+    body_edge_fillet = 1.2
+
+    recess_d = 6.5
+    recess_depth = 1.0
+
+    neck_len = 18.0
+    neck_taper_deg = 6.0
+    overlap = 10.0  # ensure physical overlap with trimmed cord for a real fuse
+
+    cut_off_len = max(70.0, overlap + neck_len + body_len + pin_len + 5.0)
+
+    # cut plane origin = plug_end moved back along -n by cut_off_len
+    if axis == "X":
+        cut_origin = (plug_end - n[0]*cut_off_len, asm_bb.center.y, asm_bb.center.z)
+    elif axis == "Y":
+        cut_origin = (asm_bb.center.x, plug_end - n[1]*cut_off_len, asm_bb.center.z)
+    else:
+        cut_origin = (asm_bb.center.x, asm_bb.center.y, plug_end - n[2]*cut_off_len)
+
+    up = (0.0, 0.0, 1.0)
+    if abs(dot(n, up)) > 0.95:
+        up = (0.0, 1.0, 0.0)
+    xDir = unit(cross(up, n))
+
+    cut_plane = cq.Plane(origin=cq.Vector(*cut_origin), xDir=cq.Vector(*xDir), normal=cq.Vector(*n))
+    print(f"Cut plane origin: ({cut_origin[0]:.3f}, {cut_origin[1]:.3f}, {cut_origin[2]:.3f}), cut_off_len={cut_off_len:.2f}")
+
+    # Tool extends from plane in +normal direction (toward plug end) and removes everything beyond
+    cut_tool = cq.Workplane(cut_plane).box(2000, 2000, 2000, centered=(True, True, False))
+    trimmed_cord = cq.Workplane(obj=cord_asm_shape).cut(cut_tool)
+
+    # Define forward face selector for operations on pins etc.
+    nx, ny, nz = n
+    if abs(nx) > 0.5:
+        fwd_sel = ">X" if nx > 0 else "<X"
+    elif abs(ny) > 0.5:
+        fwd_sel = ">Y" if ny > 0 else "<Y"
+    else:
+        fwd_sel = ">Z" if nz > 0 else "<Z"
+    print(f"Forward face selector: {fwd_sel}")
+
+    # Build Europlug at cut plane
+    end_plane = cq.Plane(origin=cq.Vector(*cut_origin), xDir=cq.Vector(*xDir), normal=cq.Vector(*n))
+
+    # Sleeve overlaps backward into the existing cord to guarantee intersection and a fused union
+    sleeve = (
+        cq.Workplane(end_plane)
+        .circle((cord_d * 1.06) / 2.0)
+        .extrude(-overlap)
+    )
+
+    # Tapered neck forward
+    neck = (
+        cq.Workplane(end_plane)
+        .circle((cord_d * 1.10) / 2.0)
+        .extrude(neck_len, taper=neck_taper_deg)
+    )
+
+    rear_plane = cq.Plane(origin=cq.Vector(*add(cut_origin, mul(n, neck_len))), xDir=cq.Vector(*xDir), normal=cq.Vector(*n))
+    front_plane = cq.Plane(origin=cq.Vector(*add(cut_origin, mul(n, neck_len + body_len))), xDir=cq.Vector(*xDir), normal=cq.Vector(*n))
+
+    # Lofted body: slightly narrower/rounder at the front for a more realistic Europlug silhouette
+    front_w = body_w - 2.0
+    front_h = body_h - 1.0
+
+    try:
+        body = (
+            cq.Workplane(rear_plane)
+            .placeSketch(rr_sketch(body_w, body_h, rear_r))
+            .workplane(offset=body_len)
+            .placeSketch(rr_sketch(front_w, front_h, front_r))
+            .loft(combine=True)
+        )
+    except Exception as e:
+        print(f"WARNING: body loft failed, falling back to extrude: {e}")
+        body = (
+            cq.Workplane(rear_plane)
+            .sketch().rect(body_w, body_h).vertices().fillet(rear_r).finalize()
+            .extrude(body_len)
+        )
+
+    # Soften edges for molded plastic look
+    try:
+        body = body.edges().fillet(body_edge_fillet)
+    except Exception as e:
+        print(f"WARNING: body fillet failed: {e}")
+
+    plug_body = sleeve.union(neck).union(body)
+
+    # Pin root recess pockets on the front face
+    pin_off = pin_spacing / 2.0
+    recess_cutter = (
+        cq.Workplane(front_plane)
+        .pushPoints([(-pin_off, 0.0), (pin_off, 0.0)])
+        .circle(recess_d / 2.0)
+        .extrude(-recess_depth)
+    )
+    try:
+        plug_body = plug_body.cut(recess_cutter)
+    except Exception as e:
+        print(f"WARNING: recess cut failed: {e}")
+
+    # Pins
+    pins = (
+        cq.Workplane(front_plane)
+        .pushPoints([(-pin_off, 0.0), (pin_off, 0.0)])
+        .circle(pin_d / 2.0)
+        .extrude(pin_len)
+    )
+
+    try:
+        pins = pins.faces(fwd_sel).edges().chamfer(pin_tip_ch)
+    except Exception as e:
+        print(f"WARNING: pin chamfer failed: {e}")
+
+    plug = plug_body.union(pins)
+
+    # Fuse plug to trimmed cord (should intersect due to sleeve overlap)
+    new_cord_asm = trimmed_cord.union(plug).val()
+
+    # Keep all solids NOT in cord_group_idx
+    cord_set = set(cord_group_idx)
+    kept_solids = [s for i, s in enumerate(solids) if i not in cord_set]
+
+    out_shapes = kept_solids + [new_cord_asm]
+    result = cq.Compound.makeCompound(out_shapes)
+
+    out_bb = result.BoundingBox()
+    print(f"Result solids in compound: {len(out_shapes)}")
+    print(f"Result bbox: x={out_bb.xlen:.2f}, y={out_bb.ylen:.2f}, z={out_bb.zlen:.2f}")
+
+    return cq.Workplane(obj=result)

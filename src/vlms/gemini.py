@@ -118,6 +118,10 @@ class VLM(BaseVLM):
                 "output_tokens": full_response.usage_metadata.candidates_token_count,
                 "thinking_tokens": full_response.usage_metadata.thoughts_token_count,
                 "total_tokens": full_response.usage_metadata.total_token_count,
+                "cached_tokens": getattr(
+                    full_response.usage_metadata, "cached_content_token_count", 0
+                )
+                or 0,
             }
             # set any token count to 0 if it is None
             for k in token_count_dict.keys():

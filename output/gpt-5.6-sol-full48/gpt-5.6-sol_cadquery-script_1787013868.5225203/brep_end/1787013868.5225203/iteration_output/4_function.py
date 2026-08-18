@@ -1,0 +1,304 @@
+def my_cad_function(args):
+    import cadquery as cq
+    import os
+    import math
+
+    source = cq.importers.importStep(os.path.expanduser(args['input_file']))
+    src = source.val()
+    bb = src.BoundingBox()
+    print('SOURCE_VALID', src.isValid())
+    print('SOURCE_BBOX', bb.xmin, bb.xmax, bb.ymin, bb.ymax, bb.zmin, bb.zmax)
+
+    x0, x1 = bb.xmin, bb.xmax
+    y0, y1 = bb.ymin, bb.ymax
+    z0, z1 = bb.zmin, bb.zmax
+
+    junction_x = 100.0
+    spine_y0 = 230.0
+    spine_y1 = 295.0
+    # Maintain sufficient clearance for a true R5 treatment of the housing
+    # bottom edge at the shoulder. The previous -445 value caused a degenerate
+    # radius because the two lower levels were separated by exactly 5 mm.
+    spine_z0 = -440.0
+    spine_mid_y = 0.5 * (spine_y0 + spine_y1)
+
+    # Reconstruct the sharp parent. This removes all legacy chamfers/radii and
+    # makes the nose and spine side surfaces coplanar, eliminating the external
+    # one-sided step while retaining the intentionally one-sided latch pocket.
+    housing = (
+        cq.Workplane('XY', origin=(x0, y0, z0))
+        .box(junction_x - x0, y1 - y0, z1 - z0,
+             centered=(False, False, False))
+    )
+    spine = (
+        cq.Workplane('XY', origin=(junction_x, spine_y0, spine_z0))
+        .box(x1 - junction_x, spine_y1 - spine_y0, z1 - spine_z0,
+             centered=(False, False, False))
+    )
+    solid = housing.union(spine).combine().clean().val()
+    print('SHARP_PARENT_VALID', solid.isValid(), 'FACES', len(solid.Faces()))
+
+    def is_line(edge):
+        try:
+            return edge.geomType() == 'LINE'
+        except Exception:
+            return False
+
+    def edge_axis(edge):
+        eb = edge.BoundingBox()
+        dims = (eb.xlen, eb.ylen, eb.zlen)
+        return max(range(3), key=lambda i: dims[i])
+
+    def adjacent_faces(shape, edge):
+        found = []
+        for face in shape.Faces():
+            for fe in face.Edges():
+                try:
+                    same = edge.isSame(fe)
+                except Exception:
+                    same = edge.hashCode() == fe.hashCode()
+                if same:
+                    found.append(face)
+                    break
+        return found
+
+    def is_sharp(shape, edge):
+        faces = adjacent_faces(shape, edge)
+        if len(faces) != 2:
+            return False
+        c = edge.Center()
+        try:
+            n1 = faces[0].normalAt(c)
+            n2 = faces[1].normalAt(c)
+            l1 = math.sqrt(n1.x*n1.x + n1.y*n1.y + n1.z*n1.z)
+            l2 = math.sqrt(n2.x*n2.x + n2.y*n2.y + n2.z*n2.z)
+            if l1 < 1e-9 or l2 < 1e-9:
+                return True
+            dot = abs((n1.x*n2.x + n1.y*n2.y + n1.z*n2.z) / (l1*l2))
+            return dot < 0.985
+        except Exception:
+            return True
+
+    def sharp_lines(shape):
+        return [e for e in shape.Edges() if is_line(e) and is_sharp(shape, e)]
+
+    # The specified R20 edges are the two transverse horizontal edges at the
+    # top of the narrow-to-large shoulder, one on each side of the spine.
+    r20_edges = []
+    for edge in solid.Edges():
+        if not is_line(edge):
+            continue
+        c = edge.Center()
+        eb = edge.BoundingBox()
+        transverse = eb.ylen > 1.0 and eb.xlen < 1e-5 and eb.zlen < 1e-5
+        if (transverse and abs(c.x-junction_x) < 1e-4 and
+                abs(c.z-z1) < 1e-4):
+            r20_edges.append(edge)
+
+    print('R20_CANDIDATES', len(r20_edges))
+    if r20_edges:
+        try:
+            trial = cq.Workplane(obj=solid).newObject(r20_edges).fillet(20.0).val()
+            if not trial.isValid():
+                raise RuntimeError('invalid R20 result')
+            solid = trial.clean()
+            print('R20_SUCCEEDED', len(r20_edges))
+        except Exception as exc:
+            print('R20_FAILED', str(exc)[:200])
+
+    def apply_r5_group(name, predicate):
+        nonlocal solid
+        targets = [e for e in sharp_lines(solid) if predicate(e)]
+        print('R5_GROUP_CANDIDATES', name, len(targets))
+        if not targets:
+            return
+
+        try:
+            trial = cq.Workplane(obj=solid).newObject(targets).fillet(5.0).val()
+            if not trial.isValid():
+                raise RuntimeError('invalid grouped R5 result')
+            solid = trial.clean()
+            print('R5_GROUP_SUCCEEDED', name, len(targets))
+            return
+        except Exception as exc:
+            print('R5_GROUP_COMBINED_FAILED', name, str(exc)[:160])
+
+        # Retry parallel coherent subsets, then individual edges if necessary.
+        for axis in (0, 1, 2):
+            subset = [e for e in sharp_lines(solid)
+                      if predicate(e) and edge_axis(e) == axis]
+            if not subset:
+                continue
+            try:
+                trial = cq.Workplane(obj=solid).newObject(subset).fillet(5.0).val()
+                if trial.isValid():
+                    solid = trial.clean()
+                    print('R5_SUBGROUP_SUCCEEDED', name, axis, len(subset))
+                    continue
+            except Exception as exc:
+                print('R5_SUBGROUP_FAILED', name, axis, str(exc)[:120])
+
+            keys = []
+            for edge in subset:
+                c = edge.Center()
+                keys.append((c.x, c.y, c.z, edge.Length(), axis))
+
+            conflicts = 0
+            for key in keys:
+                candidates = [e for e in sharp_lines(solid)
+                              if predicate(e) and edge_axis(e) == key[4]]
+                if not candidates:
+                    continue
+                edge = min(
+                    candidates,
+                    key=lambda e: (e.Center().x-key[0])**2 +
+                                  (e.Center().y-key[1])**2 +
+                                  (e.Center().z-key[2])**2 +
+                                  0.0025*(e.Length()-key[3])**2
+                )
+                try:
+                    trial = cq.Workplane(obj=solid).newObject([edge]).fillet(5.0).val()
+                    if trial.isValid():
+                        solid = trial.clean()
+                    else:
+                        conflicts += 1
+                except Exception:
+                    conflicts += 1
+            if conflicts:
+                print('R5_GEOMETRIC_CONFLICTS', name, axis, conflicts)
+
+    # Apply the replacement R5 treatment to every external edge not consumed
+    # by the R20 shoulder feature.
+    apply_r5_group('longitudinal', lambda e: edge_axis(e) == 0)
+    apply_r5_group('front', lambda e: abs(e.Center().x-x1) < 0.2)
+    apply_r5_group('rear', lambda e: abs(e.Center().x-x0) < 0.2)
+    apply_r5_group('remaining_external', lambda e: True)
+
+    # Restore the blind axial socket with its original axis and straight bore.
+    socket_z = -400.0
+    socket_radius = 20.0
+    socket_closed_x = junction_x
+    socket_tool = cq.Solid.makeCylinder(
+        socket_radius,
+        x1-socket_closed_x,
+        cq.Vector(x1, spine_mid_y, socket_z),
+        cq.Vector(-1, 0, 0)
+    )
+    solid = solid.cut(socket_tool).clean()
+
+    # Apply R5 to both the socket mouth and closed-end circular edges.
+    socket_edges = []
+    for edge in solid.Edges():
+        try:
+            if edge.geomType() not in ('CIRCLE', 'ELLIPSE'):
+                continue
+        except Exception:
+            continue
+        c = edge.Center()
+        eb = edge.BoundingBox()
+        centered = abs(c.y-spine_mid_y) < 0.15 and abs(c.z-socket_z) < 0.15
+        correct_size = eb.ylen > 39.0 and eb.zlen > 39.0
+        at_socket_end = (abs(c.x-x1) < 0.15 or
+                         abs(c.x-socket_closed_x) < 0.15)
+        if centered and correct_size and at_socket_end:
+            socket_edges.append(edge)
+
+    print('SOCKET_R5_CANDIDATES', len(socket_edges))
+    if socket_edges:
+        try:
+            trial = cq.Workplane(obj=solid).newObject(socket_edges).fillet(5.0).val()
+            if not trial.isValid():
+                raise RuntimeError('invalid socket R5 result')
+            solid = trial.clean()
+            print('SOCKET_R5_SUCCEEDED', len(socket_edges))
+        except Exception as exc:
+            print('SOCKET_R5_FAILED', str(exc)[:200])
+
+    # Cut the functional one-sided pocket as a sharp cavity first. Filleting
+    # the resulting concave boundary edges avoids the clipped cutter seams seen
+    # in the preceding model.
+    pocket_x0, pocket_x1 = 125.0, 170.0
+    pocket_y0, pocket_y1 = 225.0, 282.0
+    pocket_z0, pocket_z1 = -407.5, -372.5
+    pocket_tool = (
+        cq.Workplane('XY', origin=(pocket_x0, pocket_y0, pocket_z0))
+        .box(pocket_x1-pocket_x0,
+             pocket_y1-pocket_y0,
+             pocket_z1-pocket_z0,
+             centered=(False, False, False))
+    )
+    solid = solid.cut(pocket_tool.val()).clean()
+
+    pocket_edges = []
+    for edge in solid.Edges():
+        if not is_line(edge):
+            continue
+        c = edge.Center()
+        eb = edge.BoundingBox()
+        near_pocket = (
+            pocket_x0-0.2 <= c.x <= pocket_x1+0.2 and
+            spine_y0-0.2 <= c.y <= pocket_y1+0.2 and
+            pocket_z0-0.2 <= c.z <= pocket_z1+0.2
+        )
+        pocket_scale = max(eb.xlen, eb.ylen, eb.zlen) <= 60.0
+        if near_pocket and pocket_scale and is_sharp(solid, edge):
+            pocket_edges.append(edge)
+
+    print('POCKET_R5_CANDIDATES', len(pocket_edges))
+    if pocket_edges:
+        try:
+            trial = cq.Workplane(obj=solid).newObject(pocket_edges).fillet(5.0).val()
+            if not trial.isValid():
+                raise RuntimeError('invalid grouped pocket R5 result')
+            solid = trial.clean()
+            print('POCKET_R5_SUCCEEDED', len(pocket_edges))
+        except Exception as exc:
+            print('POCKET_R5_COMBINED_FAILED', str(exc)[:180])
+            # Greedy fallback for kernel-sensitive concave pocket vertices.
+            keys = []
+            for edge in pocket_edges:
+                c = edge.Center()
+                keys.append((c.x, c.y, c.z, edge.Length(), edge_axis(edge)))
+            conflicts = 0
+            for key in keys:
+                candidates = []
+                for edge in sharp_lines(solid):
+                    c = edge.Center()
+                    if (pocket_x0-0.2 <= c.x <= pocket_x1+0.2 and
+                            spine_y0-0.2 <= c.y <= pocket_y1+0.2 and
+                            pocket_z0-0.2 <= c.z <= pocket_z1+0.2 and
+                            edge_axis(edge) == key[4]):
+                        candidates.append(edge)
+                if not candidates:
+                    continue
+                edge = min(candidates, key=lambda e:
+                    (e.Center().x-key[0])**2 +
+                    (e.Center().y-key[1])**2 +
+                    (e.Center().z-key[2])**2 +
+                    0.0025*(e.Length()-key[3])**2)
+                try:
+                    trial = cq.Workplane(obj=solid).newObject([edge]).fillet(5.0).val()
+                    if trial.isValid():
+                        solid = trial.clean()
+                    else:
+                        conflicts += 1
+                except Exception:
+                    conflicts += 1
+            print('POCKET_R5_CONFLICTS', conflicts)
+
+    remaining_sharp = sharp_lines(solid)
+    print('FINAL_SHARP_LINE_COUNT', len(remaining_sharp))
+    for i, edge in enumerate(remaining_sharp[:30]):
+        c = edge.Center()
+        print('FINAL_SHARP_EDGE', i, round(c.x, 3), round(c.y, 3),
+              round(c.z, 3), round(edge.Length(), 3), edge_axis(edge))
+
+    out_bb = solid.BoundingBox()
+    print('RESULT_VALID', solid.isValid())
+    print('RESULT_VOLUME', round(solid.Volume(), 3))
+    print('RESULT_BBOX', round(out_bb.xmin, 3), round(out_bb.xmax, 3),
+          round(out_bb.ymin, 3), round(out_bb.ymax, 3),
+          round(out_bb.zmin, 3), round(out_bb.zmax, 3))
+    print('RESULT_COUNTS', len(solid.Faces()), len(solid.Edges()),
+          len(solid.Vertices()))
+    return cq.Workplane(obj=solid)

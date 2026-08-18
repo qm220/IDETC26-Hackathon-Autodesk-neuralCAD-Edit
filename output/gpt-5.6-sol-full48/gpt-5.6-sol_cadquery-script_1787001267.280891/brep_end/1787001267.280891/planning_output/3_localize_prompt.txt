@@ -1,0 +1,661 @@
+Now use all the given information:
+1. model.json file
+2. operation.json file
+3. Multiview images
+
+Decide which sections of the original model should be modified, removed, interacted with or if new sections should be created. Use as much information from the Multiview images, model.json files and operation.json as possible.
+
+Make this decision from several perspectives. If target clearly identify geometry, locate the corresponding section(s) and face(s) in model.json. If there is no clear geometry identified, use the referenced features and relational_constraint to identify potential sections and features. Additionally, consider the intention of the edit. Based on the function and behavior associated with each section and features, decide which section require the action the most. Then, find the corresponding section and face code from model.json.
+
+Plan out the modeling procedure needed to perform each action. Describe them in professional CAD modelling languages from choosing the plane, draw sketches to extrusion, add chamfers. Be thorough and detailed.
+
+face_code values in model.json are visual labels from shaded renders. Brep_id is the CadQuery Faces() index from the STEP analysis report (for example FACE 0).
+
+Edit operation.json accordingly. Keep the previous request_wording and actions, and add localization plus steps.
+
+OUTPUT FORMAT (JSON, operation.json, no markdown fences, use this schema):
+{
+  "request": "",
+  "request_wording": {
+    "action_words": ["..."],
+    "referenced_feature_words": ["..."],
+    "intention_words": ["..."],
+    "grammatical_words": ["..."]
+  },
+  "actions": [
+    {
+      "operation": "...",
+      "parameters": {
+        "parameter_name": "..."
+      },
+      "target": "...",
+      "relational_constraint": "...",
+      "unresolved_reference": "...",
+      "target section code": ["..."],
+      "target face code": ["..."],
+      "steps": [
+        "...",
+        "..."
+      ]
+    }
+  ],
+  "intention": ["..."]
+}
+
+The model.json, operation.json, and labeled multi-view images follow.
+
+
+model.json:
+
+{
+  "part": {
+    "name": "Internally splined bicycle sprocket / chainring",
+    "description": "Two-solid, thin circular drivetrain component consisting of a large toothed sprocket body and a separate central internally splined insert. The sprocket body has a stepped outer rim, circumferential chain-engagement teeth, an open radial spoke/web network, and a central hub seat. STEP report: volume 29778.338003 mm^3, area 19367.766188 mm^2, overall bounding box approximately 113.02 x 9.53 x 112.84 mm. Minor-face entries use compact inclusive FACE ranges; any major_faces explicitly listed in the same range are excluded from the minor set.",
+    "source_views": [
+      "front",
+      "back",
+      "left",
+      "right",
+      "top",
+      "bottom",
+      "toprightiso"
+    ],
+    "symmetry_note": "The part is approximately rotationally periodic about the central axis, with repeated outer teeth and repeated spoke/opening geometry. Front and back are not mirror-identical because the hub, rim steps, recesses, and blend profiles differ. STEP data contains two coaxial solids: SOLID 0 is the central splined insert and SOLID 1 is the main sprocket body."
+  },
+  "Section": [
+    {
+      "id": "S01",
+      "name": "Central splined insert",
+      "features included": [
+        "internal multi-tooth spline bore",
+        "front annular flange",
+        "front conical edge chamfer",
+        "cylindrical outer locating diameter",
+        "lobed front interface outline",
+        "rear circular flange",
+        "axial through bore",
+        "separate inserted solid"
+      ],
+      "function intent": "Provides the primary torque-transmitting and locating interface to a splined shaft or mating drivetrain component while allowing the larger sprocket body to use a different geometry or material.",
+      "physical behavior": "The internal spline flanks react circumferential shear and distribute torque over many teeth. The axial flange faces react clamping loads, while the cylindrical outside diameter and surrounding hub seat maintain concentricity. The relatively thick insert limits spline deformation and local bearing stress.",
+      "geometry": "A separate coaxial annular solid approximately 31.5 mm in outside diameter and 7.8 mm thick. It has a finely faceted internal spline, a cylindrical outer wall, front and rear annular faces, a shallow front chamfer, and a locally lobed or scalloped flange profile visible from the front.",
+      "location": "At the exact rotational center of the part, extending through the full axial thickness of the hub.",
+      "colour": {
+        "R": 214,
+        "G": 72,
+        "B": 72
+      },
+      "major_faces": [
+        {
+          "face_code": "0000",
+          "name": "Front spline flange face",
+          "Brep_id": "FACE 1",
+          "description": "Large planar front annulus surrounding the internally splined opening."
+        },
+        {
+          "face_code": "0001",
+          "name": "Front outer chamfer",
+          "Brep_id": "FACE 0",
+          "description": "Shallow conical band connecting the front flange face to the outer locating diameter."
+        },
+        {
+          "face_code": "0002",
+          "name": "Outer locating cylinder",
+          "Brep_id": "FACE 2",
+          "description": "Cylindrical outside surface that concentrically locates the insert in the main hub."
+        },
+        {
+          "face_code": "0003",
+          "name": "Representative internal spline flank",
+          "Brep_id": "FACE 3",
+          "description": "Representative planar axial flank from the repeated internal spline tooth set."
+        },
+        {
+          "face_code": "0004",
+          "name": "Representative spline root patch",
+          "Brep_id": "FACE 147",
+          "description": "Representative cylindrical patch joining adjacent spline facets at the spline root diameter."
+        },
+        {
+          "face_code": "0005",
+          "name": "Lobed rear transition face",
+          "Brep_id": "FACE 195",
+          "description": "Planar portion of the rear flange transition associated with the non-circular insert outline."
+        },
+        {
+          "face_code": "0006",
+          "name": "Intermediate rear shoulder",
+          "Brep_id": "FACE 224",
+          "description": "Planar annular shoulder between the spline body and the rear flange profile."
+        },
+        {
+          "face_code": "0007",
+          "name": "Rear insert face",
+          "Brep_id": "FACE 233",
+          "description": "Rear-facing planar annulus of the separate spline insert."
+        }
+      ],
+      "minor_faces_Brep_id": [
+        "FACE 4-FACE 146",
+        "FACE 148-FACE 194",
+        "FACE 196-FACE 223",
+        "FACE 225-FACE 232"
+      ],
+      "relationships": [
+        {
+          "source id": "S01",
+          "target id": "S02",
+          "function relationship": "transmits_load; locates_mating_part; constrains_dof; mounts_to",
+          "structural relationship": "contained_in; coaxial_with; attached_to"
+        },
+        {
+          "source id": "S01",
+          "target id": "S03",
+          "function relationship": "transmits_load",
+          "structural relationship": "coaxial_with; offset_from"
+        }
+      ]
+    },
+    {
+      "id": "S02",
+      "name": "Central hub and insert seat",
+      "features included": [
+        "central annular hub",
+        "insert receiving seat",
+        "front raised hub ring",
+        "rear recessed hub ring",
+        "conical hub transition",
+        "annular clamping shoulders",
+        "hub-to-spoke fillets"
+      ],
+      "function intent": "Holds and locates the splined insert, receives torque from it, and transfers that torque into the spoke network without excessive local stress.",
+      "physical behavior": "The annular seat provides radial bearing and concentric location for the insert. Front and rear shoulders react axial clamp forces. The thick hub ring resists ovalization, while conical and toroidal blends spread circumferential and radial stresses into the spokes.",
+      "geometry": "A thick annular boss surrounding the center opening. Its front side is visibly raised and scalloped around the insert; the rear side is more circular and recessed. Cylindrical, conical, planar, and toroidal transition bands join the hub to the thinner web.",
+      "location": "Concentric with the part axis, immediately outside the separate splined insert and inside the spoke roots.",
+      "colour": {
+        "R": 235,
+        "G": 151,
+        "B": 52
+      },
+      "major_faces": [
+        {
+          "face_code": "0008",
+          "name": "Front hub annulus",
+          "Brep_id": "FACE 667",
+          "description": "Planar front annular seat surrounding the central insert."
+        },
+        {
+          "face_code": "0009",
+          "name": "Front hub edge chamfer",
+          "Brep_id": "FACE 668",
+          "description": "Conical front edge band around the insert seat."
+        },
+        {
+          "face_code": "0010",
+          "name": "Hub seat cylinder",
+          "Brep_id": "FACE 669",
+          "description": "Cylindrical locating wall concentric with the insert and central axis."
+        },
+        {
+          "face_code": "0011",
+          "name": "Representative lobed seat transition",
+          "Brep_id": "FACE 651",
+          "description": "Representative conical patch from the repeated lobed transition around the insert seat."
+        },
+        {
+          "face_code": "0012",
+          "name": "Hub torque transition cone",
+          "Brep_id": "FACE 432",
+          "description": "Broad conical transition carrying load from the central hub into the surrounding web."
+        },
+        {
+          "face_code": "0013",
+          "name": "Rear hub blend",
+          "Brep_id": "FACE 580",
+          "description": "Toroidal rear transition band around the hub."
+        },
+        {
+          "face_code": "0014",
+          "name": "Rear hub annulus",
+          "Brep_id": "FACE 581",
+          "description": "Planar rear-facing hub shoulder around the central opening."
+        },
+        {
+          "face_code": "0015",
+          "name": "Representative rear seat wall",
+          "Brep_id": "FACE 635",
+          "description": "Representative cylindrical patch from the segmented rear hub-seat wall."
+        },
+        {
+          "face_code": "0016",
+          "name": "Representative rear seat chamfer",
+          "Brep_id": "FACE 619",
+          "description": "Representative conical chamfer patch around the rear insert-seat perimeter."
+        }
+      ],
+      "minor_faces_Brep_id": [
+        "FACE 620-FACE 634",
+        "FACE 636-FACE 650",
+        "FACE 652-FACE 666"
+      ],
+      "relationships": [
+        {
+          "source id": "S02",
+          "target id": "S01",
+          "function relationship": "locates_mating_part; constrains_dof; transmits_load",
+          "structural relationship": "contains; coaxial_with; attached_to"
+        },
+        {
+          "source id": "S02",
+          "target id": "S03",
+          "function relationship": "transmits_load; distributes_stress",
+          "structural relationship": "supports; blends_into; attached_to"
+        }
+      ]
+    },
+    {
+      "id": "S03",
+      "name": "Spoke and open web network",
+      "features included": [
+        "radial load-carrying spokes",
+        "large weight-reduction windows",
+        "smaller intermediate windows",
+        "spoke root fillets",
+        "spoke-to-rim fillets",
+        "front planar web facets",
+        "rear planar web facets",
+        "curved window walls"
+      ],
+      "function intent": "Transfers torque and radial chain loads between the central hub and outer rim while minimizing mass and preserving adequate in-plane stiffness.",
+      "physical behavior": "The spokes primarily carry axial-plane tension, compression, shear, and bending. Their curved edges and wide roots reduce stress concentration at the hub and rim. The openings remove low-utilization material and provide clearance while the continuous circumferential connections stabilize the spoke array against buckling and torsional distortion.",
+      "geometry": "A thin, approximately planar radial web divided into multiple curved spokes. Large rounded triangular and trapezoidal windows alternate with narrower openings. Each opening has blended side walls through the thickness, and each spoke widens smoothly at both the hub and rim.",
+      "location": "Middle radial region between the central hub and the inner edge of the outer rim.",
+      "colour": {
+        "R": 72,
+        "G": 160,
+        "B": 214
+      },
+      "major_faces": [
+        {
+          "face_code": "0017",
+          "name": "Front web plane",
+          "Brep_id": "FACE 496",
+          "description": "Dominant planar front surface shared by the visible spokes and connecting web."
+        },
+        {
+          "face_code": "0018",
+          "name": "Front upper spoke wall",
+          "Brep_id": "FACE 489",
+          "description": "Curved B-spline wall forming one side of an upper radial spoke and adjacent opening."
+        },
+        {
+          "face_code": "0019",
+          "name": "Front long spoke surface",
+          "Brep_id": "FACE 490",
+          "description": "Long curved surface extending radially through a major spoke toward the rim."
+        },
+        {
+          "face_code": "0020",
+          "name": "Front spoke-to-rim blend",
+          "Brep_id": "FACE 492",
+          "description": "Toroidal blend distributing load where a spoke joins the outer rim."
+        },
+        {
+          "face_code": "0021",
+          "name": "Window side wall",
+          "Brep_id": "FACE 313",
+          "description": "Major curved through-thickness wall bounding a weight-reduction opening."
+        },
+        {
+          "face_code": "0022",
+          "name": "Spoke root curved face",
+          "Brep_id": "FACE 332",
+          "description": "Broad B-spline face blending a spoke into the hub."
+        },
+        {
+          "face_code": "0023",
+          "name": "Long spoke edge wall",
+          "Brep_id": "FACE 333",
+          "description": "Extended curved wall along a major radial opening."
+        },
+        {
+          "face_code": "0024",
+          "name": "Representative web terrace",
+          "Brep_id": "FACE 310",
+          "description": "Planar stepped facet on the rear or intermediate web level."
+        },
+        {
+          "face_code": "0025",
+          "name": "Rear spoke wall",
+          "Brep_id": "FACE 371",
+          "description": "Curved rear-side spoke wall adjacent to a rounded opening."
+        },
+        {
+          "face_code": "0026",
+          "name": "Rear long spoke surface",
+          "Brep_id": "FACE 372",
+          "description": "Large B-spline rear surface carrying load through a principal spoke."
+        },
+        {
+          "face_code": "0027",
+          "name": "Lower spoke surface",
+          "Brep_id": "FACE 409",
+          "description": "Large curved spoke surface in the lower radial sector."
+        },
+        {
+          "face_code": "0028",
+          "name": "Lower diagonal spoke surface",
+          "Brep_id": "FACE 411",
+          "description": "Large B-spline surface of a diagonal spoke joining hub and rim."
+        },
+        {
+          "face_code": "0029",
+          "name": "Rear web plane",
+          "Brep_id": "FACE 312",
+          "description": "Dominant planar rear surface visible across the spoke network."
+        }
+      ],
+      "minor_faces_Brep_id": [
+        "FACE 296-FACE 579 excluding FACE 310, FACE 312, FACE 313, FACE 332, FACE 333, FACE 371, FACE 372, FACE 409, FACE 411, FACE 432, FACE 489, FACE 490, FACE 492, FACE 496",
+        "FACE 582-FACE 618"
+      ],
+      "relationships": [
+        {
+          "source id": "S03",
+          "target id": "S02",
+          "function relationship": "transmits_load; distributes_stress",
+          "structural relationship": "attached_to; supported_by; blends_into"
+        },
+        {
+          "source id": "S03",
+          "target id": "S04",
+          "function relationship": "transmits_load; distributes_stress",
+          "structural relationship": "supports; attached_to; blends_into"
+        },
+        {
+          "source id": "S03",
+          "target id": "S05",
+          "function relationship": "provides_clearance",
+          "structural relationship": "offset_from"
+        }
+      ]
+    },
+    {
+      "id": "S04",
+      "name": "Outer stepped rim",
+      "features included": [
+        "continuous circumferential load ring",
+        "front raised rim rail",
+        "rear rim shoulder",
+        "inner rim wall",
+        "outer rim wall",
+        "front and rear fillet bands",
+        "tooth-root support ring",
+        "circumferential stepped grooves"
+      ],
+      "function intent": "Forms a stiff continuous ring that distributes localized tooth loads around the sprocket and provides a stable base for all chain-engagement teeth.",
+      "physical behavior": "The closed ring carries circumferential membrane stress and limits radial distortion under chain tension. Axial steps and rounded rails increase section modulus and resist dish-like bending. Fillets spread loads from individual teeth and spoke junctions into the ring.",
+      "geometry": "A continuous annular band near the outside diameter with multiple axial levels. The front view shows two narrow raised circumferential rails and blended grooves; the rear view is flatter. Numerous toroidal and B-spline patches form smooth front and rear edge transitions.",
+      "location": "Circumferentially around the spoke tips and immediately radially inside the chain-engagement teeth.",
+      "colour": {
+        "R": 99,
+        "G": 190,
+        "B": 114
+      },
+      "major_faces": [
+        {
+          "face_code": "0030",
+          "name": "Front rim shoulder",
+          "Brep_id": "FACE 778",
+          "description": "Large planar annular shoulder on the front side of the outer ring."
+        },
+        {
+          "face_code": "0031",
+          "name": "Front circumferential rim wall",
+          "Brep_id": "FACE 592",
+          "description": "Representative cylindrical circumferential wall of the stepped rim."
+        },
+        {
+          "face_code": "0032",
+          "name": "Front rim fillet band",
+          "Brep_id": "FACE 334",
+          "description": "Toroidal front blend joining the rim rail to the adjacent annular surface."
+        },
+        {
+          "face_code": "0033",
+          "name": "Outer rim cylindrical band",
+          "Brep_id": "FACE 593",
+          "description": "Representative broad cylindrical patch of the load-carrying outer rim."
+        },
+        {
+          "face_code": "0034",
+          "name": "Rear rim fillet band",
+          "Brep_id": "FACE 436",
+          "description": "Toroidal rear blend around the outer circumferential ring."
+        },
+        {
+          "face_code": "0035",
+          "name": "Rear rim shoulder",
+          "Brep_id": "FACE 941",
+          "description": "Large planar annular shoulder on the rear side of the outer ring."
+        },
+        {
+          "face_code": "0036",
+          "name": "Rim front sculpted patch",
+          "Brep_id": "FACE 833",
+          "description": "Representative B-spline patch forming the sculpted front edge of the rim."
+        },
+        {
+          "face_code": "0037",
+          "name": "Rim front rounded rail",
+          "Brep_id": "FACE 834",
+          "description": "Representative toroidal patch from the rounded front circumferential rail."
+        },
+        {
+          "face_code": "0038",
+          "name": "Rim rear sculpted patch",
+          "Brep_id": "FACE 1050",
+          "description": "Representative B-spline patch forming the corresponding rear rim contour."
+        },
+        {
+          "face_code": "0039",
+          "name": "Rim rear rounded rail",
+          "Brep_id": "FACE 1051",
+          "description": "Representative toroidal patch from the rounded rear circumferential rail."
+        }
+      ],
+      "minor_faces_Brep_id": [
+        "FACE 234-FACE 295",
+        "FACE 833-FACE 940 excluding FACE 833, FACE 834",
+        "FACE 942-FACE 1481 excluding FACE 1050, FACE 1051"
+      ],
+      "relationships": [
+        {
+          "source id": "S04",
+          "target id": "S03",
+          "function relationship": "transmits_load; distributes_stress",
+          "structural relationship": "supported_by; attached_to; blends_into"
+        },
+        {
+          "source id": "S04",
+          "target id": "S05",
+          "function relationship": "supports; distributes_stress; transmits_load",
+          "structural relationship": "attached_to; shares_face; blends_into"
+        }
+      ]
+    },
+    {
+      "id": "S05",
+      "name": "Chain-engagement teeth",
+      "features included": [
+        "repeated radial teeth",
+        "tooth tips",
+        "leading tooth flanks",
+        "trailing tooth flanks",
+        "tooth-root valleys",
+        "front tooth chamfers",
+        "rear tooth chamfers",
+        "tooth-to-rim blends"
+      ],
+      "function intent": "Engages a roller chain and converts chain tension into torque about the central spline axis.",
+      "physical behavior": "Each tooth receives localized bearing and sliding contact from a chain roller. Opposed tooth flanks transmit tangential force into the rim, while rounded roots and blended side edges reduce bending stress and avoid sharp stress raisers. Repetition distributes load among several teeth during operation.",
+      "geometry": "A periodic ring of outward-projecting, approximately trapezoidal teeth around the full circumference. Each tooth has a rounded or cylindrical tip region, two inclined flank surfaces, front and rear chamfered side bands, and blended roots joining the stepped rim.",
+      "location": "Outermost radial perimeter of the part, surrounding the continuous rim.",
+      "colour": {
+        "R": 164,
+        "G": 103,
+        "B": 204
+      },
+      "major_faces": [
+        {
+          "face_code": "0040",
+          "name": "Representative front tooth flank",
+          "Brep_id": "FACE 672",
+          "description": "Conical inclined flank patch on the front half of a representative chain tooth."
+        },
+        {
+          "face_code": "0041",
+          "name": "Representative tooth tip",
+          "Brep_id": "FACE 671",
+          "description": "Cylindrical crown patch at the outer tip of a representative tooth."
+        },
+        {
+          "face_code": "0042",
+          "name": "Representative opposite tooth flank",
+          "Brep_id": "FACE 673",
+          "description": "Planar opposite flank or edge facet adjacent to the representative tooth tip."
+        },
+        {
+          "face_code": "0043",
+          "name": "Representative tooth root facet",
+          "Brep_id": "FACE 670",
+          "description": "Planar root-side facet joining the tooth profile to the supporting rim."
+        },
+        {
+          "face_code": "0044",
+          "name": "Representative rear tooth flank",
+          "Brep_id": "FACE 780",
+          "description": "Conical inclined flank patch on the rear half of a representative tooth."
+        },
+        {
+          "face_code": "0045",
+          "name": "Representative rear tooth crown",
+          "Brep_id": "FACE 779",
+          "description": "Cylindrical rear crown patch corresponding to a representative tooth."
+        },
+        {
+          "face_code": "0046",
+          "name": "Bottom tooth tip",
+          "Brep_id": "FACE 711",
+          "description": "Cylindrical outermost tip patch at the bottommost tooth in STEP coordinates."
+        },
+        {
+          "face_code": "0047",
+          "name": "Bottom tooth front flank",
+          "Brep_id": "FACE 712",
+          "description": "Conical front-side flank of the bottommost tooth."
+        },
+        {
+          "face_code": "0048",
+          "name": "Bottom tooth rear flank",
+          "Brep_id": "FACE 800",
+          "description": "Conical rear-side flank of the bottommost tooth."
+        }
+      ],
+      "minor_faces_Brep_id": [
+        "FACE 674-FACE 710",
+        "FACE 713-FACE 777",
+        "FACE 781-FACE 799",
+        "FACE 801-FACE 832"
+      ],
+      "relationships": [
+        {
+          "source id": "S05",
+          "target id": "S04",
+          "function relationship": "transmits_load; distributes_stress",
+          "structural relationship": "attached_to; supported_by; blends_into"
+        },
+        {
+          "source id": "S05",
+          "target id": "S01",
+          "function relationship": "transmits_load",
+          "structural relationship": "coaxial_with; offset_from"
+        }
+      ]
+    }
+  ]
+}
+
+operation.json:
+
+{
+  "request": "Hi , Please change the center flower type profile into a hexagonal profile for better torque transfer",
+  "request_wording": {
+    "action_words": [
+      "change",
+      "hexagonal",
+      "profile"
+    ],
+    "referenced_feature_words": [
+      "center",
+      "flower",
+      "type",
+      "profile"
+    ],
+    "intention_words": [
+      "better",
+      "torque",
+      "transfer"
+    ],
+    "grammatical_words": [
+      "Hi",
+      "Please",
+      "the",
+      "into",
+      "a",
+      "for"
+    ]
+  },
+  "actions": [
+    {
+      "operation": "Replace the existing flower-type profile with a hexagonal profile.",
+      "parameters": {
+        "profile_shape": "hexagonal"
+      },
+      "target": "The existing center flower-type profile.",
+      "relational_constraint": "The new hexagonal profile must occupy the central location of the existing flower-type profile.",
+      "unresolved_reference": "Identify the centrally located flower-type profile and the CAD sketch, face, or feature that defines it; the hexagon's size and orientation are not specified."
+    }
+  ],
+  "intention": [
+    "Improve torque transfer."
+  ]
+}
+
+View: front
+
+[IMAGE 0: /home/adml/Research/Hackathon2026/IDETC26-Hackathon-Autodesk-neuralCAD-Edit/data/edit_192_external/breps/SUJ2G2UMJQR7PMBX_1759210102.574659_front.jpg]
+
+View: back
+
+[IMAGE 1: /home/adml/Research/Hackathon2026/IDETC26-Hackathon-Autodesk-neuralCAD-Edit/data/edit_192_external/breps/SUJ2G2UMJQR7PMBX_1759210102.574659_back.jpg]
+
+View: left
+
+[IMAGE 2: /home/adml/Research/Hackathon2026/IDETC26-Hackathon-Autodesk-neuralCAD-Edit/data/edit_192_external/breps/SUJ2G2UMJQR7PMBX_1759210102.574659_left.jpg]
+
+View: right
+
+[IMAGE 3: /home/adml/Research/Hackathon2026/IDETC26-Hackathon-Autodesk-neuralCAD-Edit/data/edit_192_external/breps/SUJ2G2UMJQR7PMBX_1759210102.574659_right.jpg]
+
+View: top
+
+[IMAGE 4: /home/adml/Research/Hackathon2026/IDETC26-Hackathon-Autodesk-neuralCAD-Edit/data/edit_192_external/breps/SUJ2G2UMJQR7PMBX_1759210102.574659_top.jpg]
+
+View: bottom
+
+[IMAGE 5: /home/adml/Research/Hackathon2026/IDETC26-Hackathon-Autodesk-neuralCAD-Edit/data/edit_192_external/breps/SUJ2G2UMJQR7PMBX_1759210102.574659_bottom.jpg]
+
+View: toprightiso
+
+[IMAGE 6: /home/adml/Research/Hackathon2026/IDETC26-Hackathon-Autodesk-neuralCAD-Edit/data/edit_192_external/breps/SUJ2G2UMJQR7PMBX_1759210102.574659_toprightiso.jpg]

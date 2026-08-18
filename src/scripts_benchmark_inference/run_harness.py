@@ -14,6 +14,7 @@ import pandas as pd
 import argparse
 import time
 import shutil
+from src.vlms.base_vlm import format_token_report
 
 
 task_instructions = {
@@ -137,6 +138,8 @@ def run_single_task(vlm, row, args):
 
     with open(settings_output_fn, "w") as f:
         json.dump(settings_dict, f, indent=4)
+
+    print(format_token_report(settings_dict.get("token_counts")))
 
     if not success and args.remove_failed:
         shutil.rmtree(os.path.join(args.output_folder, edit_id), ignore_errors=True)

@@ -1,0 +1,629 @@
+Now use all the given information:
+1. model.json file
+2. operation.json file
+3. Multiview images
+
+Decide which sections of the original model should be modified, removed, interacted with or if new sections should be created. Use as much information from the Multiview images, model.json files and operation.json as possible.
+
+Make this decision from several perspectives. If target clearly identify geometry, locate the corresponding section(s) and face(s) in model.json. If there is no clear geometry identified, use the referenced features and relational_constraint to identify potential sections and features. Additionally, consider the intention of the edit. Based on the function and behavior associated with each section and features, decide which section require the action the most. Then, find the corresponding section and face code from model.json.
+
+Plan out the modeling procedure needed to perform each action. Describe them in professional CAD modelling languages from choosing the plane, draw sketches to extrusion, add chamfers. Be thorough and detailed.
+
+face_code values in model.json are visual labels from shaded renders. Brep_id is the CadQuery Faces() index from the STEP analysis report (for example FACE 0).
+
+Edit operation.json accordingly. Keep the previous request_wording and actions, and add localization plus steps.
+
+OUTPUT FORMAT (JSON, operation.json, no markdown fences, use this schema):
+{
+  "request": "",
+  "request_wording": {
+    "action_words": ["..."],
+    "referenced_feature_words": ["..."],
+    "intention_words": ["..."],
+    "grammatical_words": ["..."]
+  },
+  "actions": [
+    {
+      "operation": "...",
+      "parameters": {
+        "parameter_name": "..."
+      },
+      "target": "...",
+      "relational_constraint": "...",
+      "unresolved_reference": "...",
+      "target section code": ["..."],
+      "target face code": ["..."],
+      "steps": [
+        "...",
+        "..."
+      ]
+    }
+  ],
+  "intention": ["..."]
+}
+
+The model.json, operation.json, and labeled multi-view images follow.
+
+
+model.json:
+
+{
+  "part": {
+    "name": "Mounting bracket with arched web and threaded top boss",
+    "description": "Single-piece bracket: wide base mounting flange with two through-holes; a vertical/arched load path with a large internal clearance cutout; two opposed obround side pockets; an upper rectangular housing block with a small cross-drilled hole; and a top cylindrical boss with a vertical threaded/bored interface and blended seat.",
+    "source_views": [
+      "front",
+      "back",
+      "left",
+      "right",
+      "top",
+      "bottom",
+      "toprightiso"
+    ],
+    "symmetry_note": "Upper/mid body is largely symmetric about the mid-thickness plane z≈-21 (opposed side pockets and similar side blends). The base flange is wider (z to -60) than the main body (z to -42), so overall symmetry is partial."
+  },
+  "Section": [
+    {
+      "id": "S1",
+      "name": "Base mounting flange",
+      "features included": [
+        "two through mounting holes (base)",
+        "wide rectangular flange footprint",
+        "corner and edge rounds/fillets",
+        "flat mounting datum faces (top/bottom of flange)"
+      ],
+      "function intent": "Provide a stable mounting interface to a supporting structure and distribute reaction loads into the bracket.",
+      "physical behavior": "Works primarily in compression at the mounting interface and bending/shear through the flange thickness; corner rounds reduce stress concentration; through-holes accept fasteners to clamp the flange to a mating surface.",
+      "geometry": "Wide rectangular plate (y=0..15) wider in z than the upper body, with rounded outside corners and two vertical through-holes near the ends.",
+      "location": "Lowest portion of the part (y=0..15), spanning full length in x and full flange width in z (z=-60..0).",
+      "colour": {
+        "R": 210,
+        "G": 140,
+        "B": 90
+      },
+      "major_faces": [
+        {
+          "face_code": "0000",
+          "name": "Flange bottom datum",
+          "Brep_id": "FACE 59",
+          "description": "Bottom planar mounting face of the base flange (y=0)."
+        },
+        {
+          "face_code": "0001",
+          "name": "Flange top datum",
+          "Brep_id": "FACE 57",
+          "description": "Top planar face of the base flange (y=15), interface to the bracket body."
+        },
+        {
+          "face_code": "0002",
+          "name": "Flange left end face",
+          "Brep_id": "FACE 66",
+          "description": "Planar end face at x=0 across flange thickness."
+        },
+        {
+          "face_code": "0003",
+          "name": "Flange right end face",
+          "Brep_id": "FACE 65",
+          "description": "Planar end face at x=168 across flange thickness."
+        },
+        {
+          "face_code": "0004",
+          "name": "Flange rear edge face (wide side)",
+          "Brep_id": "FACE 61",
+          "description": "Planar face at z=-60 (rear wide edge) across the flange thickness band."
+        },
+        {
+          "face_code": "0005",
+          "name": "Mount hole - right",
+          "Brep_id": "FACE 0",
+          "description": "Cylindrical wall of right flange through-hole (radius 7.5), axis along y."
+        },
+        {
+          "face_code": "0006",
+          "name": "Mount hole - left",
+          "Brep_id": "FACE 1",
+          "description": "Cylindrical wall of left flange through-hole (radius 7.5), axis along y."
+        },
+        {
+          "face_code": "0007",
+          "name": "Corner round - left/front",
+          "Brep_id": "FACE 58",
+          "description": "Cylindrical blend at left/front flange corner (radius 9), axis along y."
+        },
+        {
+          "face_code": "0008",
+          "name": "Corner round - left/rear",
+          "Brep_id": "FACE 60",
+          "description": "Cylindrical blend at left/rear flange corner (radius 9), axis along y."
+        },
+        {
+          "face_code": "0009",
+          "name": "Corner round - right/front",
+          "Brep_id": "FACE 63",
+          "description": "Cylindrical blend at right/front flange corner (radius 9), axis along y."
+        },
+        {
+          "face_code": "0010",
+          "name": "Corner round - right/rear",
+          "Brep_id": "FACE 62",
+          "description": "Cylindrical blend at right/rear flange corner (radius 9), axis along y."
+        }
+      ],
+      "minor_faces_Brep_id": [],
+      "relationships": [
+        {
+          "source id": "S1",
+          "target id": "S2",
+          "function relationship": "mounts_to",
+          "structural relationship": "supports"
+        },
+        {
+          "source id": "S1",
+          "target id": "S2",
+          "function relationship": "distributes_stress",
+          "structural relationship": "attached_to"
+        }
+      ]
+    },
+    {
+      "id": "S2",
+      "name": "Lower arched web + clearance cutout + opposed obround pockets",
+      "features included": [
+        "arched load path / arm (outer convex curve)",
+        "large internal clearance cutout (C-shaped window)",
+        "opposed obround blind pockets (one from each side face)",
+        "outer vertical side walls and blends to base",
+        "local corner/edge fillets around lower transitions"
+      ],
+      "function intent": "Transmit loads from the upper housing/boss down to the base while providing clearance for a mating component via the large internal cutout and side pockets.",
+      "physical behavior": "Carries combined bending and shear; arched outer surface increases section modulus; internal cutout reduces mass while maintaining a rib-like load path; blends/fillets reduce peak stress at curvature changes; pockets reduce mass/provide clearance without breaking through the web.",
+      "geometry": "Main body thickness z=-42..0 above the flange; includes a large curved internal window defined by cylindrical arcs plus planar/angled transitions; includes two obround blind pockets (one from z=0 side to z=-10, and one from z=-42 side to z=-32).",
+      "location": "Between the base flange and upper block, primarily y=15..~156; spans x approximately 28.5..134.5 within the main body thickness (z=-42..0).",
+      "colour": {
+        "R": 120,
+        "G": 170,
+        "B": 210
+      },
+      "major_faces": [
+        {
+          "face_code": "0011",
+          "name": "Front side face (main body)",
+          "Brep_id": "FACE 28",
+          "description": "Large planar side face at z=0 over base+body region."
+        },
+        {
+          "face_code": "0012",
+          "name": "Back side face (main body)",
+          "Brep_id": "FACE 52",
+          "description": "Large planar side face at z=-42 over main body region."
+        },
+        {
+          "face_code": "0013",
+          "name": "Left outer wall of web/body",
+          "Brep_id": "FACE 53",
+          "description": "Planar outer wall at x=37.5 (portion of lower body)."
+        },
+        {
+          "face_code": "0014",
+          "name": "Right outer wall of arm/body",
+          "Brep_id": "FACE 55",
+          "description": "Planar outer wall at x=130.5 adjacent to the arched arm."
+        },
+        {
+          "face_code": "0015",
+          "name": "Outer arm curve",
+          "Brep_id": "FACE 45",
+          "description": "Large convex cylindrical surface (R≈51) forming the outside of the arched arm."
+        },
+        {
+          "face_code": "0016",
+          "name": "Inner clearance arc",
+          "Brep_id": "FACE 49",
+          "description": "Concave cylindrical surface (R≈27) forming the main internal clearance cutout arc."
+        },
+        {
+          "face_code": "0017",
+          "name": "Cutout flat seat",
+          "Brep_id": "FACE 51",
+          "description": "Planar face (y=45) forming a flat segment of the internal cutout boundary."
+        },
+        {
+          "face_code": "0018",
+          "name": "Cutout angled face",
+          "Brep_id": "FACE 47",
+          "description": "Angled planar face forming a straight/angled segment of the internal cutout boundary."
+        },
+        {
+          "face_code": "0019",
+          "name": "Cutout transition cylinder (mid-radius)",
+          "Brep_id": "FACE 48",
+          "description": "Cylindrical transition (R≈15) blending between planar/angled and curved cutout regions."
+        },
+        {
+          "face_code": "0020",
+          "name": "Cutout transition cylinder (small-radius)",
+          "Brep_id": "FACE 50",
+          "description": "Cylindrical transition (R≈9) near the lower portion of the cutout boundary."
+        },
+        {
+          "face_code": "0021",
+          "name": "Lower blend at base junction (left)",
+          "Brep_id": "FACE 56",
+          "description": "Cylindrical fillet (R≈9) at lower left body/base transition region."
+        },
+        {
+          "face_code": "0022",
+          "name": "Lower blend at base junction (right)",
+          "Brep_id": "FACE 54",
+          "description": "Small cylindrical fillet (R≈4) at lower right body/base transition region."
+        },
+        {
+          "face_code": "0023",
+          "name": "Pocket A (z=-42 side) - left wall",
+          "Brep_id": "FACE 16",
+          "description": "Planar wall at x=104 of the obround blind pocket cut from the z=-42 side."
+        },
+        {
+          "face_code": "0024",
+          "name": "Pocket A (z=-42 side) - lower rounded end",
+          "Brep_id": "FACE 15",
+          "description": "Cylindrical end wall (R=9) of the obround pocket (z=-42 side), lower end."
+        },
+        {
+          "face_code": "0025",
+          "name": "Pocket A (z=-42 side) - right wall",
+          "Brep_id": "FACE 14",
+          "description": "Planar wall at x=122 of the obround blind pocket cut from the z=-42 side."
+        },
+        {
+          "face_code": "0026",
+          "name": "Pocket A (z=-42 side) - upper rounded end",
+          "Brep_id": "FACE 17",
+          "description": "Cylindrical end wall (R=9) of the obround pocket (z=-42 side), upper end."
+        },
+        {
+          "face_code": "0027",
+          "name": "Pocket A (z=-42 side) - pocket floor",
+          "Brep_id": "FACE 18",
+          "description": "Planar floor of the z=-42-side blind pocket at z=-32."
+        },
+        {
+          "face_code": "0028",
+          "name": "Pocket B (z=0 side) - left wall",
+          "Brep_id": "FACE 21",
+          "description": "Planar wall at x=104 of the obround blind pocket cut from the z=0 side."
+        },
+        {
+          "face_code": "0029",
+          "name": "Pocket B (z=0 side) - lower rounded end",
+          "Brep_id": "FACE 22",
+          "description": "Cylindrical end wall (R=9) of the obround pocket (z=0 side), lower end."
+        },
+        {
+          "face_code": "0030",
+          "name": "Pocket B (z=0 side) - right wall",
+          "Brep_id": "FACE 19",
+          "description": "Planar wall at x=122 of the obround blind pocket cut from the z=0 side."
+        },
+        {
+          "face_code": "0031",
+          "name": "Pocket B (z=0 side) - upper rounded end",
+          "Brep_id": "FACE 20",
+          "description": "Cylindrical end wall (R=9) of the obround pocket (z=0 side), upper end."
+        },
+        {
+          "face_code": "0032",
+          "name": "Pocket B (z=0 side) - pocket floor",
+          "Brep_id": "FACE 23",
+          "description": "Planar floor of the z=0-side blind pocket at z=-10."
+        }
+      ],
+      "minor_faces_Brep_id": [
+        "FACE 27",
+        "FACE 33",
+        "FACE 35",
+        "FACE 41",
+        "FACE 42",
+        "FACE 43",
+        "FACE 44",
+        "FACE 46",
+        "FACE 64"
+      ],
+      "relationships": [
+        {
+          "source id": "S2",
+          "target id": "S1",
+          "function relationship": "transmits_load",
+          "structural relationship": "attached_to"
+        },
+        {
+          "source id": "S2",
+          "target id": "S3",
+          "function relationship": "transmits_load",
+          "structural relationship": "supports"
+        },
+        {
+          "source id": "S2",
+          "target id": "S3",
+          "function relationship": "distributes_stress",
+          "structural relationship": "blends_into"
+        }
+      ]
+    },
+    {
+      "id": "S3",
+      "name": "Upper housing block + top seat pocket + cross-hole",
+      "features included": [
+        "upper rectangular housing block",
+        "top seat/shoulder under boss",
+        "cross-drilled hole (small)",
+        "edge/corner blends near top seat"
+      ],
+      "function intent": "Provide a stiff mounting/housing region for the top boss interface, including a transverse pin/fastener/vent feature (cross-hole) and a seated platform for the boss.",
+      "physical behavior": "Acts as a compression/tension and bending node: spreads load from the boss into the web; the seat/shoulder provides bearing area and locates the boss; cross-hole provides secondary interface with minimal effect on global stiffness due to its small diameter relative to block section.",
+      "geometry": "Rectangular prismatic block region with a stepped/seat platform (y=153 and y=162 planes), local blends/fillets, and a small cylindrical cross-hole (R=3) through the block.",
+      "location": "Upper portion of the main body beneath the boss, roughly y≈84..162 around x≈46.5..88.5 and z=-42..0.",
+      "colour": {
+        "R": 150,
+        "G": 210,
+        "B": 140
+      },
+      "major_faces": [
+        {
+          "face_code": "0033",
+          "name": "Seat bottom/shoulder plane",
+          "Brep_id": "FACE 30",
+          "description": "Planar shoulder at y=153 forming the lower seat boundary under the boss platform."
+        },
+        {
+          "face_code": "0034",
+          "name": "Seat top rim plane (right patch)",
+          "Brep_id": "FACE 12",
+          "description": "Planar patch at y=162 forming part of the top platform surrounding the boss."
+        },
+        {
+          "face_code": "0035",
+          "name": "Seat top rim plane (left patch)",
+          "Brep_id": "FACE 13",
+          "description": "Planar patch at y=162 forming the remaining top platform surrounding the boss."
+        },
+        {
+          "face_code": "0036",
+          "name": "Upper block side wall (x=46.5)",
+          "Brep_id": "FACE 36",
+          "description": "Planar side wall at x=46.5 of the upper housing block."
+        },
+        {
+          "face_code": "0037",
+          "name": "Upper block side wall (x=88.5)",
+          "Brep_id": "FACE 37",
+          "description": "Planar side wall at x=88.5 of the upper housing block."
+        },
+        {
+          "face_code": "0038",
+          "name": "Cross-hole cylinder segment A",
+          "Brep_id": "FACE 3",
+          "description": "Cylindrical wall (R=3) of cross-drilled hole through the upper block (one face segment due to intersections)."
+        },
+        {
+          "face_code": "0039",
+          "name": "Cross-hole cylinder segment B",
+          "Brep_id": "FACE 2",
+          "description": "Cylindrical wall (R=3) of cross-drilled hole through the upper block (second face segment)."
+        },
+        {
+          "face_code": "0040",
+          "name": "Top-edge blend cylinder (front band)",
+          "Brep_id": "FACE 24",
+          "description": "Cylindrical blend (R=6) along an upper front edge region near the seat platform."
+        },
+        {
+          "face_code": "0041",
+          "name": "Top-edge blend cylinder (rear band)",
+          "Brep_id": "FACE 11",
+          "description": "Cylindrical blend (R=6) along an upper rear edge region near the seat platform."
+        },
+        {
+          "face_code": "0042",
+          "name": "Vertical edge blend cylinder (left)",
+          "Brep_id": "FACE 25",
+          "description": "Vertical cylindrical blend (R=6) along left edge region near y=156..162."
+        },
+        {
+          "face_code": "0043",
+          "name": "Vertical edge blend cylinder (right)",
+          "Brep_id": "FACE 26",
+          "description": "Vertical cylindrical blend (R=6) along right edge region near y=156..162."
+        }
+      ],
+      "minor_faces_Brep_id": [
+        "FACE 31",
+        "FACE 32",
+        "FACE 34",
+        "FACE 38",
+        "FACE 39",
+        "FACE 40"
+      ],
+      "relationships": [
+        {
+          "source id": "S3",
+          "target id": "S2",
+          "function relationship": "transmits_load",
+          "structural relationship": "supported_by"
+        },
+        {
+          "source id": "S3",
+          "target id": "S4",
+          "function relationship": "locates_mating_part",
+          "structural relationship": "supports"
+        },
+        {
+          "source id": "S3",
+          "target id": "S4",
+          "function relationship": "distributes_stress",
+          "structural relationship": "attached_to"
+        }
+      ]
+    },
+    {
+      "id": "S4",
+      "name": "Top boss + threaded/bored interface",
+      "features included": [
+        "cylindrical boss exterior",
+        "vertical bore / threaded interface cylinder",
+        "top chamfer/lead-in",
+        "filleted/blended boss-to-seat transition"
+      ],
+      "function intent": "Provide the primary functional interface for a mating fastener/shaft/fitting via a vertical threaded/bored hole and a locating boss.",
+      "physical behavior": "Carries local bearing/contact loads at the boss seat and internal thread/bore; blends reduce notch sensitivity where high axial and bending stresses concentrate at the boss root.",
+      "geometry": "Outer cylinder (R=12) rising above the seat; internal vertical cylinder (R≈7.0175) for bore/thread; top planar cap and conical entry chamfer; toroidal/BSpline blends at the boss root/seat region.",
+      "location": "Topmost feature (y≈162..180) centered at x≈67.5, within main body thickness (z around -21).",
+      "colour": {
+        "R": 190,
+        "G": 160,
+        "B": 220
+      },
+      "major_faces": [
+        {
+          "face_code": "0044",
+          "name": "Internal bore/thread cylinder",
+          "Brep_id": "FACE 29",
+          "description": "Cylindrical wall of the vertical bore (R≈7.0175), axis along y."
+        },
+        {
+          "face_code": "0045",
+          "name": "Top entry chamfer",
+          "Brep_id": "FACE 4",
+          "description": "Conical chamfer at the bore/boss top entry."
+        },
+        {
+          "face_code": "0046",
+          "name": "Boss top face",
+          "Brep_id": "FACE 6",
+          "description": "Top planar annular face at y=180."
+        },
+        {
+          "face_code": "0047",
+          "name": "Boss exterior cylinder",
+          "Brep_id": "FACE 5",
+          "description": "Outer cylindrical surface of the boss (R=12), axis along y."
+        },
+        {
+          "face_code": "0048",
+          "name": "Root fillet (torus) - right",
+          "Brep_id": "FACE 7",
+          "description": "Toroidal blend at boss root/seat transition on one side."
+        },
+        {
+          "face_code": "0049",
+          "name": "Root fillet (torus) - left",
+          "Brep_id": "FACE 9",
+          "description": "Toroidal blend at boss root/seat transition on the opposite side."
+        },
+        {
+          "face_code": "0050",
+          "name": "Seat transition blend (upper BSpline)",
+          "Brep_id": "FACE 8",
+          "description": "Sculpted blend surface between boss root and seat platform (upper region)."
+        },
+        {
+          "face_code": "0051",
+          "name": "Seat transition blend (lower BSpline)",
+          "Brep_id": "FACE 10",
+          "description": "Sculpted blend surface between boss root and seat platform (lower region)."
+        }
+      ],
+      "minor_faces_Brep_id": [],
+      "relationships": [
+        {
+          "source id": "S4",
+          "target id": "S3",
+          "function relationship": "mounts_to",
+          "structural relationship": "attached_to"
+        },
+        {
+          "source id": "S4",
+          "target id": "S3",
+          "function relationship": "transmits_load",
+          "structural relationship": "supported_by"
+        },
+        {
+          "source id": "S4",
+          "target id": "S3",
+          "function relationship": "constrains_dof",
+          "structural relationship": "coaxial_with"
+        }
+      ]
+    }
+  ]
+}
+
+operation.json:
+
+{
+  "request": "Change that vertical slot to cut through complete body to decrease weight",
+  "request_wording": {
+    "action_words": [
+      "Change",
+      "cut",
+      "through",
+      "complete"
+    ],
+    "referenced_feature_words": [
+      "vertical",
+      "slot",
+      "body"
+    ],
+    "intention_words": [
+      "decrease",
+      "weight"
+    ],
+    "grammatical_words": [
+      "that",
+      "to",
+      "to"
+    ]
+  },
+  "actions": [
+    {
+      "operation": "Edit existing slot cut feature to be a through-all cut (cut through the complete body)",
+      "parameters": {
+        "extent_depth": "through complete body (through-all)"
+      },
+      "target": "the vertical slot",
+      "relational_constraint": "slot cut must pass through the entire thickness of the body",
+      "unresolved_reference": "Which specific 'vertical slot' feature is being referenced (if multiple), and which solid body is meant by 'complete body' (if the part is multi-body)."
+    }
+  ],
+  "intention": [
+    "Decrease weight"
+  ]
+}
+
+View: front
+
+[IMAGE 0: /home/adml/Research/Hackathon2026/IDETC26-Hackathon-Autodesk-neuralCAD-Edit/data/edit_192_external/breps/4E22SJE7QVTSP2E3_1758737088.581102_front.jpg]
+
+View: back
+
+[IMAGE 1: /home/adml/Research/Hackathon2026/IDETC26-Hackathon-Autodesk-neuralCAD-Edit/data/edit_192_external/breps/4E22SJE7QVTSP2E3_1758737088.581102_back.jpg]
+
+View: left
+
+[IMAGE 2: /home/adml/Research/Hackathon2026/IDETC26-Hackathon-Autodesk-neuralCAD-Edit/data/edit_192_external/breps/4E22SJE7QVTSP2E3_1758737088.581102_left.jpg]
+
+View: right
+
+[IMAGE 3: /home/adml/Research/Hackathon2026/IDETC26-Hackathon-Autodesk-neuralCAD-Edit/data/edit_192_external/breps/4E22SJE7QVTSP2E3_1758737088.581102_right.jpg]
+
+View: top
+
+[IMAGE 4: /home/adml/Research/Hackathon2026/IDETC26-Hackathon-Autodesk-neuralCAD-Edit/data/edit_192_external/breps/4E22SJE7QVTSP2E3_1758737088.581102_top.jpg]
+
+View: bottom
+
+[IMAGE 5: /home/adml/Research/Hackathon2026/IDETC26-Hackathon-Autodesk-neuralCAD-Edit/data/edit_192_external/breps/4E22SJE7QVTSP2E3_1758737088.581102_bottom.jpg]
+
+View: toprightiso
+
+[IMAGE 6: /home/adml/Research/Hackathon2026/IDETC26-Hackathon-Autodesk-neuralCAD-Edit/data/edit_192_external/breps/4E22SJE7QVTSP2E3_1758737088.581102_toprightiso.jpg]

@@ -27,12 +27,18 @@ def parse_rating(rating: dict) -> dict:
             return_dict["chamfer_similarity_norm"] = rating["chamfer similarity norm gt"]
         if "diff f1 gt" in rating:
             return_dict["diff_f1"] = rating["diff f1 gt"]
+        if "volume f1 human" in rating:
+            return_dict["volume_f1_human"] = rating["volume f1 human"]
+        if "chamfer similarity norm human" in rating:
+            return_dict["chamfer_similarity_norm_human"] = rating["chamfer similarity norm human"]
+        if "diff f1 human" in rating:
+            return_dict["diff_f1_human"] = rating["diff f1 human"]
         return return_dict
 
     return None
 
 
-def display_rating_results(config: dict, dbm: DatabaseManager, difficulty: str = "all", request_fields={"eval_vis_multi": True, "eval_geometric": True}, request_type="edit"):
+def display_rating_results(config: dict, dbm: DatabaseManager, difficulty: str = "all", request_fields={"eval_vis_multi": True, "eval_geometric": True}, request_type="edit", verbose=True):
 
     request_fields["request_type"] = request_type
 
@@ -85,7 +91,8 @@ def display_rating_results(config: dict, dbm: DatabaseManager, difficulty: str =
         if not valid_user:
             continue
 
-        print(rating)
+        if verbose:
+            print(rating)
 
         metrics = parse_rating(rating)
 
@@ -103,7 +110,8 @@ def display_rating_results(config: dict, dbm: DatabaseManager, difficulty: str =
     for user_scores in scores.values():
         all_metrics.update(user_scores.keys())
 
-    print(all_metrics)
+    if verbose:
+        print(all_metrics)
 
     for request_id in request_ids:
         for user_id in config["benchmark_eval_users"][request_type]:
@@ -120,9 +128,12 @@ def display_rating_results(config: dict, dbm: DatabaseManager, difficulty: str =
 
 
 METRIC_DISPLAY_NAMES = {
-    "chamfer_similarity_norm": "Chamfer similarity (norm)",
-    "diff_f1": "Diff F1",
-    "volume_f1": "Volume F1",
+    "chamfer_similarity_norm": "Chamfer similarity (norm) vs GT",
+    "diff_f1": "Diff F1 vs GT",
+    "volume_f1": "Volume F1 vs GT",
+    "chamfer_similarity_norm_human": "Chamfer similarity (norm) vs human",
+    "diff_f1_human": "Diff F1 vs human",
+    "volume_f1_human": "Volume F1 vs human",
 }
 
 BASELINE_MODELS = {
@@ -272,7 +283,15 @@ def faceted_bar_plot(config: dict, results: dict, request_type: str = "edit", me
     metric_model_scores = _aggregate_scores_by_metric(results)
 
     if metrics is None:
-        metrics = [m for m in ["chamfer_similarity_norm", "volume_f1", "diff_f1"] if m in metric_model_scores]
+        preferred = [
+            "chamfer_similarity_norm",
+            "volume_f1",
+            "diff_f1",
+            "chamfer_similarity_norm_human",
+            "volume_f1_human",
+            "diff_f1_human",
+        ]
+        metrics = [m for m in preferred if m in metric_model_scores]
         metrics += [m for m in metric_model_scores if m not in metrics]
 
     models = _bar_models(config, request_type)

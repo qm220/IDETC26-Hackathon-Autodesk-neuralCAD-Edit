@@ -1,0 +1,291 @@
+Thinking text:
+**Crafting completion response**
+
+It seems I'm on the right track with this process. The images show that the outer perimeter has a small radius, while corners maintain a larger plan radius, which is fine. I need to check if any R10 remains, but post-check shows none. So, it seems complete. I must indicate "complete true" in the JSON response and use the same function string from the last iteration. If not, I’ll need to handle any errors correctly. I need to ensure it’s all structured properly!
+
+Generated script:
+def my_cad_function(args):
+    import os
+    import cadquery as cq
+
+    input_path = os.path.expanduser(args.get("input_file", ""))
+    if not input_path or not os.path.exists(input_path):
+        raise ValueError(f"Input STEP file not found: {input_path}")
+
+    wp = cq.importers.importStep(input_path)
+    base = wp.val()
+
+    print("Loaded STEP")
+    print(f"  valid={base.isValid()} faces={len(base.Faces())} edges={len(base.Edges())}")
+    bb0 = base.BoundingBox()
+    dx0, dy0, dz0 = (bb0.xmax - bb0.xmin), (bb0.ymax - bb0.ymin), (bb0.zmax - bb0.zmin)
+    print(
+        f"  bbox: xmin={bb0.xmin:.3f} xmax={bb0.xmax:.3f} (dx={dx0:.3f})  "
+        f"ymin={bb0.ymin:.3f} ymax={bb0.ymax:.3f} (dy={dy0:.3f})  "
+        f"zmin={bb0.zmin:.3f} zmax={bb0.zmax:.3f} (dz={dz0:.3f})"
+    )
+
+    # -----------------------
+    # Parameters
+    # -----------------------
+    R_OLD = 10.0
+    R_NEW = 2.0
+    r_tol = 0.35
+
+    from OCP.BRepAdaptor import BRepAdaptor_Surface
+    from OCP.GeomAbs import GeomAbs_Cylinder, GeomAbs_Torus, GeomAbs_Plane
+
+    def count_r_faces(shape: cq.Shape, r_target: float):
+        cyl = 0
+        tor = 0
+        for f in shape.Faces():
+            ad = BRepAdaptor_Surface(f.wrapped, True)
+            st = ad.GetType()
+            if st == GeomAbs_Cylinder:
+                if abs(float(ad.Cylinder().Radius()) - r_target) <= r_tol:
+                    cyl += 1
+            elif st == GeomAbs_Torus:
+                if abs(float(ad.Torus().MinorRadius()) - r_target) <= r_tol:
+                    tor += 1
+        return cyl, tor
+
+    # -----------------------
+    # 1) Remove the all-around R10 fillet faces (cyl R10 + torus minor R10)
+    # -----------------------
+    c10, t10 = count_r_faces(base, R_OLD)
+    print(f"Initial R~{R_OLD} faces detected: cylinders={c10}, torus(minor)={t10}")
+
+    current = base
+
+    for p in range(3):
+        faces_r10 = []
+        for f in current.Faces():
+            ad = BRepAdaptor_Surface(f.wrapped, True)
+            st = ad.GetType()
+            if st == GeomAbs_Cylinder:
+                if abs(float(ad.Cylinder().Radius()) - R_OLD) <= r_tol:
+                    faces_r10.append(f.wrapped)
+            elif st == GeomAbs_Torus:
+                if abs(float(ad.Torus().MinorRadius()) - R_OLD) <= r_tol:
+                    faces_r10.append(f.wrapped)
+
+        print(f"Defeaturing pass {p+1}: faces marked for removal={len(faces_r10)}")
+        if not faces_r10:
+            break
+
+        try:
+            from OCP.BRepAlgoAPI import BRepAlgoAPI_Defeaturing
+            from OCP.TopTools import TopTools_ListOfShape
+            from OCP.ShapeFix import ShapeFix_Shape
+
+            df = BRepAlgoAPI_Defeaturing()
+            if hasattr(df, "SetShape"):
+                df.SetShape(current.wrapped)
+            else:
+                df = BRepAlgoAPI_Defeaturing(current.wrapped)
+
+            lst = TopTools_ListOfShape()
+            for fw in faces_r10:
+                lst.Append(fw)
+
+            added = False
+            if hasattr(df, "AddFacesToRemove"):
+                try:
+                    df.AddFacesToRemove(lst)
+                    added = True
+                except Exception as e:
+                    print("  AddFacesToRemove failed:", e)
+            if (not added) and hasattr(df, "AddFaceToRemove"):
+                try:
+                    for fw in faces_r10:
+                        df.AddFaceToRemove(fw)
+                    added = True
+                except Exception as e:
+                    print("  AddFaceToRemove failed:", e)
+
+            if not added:
+                print("  Defeaturing API could not add faces-to-remove; aborting removal.")
+                break
+
+            try:
+                if hasattr(df, "SetFuzzyValue"):
+                    df.SetFuzzyValue(1e-4)
+                if hasattr(df, "SetUseOBB"):
+                    df.SetUseOBB(True)
+            except Exception:
+                pass
+
+            df.Build()
+            if hasattr(df, "IsDone") and not df.IsDone():
+                print("  Defeaturing IsDone()=False; aborting removal.")
+                break
+
+            new_shape = cq.Shape.cast(df.Shape())
+
+            # Fix shape after defeaturing
+            try:
+                fixer = ShapeFix_Shape(new_shape.wrapped)
+                fixer.Perform()
+                new_shape = cq.Shape.cast(fixer.Shape())
+            except Exception as e:
+                print("  ShapeFix failed (continuing):", e)
+
+            current = new_shape
+            c10, t10 = count_r_faces(current, R_OLD)
+            print(
+                f"  After pass {p+1}: valid={current.isValid()} faces={len(current.Faces())} edges={len(current.Edges())}  "
+                f"remaining R~{R_OLD}: cyl={c10}, tor(minor)={t10}"
+            )
+            if c10 == 0 and t10 == 0:
+                break
+
+        except Exception as e:
+            print("Defeaturing exception:", e)
+            break
+
+    c10, t10 = count_r_faces(current, R_OLD)
+    if c10 != 0 or t10 != 0:
+        print(
+            f"WARNING: R~{R_OLD} surfaces still present after defeaturing (cyl={c10}, tor={t10}). "
+            f"Returning without adding new fillet to avoid stacking."
+        )
+        return current
+
+    # -----------------------
+    # 2) Add uniform R2 fillet to the same outer perimeter edge loops
+    #    Robust selection: find the two largest planar (annular) faces, and fillet
+    #    the edges of their OUTER wires (not the inner opening).
+    # -----------------------
+    from math import sqrt
+
+    def dot(a, b):
+        return a[0]*b[0] + a[1]*b[1] + a[2]*b[2]
+
+    def sub(a, b):
+        return (a[0]-b[0], a[1]-b[1], a[2]-b[2])
+
+    def norm(v):
+        return sqrt(dot(v, v))
+
+    def unit(v):
+        n = norm(v)
+        if n < 1e-12:
+            return (0.0, 0.0, 0.0)
+        return (v[0]/n, v[1]/n, v[2]/n)
+
+    planar = []
+    for f in current.Faces():
+        ad = BRepAdaptor_Surface(f.wrapped, True)
+        if ad.GetType() != GeomAbs_Plane:
+            continue
+        try:
+            area = float(cq.Face(f.wrapped).Area())
+        except Exception:
+            area = 0.0
+        pln = ad.Plane()
+        n = pln.Axis().Direction()
+        p0 = pln.Location()
+        nvec = unit((float(n.X()), float(n.Y()), float(n.Z())))
+        pvec = (float(p0.X()), float(p0.Y()), float(p0.Z()))
+        planar.append((area, f, nvec, pvec))
+
+    planar.sort(key=lambda x: x[0], reverse=True)
+    print(f"Planar faces found: {len(planar)}")
+    for i, (a, _f, nvec, pvec) in enumerate(planar[:6]):
+        print(f"  planar[{i}] area={a:.3f} n={tuple(round(v,4) for v in nvec)} p={tuple(round(v,3) for v in pvec)}")
+
+    # Find best opposing (or parallel) pair among the largest planar faces
+    best = None
+    topN = min(12, len(planar))
+    for i in range(topN):
+        ai, fi, ni, pi = planar[i]
+        for j in range(i+1, topN):
+            aj, fj, nj, pj = planar[j]
+            if abs(dot(ni, nj)) < 0.985:
+                continue
+            # plane separation along ni
+            d = abs(dot(sub(pj, pi), ni))
+            score = d * (ai + aj)
+            if best is None or score > best[0]:
+                best = (score, d, (ai, fi, ni, pi), (aj, fj, nj, pj))
+
+    if best is None:
+        print("ERROR: Could not identify the two broad planar faces for outer-edge selection. Returning current.")
+        return current
+
+    _score, dsep, A, B = best
+    (ai, faceA, nA, pA) = A
+    (aj, faceB, nB, pB) = B
+    print(f"Selected planar face pair: areas=({ai:.3f},{aj:.3f}) separation~{dsep:.3f}")
+
+    # Collect outer-wire edges from both faces
+    edges = []
+    for lab, f in [("A", faceA), ("B", faceB)]:
+        try:
+            cf = cq.Face(f.wrapped)
+            ow = cf.outerWire()
+            ews = ow.Edges()
+            print(f"  Face {lab}: outerWire edges={len(ews)}")
+            for e in ews:
+                edges.append(e.wrapped)
+        except Exception as e:
+            print(f"  Failed extracting outerWire for face {lab}:", e)
+
+    # Deduplicate edges by HashCode
+    dedup = {}
+    uniq = []
+    for ew in edges:
+        try:
+            hk = int(ew.HashCode(10**9))
+        except Exception:
+            hk = id(ew)
+        if hk in dedup:
+            continue
+        dedup[hk] = True
+        uniq.append(ew)
+    edges = uniq
+
+    print(f"Edges selected for new R{R_NEW} fillet (from outer wires): {len(edges)}")
+    if len(edges) == 0:
+        print("No edges selected; returning current for inspection.")
+        return current
+
+    # Apply fillet
+    try:
+        from OCP.BRepFilletAPI import BRepFilletAPI_MakeFillet
+        from OCP.ShapeFix import ShapeFix_Shape
+
+        mk = BRepFilletAPI_MakeFillet(current.wrapped)
+        for ew in edges:
+            mk.Add(R_NEW, ew)
+        mk.Build()
+        if hasattr(mk, "IsDone") and not mk.IsDone():
+            print("Fillet tool IsDone()=False; returning current.")
+            return current
+
+        result = cq.Shape.cast(mk.Shape())
+
+        try:
+            fixer = ShapeFix_Shape(result.wrapped)
+            fixer.Perform()
+            result = cq.Shape.cast(fixer.Shape())
+        except Exception:
+            pass
+
+        print("Applied new fillet")
+        print(f"  result valid={result.isValid()} faces={len(result.Faces())} edges={len(result.Edges())}")
+
+        c10, t10 = count_r_faces(result, R_OLD)
+        c2, t2 = count_r_faces(result, R_NEW)
+        print(f"Post-check: remaining R~{R_OLD}: cyl={c10}, tor(minor)={t10}")
+        print(f"Post-check: detected R~{R_NEW}: cyl={c2}, tor(minor)={t2}")
+
+        return result
+
+    except Exception as e:
+        print("Fillet exception:", e)
+        return current
+
+
+Program output:
+CadQuery skipped because complete=true.

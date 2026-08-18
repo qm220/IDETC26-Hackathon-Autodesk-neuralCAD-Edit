@@ -1,0 +1,204 @@
+def my_cad_function(args):
+    import os
+    import math
+    import cadquery as cq
+
+    shape = cq.importers.importStep(os.path.expanduser(args["input_file"]))
+    solid = shape.val()
+    print("INPUT_VALID", solid.isValid(), "VOLUME", solid.Volume())
+
+    # Identify the opposed planar aperture walls normal to global X.
+    x_side_faces = []
+    for face in solid.Faces():
+        if face.geomType() != "PLANE":
+            continue
+        c = face.Center()
+        try:
+            n = face.normalAt(c).normalized()
+        except Exception:
+            continue
+        if abs(n.x) > 0.99 and face.Area() > 5000.0:
+            x_side_faces.append(face)
+
+    if len(x_side_faces) < 2:
+        raise RuntimeError("Could not identify the opposed planar aperture sidewalls")
+
+    x_side_faces.sort(key=lambda f: f.Center().x)
+    left_face = x_side_faces[0]
+    right_face = x_side_faces[-1]
+    lc = left_face.Center()
+    rc = right_face.Center()
+    frame_center = cq.Vector(
+        0.5 * (lc.x + rc.x),
+        0.5 * (lc.y + rc.y),
+        0.5 * (lc.z + rc.z)
+    )
+    aperture_half_width = 0.5 * abs(rc.x - lc.x)
+
+    # The smaller planar annular face is the rear/bottom seating datum.
+    annular_faces = [
+        f for f in solid.Faces()
+        if f.geomType() == "PLANE" and len(f.Wires()) >= 2
+    ]
+    if not annular_faces:
+        raise RuntimeError("Could not identify the rear annular seating face")
+
+    rear_face = min(annular_faces, key=lambda f: f.Area())
+    rear_center = rear_face.Center()
+    rear_normal = rear_face.normalAt(rear_center).normalized()
+
+    # Project the aperture center onto the rear datum plane.
+    datum_plane_offset = rear_center.dot(rear_normal)
+    center_to_plane = datum_plane_offset - frame_center.dot(rear_normal)
+    datum_origin = frame_center + rear_normal.multiply(center_to_plane)
+
+    x_dir = cq.Vector(1.0, 0.0, 0.0)
+    y_dir = rear_normal.cross(x_dir).normalized()
+
+    # Recover the aperture height from its opposed long planar walls.
+    horizontal_inner_faces = []
+    for face in solid.Faces():
+        if face.geomType() != "PLANE" or face.Area() < 9000.0:
+            continue
+        c = face.Center()
+        try:
+            n = face.normalAt(c).normalized()
+        except Exception:
+            continue
+        if abs(n.dot(y_dir)) > 0.95:
+            horizontal_inner_faces.append(face)
+
+    if len(horizontal_inner_faces) >= 2:
+        positions = [
+            (f.Center() - frame_center).dot(y_dir)
+            for f in horizontal_inner_faces
+        ]
+        aperture_half_height = 0.5 * (max(positions) - min(positions))
+    else:
+        aperture_half_height = 280.0
+
+    print("REAR_DATUM_AREA", rear_face.Area())
+    print("REAR_NORMAL", rear_normal.x, rear_normal.y, rear_normal.z)
+    print("APERTURE_HALF_DIMS", aperture_half_width, aperture_half_height)
+
+    aperture_radius = 50.0
+    offset = 20.0
+    support_height = 5.0
+    top_fillet_radius = 2.0
+    attachment_overlap = 0.5
+
+    inner_half_width = aperture_half_width - offset
+    inner_half_height = aperture_half_height - offset
+    inner_radius = aperture_radius - offset
+
+    if inner_half_width <= inner_radius or inner_half_height <= inner_radius:
+        raise RuntimeError("The requested 20 mm aperture offset self-intersects")
+
+    support_plane = cq.Plane(
+        origin=datum_origin,
+        xDir=x_dir,
+        normal=rear_normal
+    )
+
+    def rounded_rectangle_wire(half_width, half_height, radius):
+        if radius <= 0 or radius >= min(half_width, half_height):
+            raise ValueError("Invalid rounded-rectangle radius")
+
+        d = radius / math.sqrt(2.0)
+        local_points = [
+            (-half_width + radius, -half_height),
+            ( half_width - radius, -half_height),
+            ( half_width - radius + d, -half_height + radius - d),
+            ( half_width, -half_height + radius),
+            ( half_width, half_height - radius),
+            ( half_width - radius + d, half_height - radius + d),
+            ( half_width - radius, half_height),
+            (-half_width + radius, half_height),
+            (-half_width + radius - d, half_height - radius + d),
+            (-half_width, half_height - radius),
+            (-half_width, -half_height + radius),
+            (-half_width + radius - d, -half_height + radius - d),
+            (-half_width + radius, -half_height)
+        ]
+
+        points = [
+            support_plane.toWorldCoords(cq.Vector(x, y, 0.0))
+            for x, y in local_points
+        ]
+
+        edges = [
+            cq.Edge.makeLine(points[0], points[1]),
+            cq.Edge.makeThreePointArc(points[1], points[2], points[3]),
+            cq.Edge.makeLine(points[3], points[4]),
+            cq.Edge.makeThreePointArc(points[4], points[5], points[6]),
+            cq.Edge.makeLine(points[6], points[7]),
+            cq.Edge.makeThreePointArc(points[7], points[8], points[9]),
+            cq.Edge.makeLine(points[9], points[10]),
+            cq.Edge.makeThreePointArc(points[10], points[11], points[12])
+        ]
+        return cq.Wire.assembleEdges(edges)
+
+    # The outer boundary overlaps the existing aperture wall by 0.5 mm to
+    # guarantee a robust additive union. The inner boundary is the requested
+    # 20 mm inward offset, leaving the central opening unobstructed.
+    outer_wire = rounded_rectangle_wire(
+        aperture_half_width + attachment_overlap,
+        aperture_half_height + attachment_overlap,
+        aperture_radius + attachment_overlap
+    )
+    inner_wire = rounded_rectangle_wire(
+        inner_half_width,
+        inner_half_height,
+        inner_radius
+    )
+
+    outer_face = cq.Face.makeFromWires(outer_wire)
+    inner_face = cq.Face.makeFromWires(inner_wire)
+    extrusion_vector = rear_normal.multiply(support_height)
+
+    outer_prism = outer_face.extrude(extrusion_vector)
+    inner_prism = inner_face.extrude(extrusion_vector)
+    support = outer_prism.cut(inner_prism)
+
+    # Find the annular face at the original rear datum. Its smaller wire is the
+    # exposed upper edge of the support. Only that loop receives the 2 mm blend.
+    top_faces = []
+    for face in support.Faces():
+        if face.geomType() != "PLANE" or len(face.Wires()) < 2:
+            continue
+        distance = abs((face.Center() - datum_origin).dot(rear_normal))
+        if distance < 1.0e-4:
+            top_faces.append(face)
+
+    if not top_faces:
+        raise RuntimeError("Could not identify the upper annular support face")
+
+    support_top = max(top_faces, key=lambda f: f.Area())
+    top_wires = support_top.Wires()
+    inner_top_wire = min(
+        top_wires,
+        key=lambda w: sum(edge.Length() for edge in w.Edges())
+    )
+    upper_edges = inner_top_wire.Edges()
+    print("TOP_FILLET_EDGE_COUNT", len(upper_edges))
+
+    support = support.makeFillet(top_fillet_radius, upper_edges)
+
+    # Fuse to the source part. The opposite termination of the 5 mm extrusion
+    # is untouched, preserving a flat underside and sharp lower edge loops.
+    result = solid.fuse(support).clean()
+
+    print("RESULT_VALID", result.isValid())
+    print("RESULT_SOLIDS", len(result.Solids()))
+    print("RESULT_VOLUME", result.Volume())
+    print("ADDED_VOLUME", result.Volume() - solid.Volume())
+    print("RESULT_FACES", len(result.Faces()), "RESULT_EDGES", len(result.Edges()))
+
+    if not result.isValid():
+        raise RuntimeError("The modified frame is not a valid solid")
+    if len(result.Solids()) != 1:
+        raise RuntimeError("The supporting step did not fuse into one solid")
+    if result.Volume() <= solid.Volume():
+        raise RuntimeError("No supporting material was added")
+
+    return cq.Workplane(obj=result)

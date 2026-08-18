@@ -1,0 +1,90 @@
+Thinking text:
+**Evaluating edge selections**
+
+I’m selecting edges based on specific criteria: either xSpan or zSpan greater than 3, and I'm excluding vertical edges. I also want to exclude bottom edges where yMax is less than or equal to 10.1. I feel good about that! It seems like I’ll be focusing on candidates within the specified region and the x/z bounding box, but I'm wondering if the deck edge should only be counted as part of the pocket. I need to ensure the edge bounding extents are local and not normalized.
+
+Generated script:
+def my_cad_function(args):
+    input_file = os.path.expanduser(args["input_file"])
+    imported = cq.importers.importStep(input_file)
+    root = imported.val() if hasattr(imported, "val") else imported
+
+    solids = list(root.Solids())
+    if len(solids) < 2:
+        raise ValueError("Expected the STEP model to contain the housing and a separate control wheel")
+
+    solids.sort(key=lambda s: s.Volume(), reverse=True)
+    housing = solids[0]
+    other_solids = solids[1:]
+
+    print("Imported solids:", len(solids))
+    for i, solid in enumerate(solids):
+        bb = solid.BoundingBox()
+        print(
+            "Solid", i,
+            "volume", round(solid.Volume(), 4),
+            "bbox", (round(bb.xmin, 3), round(bb.ymin, 3), round(bb.zmin, 3)),
+            "to", (round(bb.xmax, 3), round(bb.ymax, 3), round(bb.zmax, 3))
+        )
+
+    # The wheel-slot rim lies inside this compact transverse/longitudinal region.
+    # Reject the floor edges at y=10 and the vertical pocket-corner edges by
+    # requiring an appreciable span in x or z.
+    rim_edges = []
+    for edge in housing.Edges():
+        bb = edge.BoundingBox()
+        dx = bb.xmax - bb.xmin
+        dy = bb.ymax - bb.ymin
+        dz = bb.zmax - bb.zmin
+        in_slot_region = (
+            bb.xmin >= 23.5 and bb.xmax <= 32.0 and
+            bb.zmin >= 42.0 and bb.zmax <= 61.0
+        )
+        is_above_floor = bb.ymax > 11.0
+        is_rim_direction = max(dx, dz) > 2.0
+        if in_slot_region and is_above_floor and is_rim_direction:
+            rim_edges.append(edge)
+            c = edge.Center()
+            print(
+                "Rim candidate:",
+                "center", (round(c.x, 3), round(c.y, 3), round(c.z, 3)),
+                "span", (round(dx, 3), round(dy, 3), round(dz, 3)),
+                "length", round(edge.Length(), 3)
+            )
+
+    if len(rim_edges) != 4:
+        raise ValueError("Expected exactly four upper wheel-slot rim edges; found %d" % len(rim_edges))
+
+    filleted_housing = housing.fillet(2.0, rim_edges)
+    if not filleted_housing.isValid():
+        raise ValueError("The housing became invalid after applying the slot-rim fillet")
+
+    print("Applied a 2 mm fillet to all four wheel-slot rim edges")
+    print("Housing faces before/after:", len(housing.Faces()), len(filleted_housing.Faces()))
+    print("Result valid:", filleted_housing.isValid())
+
+    result_solids = [filleted_housing] + other_solids
+    return cq.Compound.makeCompound(result_solids)
+
+
+Program output:
+stdout: Loading function from: /home/adml/Research/Hackathon2026/IDETC26-Hackathon-Autodesk-neuralCAD-Edit/output/gpt-5.6-sol-full48/gpt-5.6-sol_cadquery-script_1787004607.404699/brep_end/1787004607.404699/temp_script.py
+Imported solids: 2
+Solid 0 volume 126577.394 bbox (-5.89, 2.16, -24.899) to (59.655, 34.059, 77.619)
+Solid 1 volume 612.9573 bbox (25.423, 15.069, 44.238) to (30.42, 29.133, 58.299)
+Rim candidate: center (25.116, 24.651, 51.508) span (0.37, 6.865, 15.646) length 17.094
+Rim candidate: center (27.586, 28.016, 43.577) span (5.313, 0.056, 0.126) length 5.316
+Rim candidate: center (30.428, 24.645, 51.382) span (0.37, 6.875, 15.646) length 17.098
+Rim candidate: center (27.956, 21.142, 59.222) span (5.313, 0.056, 0.126) length 5.315
+Applied a 2 mm fillet to all four wheel-slot rim edges
+Housing faces before/after: 11 15
+Result valid: True
+Exported shape to: /home/adml/Research/Hackathon2026/IDETC26-Hackathon-Autodesk-neuralCAD-Edit/output/gpt-5.6-sol-full48/gpt-5.6-sol_cadquery-script_1787004607.404699/brep_end/1787004607.404699/tmp.step
+Exported STL to: /home/adml/Research/Hackathon2026/IDETC26-Hackathon-Autodesk-neuralCAD-Edit/output/gpt-5.6-sol-full48/gpt-5.6-sol_cadquery-script_1787004607.404699/brep_end/1787004607.404699/tmp.stl
+Exported PNG image to: /home/adml/Research/Hackathon2026/IDETC26-Hackathon-Autodesk-neuralCAD-Edit/output/gpt-5.6-sol-full48/gpt-5.6-sol_cadquery-script_1787004607.404699/brep_end/1787004607.404699/tmp.png
+Script completed.
+
+stderr: 
+
+Exported this iteration:
+tmp.step, tmp.stl, tmp.png, tmp_front.png, tmp_back.png, tmp_left.png, tmp_right.png, tmp_top.png, tmp_bottom.png, tmp_toprightiso.png

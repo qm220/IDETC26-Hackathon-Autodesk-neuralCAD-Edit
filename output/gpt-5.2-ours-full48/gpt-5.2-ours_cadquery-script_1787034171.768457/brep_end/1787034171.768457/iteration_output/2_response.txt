@@ -1,0 +1,322 @@
+Thinking text:
+**Troubleshooting drafting issues**
+
+It looks like the draft isn't being applied because of some issues with the output. The inner and outer fillets are failing, so I need to implement a new function using OCC. I wonder if CadQuery has a draft method in cq.Workplane? I've run into an error saying the Workplane object lacks such an attribute, meaning the draft functionality isn't available. I’ll also need to refine edge selection for filleting by focusing on specific internal and external edges.
+**Optimizing edge selection**
+
+I’m thinking about the best way to classify edges using their normals and edge curves. A better approach might be using OCC to compute the dihedral angle for shared edges. This way, I can determine if they're convex or concave by analyzing the oriented normals. However, it seems pretty complex, so I could also try using CadQuery's methods to apply fillets while excluding bottom edges and focusing on outer edges. I'll take it step-by-step, first applying a draft to vertical surfaces.
+**Addressing fillet failures**
+
+I'm considering how to handle fillet failures by applying solutions per edge, even though that might be slow. I plan to apply drafts similarly to a list of faces. Next, I need to create two cylinder features as bosses or holes from the bottom to the top surface. I wonder if it’s better to apply bosses before the fillets, especially since the draft might alter the top intersection. I’ll also make sure to scale the model correctly and exclude edges on the bottom face to keep them sharp.
+**Clarifying boss placement**
+
+After scaling the original dimensions, the x range goes from ±1 to ±10 and y from ±3 to ±30. The window spans x ±8 and y ±28, so it seems the boss centers at y ±15 are indeed within the window region. However, since there's no material at that height due to the opening, I wonder if the bosses should start on a flat bottom surface outside the pocket. But technically, they could still span the opening like standoffs. That actually sounds plausible!
+**Implementing draft angles**
+
+I'm analyzing the render, noticing circular openings from the back and considering how they relate to the placement of cylinders. The cylinders should effectively reach the top saddle surface, and our calculations appear correct. I need to implement the draft using OCC's BRepOffsetAPI_DraftAngle, adding faces with the pull direction and a neutral plane. The draft angle should be positive, causing the top edges to shrink while the bottom remains stable. I’ll include both vertical and cylindrical faces in the draft process, though the cylindrical holes might end up conical. I’ll implement this code and adjust if needed!
+**Classifying edges for fillets**
+
+I'm figuring out the best way to apply fillets after drafting to avoid losing definition. To classify inner versus outer edges, I'll implement concave/convex detection using OCC tools. I will gather the list of faces from the solid and map edges to adjacent faces. The key steps will involve calculating normals at midpoints and using these to detect concavity by comparing the signs of their cross products. 
+
+I also want to ensure robust selection of edges: excluding those on the bottom or those that don’t belong to pocket surfaces. We'll try a methodical approach to incremental filleting to minimize failures, applying it edge by edge. Next, I’ll calculate whether edges are convex or concave based on their normals, along with considering their positioning around pockets and the outer bounding box.
+**Determining edges for filleting**
+
+I'm considering how to classify edges for filleting. Maybe it's easiest to define inner edges as those not visible from outside, specifically those with all points inside the bounding box and not near the extremes. Outer edges will be primarily those at the extremes of the bounding box. However, we need to be cautious since previous attempts failed due to too many selected edges. 
+
+I'll compute the bottom plane and exclude bottom edges. For outer edges, I'll select edges at extreme coordinates and around top saddle intersections. Inner edges need to exclude too short ones. The plan is to use a per-edge approach, trying fillets iteratively and adjusting as needed based on results. The sequence will involve scaling, applying drafts to the original solid, and then proceeding with filleting.
+**Adding cylinder bosses and executing fillets**
+
+I need to add two cylinder bosses with a concentric hole starting at the bottom plane. Since we need to draft all vertical surfaces, I should create the bosses before the drafting occurs. After adding them, I will draft everything to ensure the top wall height aligns correctly. 
+
+It’s important to account for how the draft might impact the intersections and edges. I’ll ensure that boss heights are computed based on intersections and maintain the plane shape at the top. I also need to carefully select edges for filleting and exclude those on the flat bottom surface, ensuring I treat the boss edges appropriately as inner edges. I will implement the fillets methodically, monitoring any intersections closely!
+**Classifying edges for filleting**
+
+After drafting, I need to account for shifts in edge extremes. For the outer edges, I’ll check the intersection of the top saddle and end pads primarily around the x and y extremes.  
+
+For inner edges where I plan to apply a radius of 1, I'll include pocket ceiling intersections. I need to exclude seam edges and apply fillets only to sharp edges where the angle between normals exceeds a certain threshold. I'll assess angles for each edge’s adjacent faces to ensure that I accurately classify both inner and outer edges, keeping in mind their proximity to the top surface. I want to filter effectively so I apply the correct fillet size!
+**Defining edge selections for filleting**
+
+I want to clearly define my selections for outer and inner edges. The outer edges should be near the extremes of x/y coordinates or close to the top surface, while ensuring they are not in the pocket area. I’ll exclude bottom-surface edges and properly select my candidate edges for a fillet radius of 1.
+
+For the fillet algorithm, I need to be cautious in how I define and update edge lists. I'll apply fillets in batches based on geometric criteria to avoid identity issues with edges after modifications. If failures occur, I’ll refine my selections and apply filters, focusing on sharp angles and excluding seam edges. I'll also categorize edges to apply fillets both for outer and inner selections appropriately, ensuring they're based on their positions and proximity to pocket edges.
+**Refining edge fillet process**
+
+I’m working on capturing all relevant edge criteria, especially for pocket edges, by setting pocket boundaries based on their x/y values. I’ll derive edge midpoints and classify them appropriately. For filleting, I need a solid plan since I'll call a function that will handle the operations.
+
+If a filleting attempt fails, I’ll apply a splitting strategy by taking subsets of edges. Each time, I'll need to recompute edge selections based on their geometric properties instead of their identities. This way, I can efficiently handle the recursive logic without running into topology changes. I'll use geometric selectors to refine the edge list dynamically, ensuring I skip bottom edges and focus on suitable candidates for filleting.
+**Implementing draft and fillet functions**
+
+I’m working on defining an outer and inner points list, ensuring to include pocket edges and holes for the fillet process. I need to be careful with point selection since choosing the nearest edge might lead to incorrect selections. The goal is to apply drafts using the OCP functions, so I'll set up a robust draft function while importing necessary components. 
+
+After computing drafts, I'll ensure outputs are accurate, checking dimensions, scaling, and spacing. I’ll also prepare error handling for any issues with the draft or fillet applications and craft a JSON error description, mentioning potential failures.
+
+Generated script:
+def my_cad_function(args):
+    import cadquery as cq
+    import cadquery.selectors as cqs
+    import os, math
+
+    if "input_file" not in args:
+        raise ValueError("Missing args['input_file']")
+
+    input_file = os.path.expanduser(args["input_file"])
+    wp_in = cq.importers.importStep(input_file)
+    shp_in = wp_in.val()
+
+    # Ensure single solid when possible
+    try:
+        shp_in = cq.Workplane(obj=shp_in).combineSolids().val()
+    except Exception:
+        pass
+
+    if not isinstance(shp_in, cq.Solid):
+        # best effort
+        try:
+            shp_in = cq.Workplane(obj=shp_in).combineSolids().val()
+        except Exception:
+            pass
+
+    print(f"[DBG] Imported shape type: {type(shp_in)}")
+
+    # -----------------------------
+    # 1) Scale uniformly 10x about origin
+    # -----------------------------
+    solid = shp_in.scale(10.0) if hasattr(shp_in, "scale") else shp_in
+
+    bb = solid.BoundingBox()
+    print(f"[DBG] After scale bbox: x=({bb.xmin:.3f},{bb.xmax:.3f}) y=({bb.ymin:.3f},{bb.ymax:.3f}) z=({bb.zmin:.3f},{bb.zmax:.3f})")
+
+    bottom_z = bb.zmin
+
+    # Helpers
+    def edge_on_bottom(e, zref, tol=1e-3):
+        ebb = e.BoundingBox()
+        return abs(ebb.zmin - zref) < tol and abs(ebb.zmax - zref) < tol
+
+    def v_mid_edge(e):
+        try:
+            c = e.Center()
+            return cq.Vector(c.x, c.y, c.z)
+        except Exception:
+            ebb = e.BoundingBox()
+            return cq.Vector((ebb.xmin + ebb.xmax) / 2.0, (ebb.ymin + ebb.ymax) / 2.0, (ebb.zmin + ebb.zmax) / 2.0)
+
+    # -----------------------------
+    # 5) Add two cylindrical features (OD=6, ID=3), spaced 30mm, centered
+    # -----------------------------
+    pts = [(0.0, 15.0), (0.0, -15.0)]  # along Y, symmetric
+    boss_r = 3.0
+    hole_r = 1.5
+
+    def top_z_at_xy(s, x, y, z_lo, z_hi):
+        line = cq.Edge.makeLine(cq.Vector(x, y, z_lo), cq.Vector(x, y, z_hi))
+        try:
+            common = s.intersect(line)
+            cbb = common.BoundingBox()
+            if (cbb.zmax - cbb.zmin) < 1e-7:
+                return None
+            return cbb.zmax
+        except Exception:
+            return None
+
+    bb = solid.BoundingBox()
+    z_lo = bb.zmin - 5.0
+    z_hi = bb.zmax + 5.0
+
+    base_plane = cq.Plane(origin=(0, 0, bottom_z), normal=(0, 0, 1), xDir=(1, 0, 0))
+
+    for (x, y) in pts:
+        zt = top_z_at_xy(solid, x, y, z_lo, z_hi)
+        if zt is None:
+            zt = bb.zmax
+            print(f"[DBG] WARN: Could not ray-intersect top at ({x},{y}); using top_z={zt:.3f}")
+        height = max(0.1, zt - bottom_z)
+
+        boss = cq.Workplane(base_plane).center(x, y).circle(boss_r).extrude(height).val()
+        solid = solid.fuse(boss)
+
+        hole = cq.Workplane(base_plane).center(x, y).circle(hole_r).extrude(height).val()
+        solid = solid.cut(hole)
+
+        print(f"[DBG] Boss at ({x:.1f},{y:.1f}) height={height:.3f} (bottom_z={bottom_z:.3f} -> z_top={zt:.3f})")
+
+    # -----------------------------
+    # 2) Draft 2 degrees to ALL vertical surfaces, hinge = flat bottom plane
+    # Implemented via OCCT BRepOffsetAPI_DraftAngle (CQ Workplane has no .draft() here)
+    # -----------------------------
+    def apply_draft_occ(s, angle_deg=2.0):
+        try:
+            from OCP.BRepOffsetAPI import BRepOffsetAPI_DraftAngle
+            from OCP.gp import gp_Dir, gp_Pln, gp_Pnt
+        except Exception as e:
+            print(f"[DBG] WARN: OCP draft imports failed; skipping draft. Error: {e}")
+            return s
+
+        bb_local = s.BoundingBox()
+        zmin = bb_local.zmin
+
+        pull_dir = gp_Dir(0, 0, 1)
+        neutral = gp_Pln(gp_Pnt(0, 0, zmin), gp_Dir(0, 0, 1))
+
+        # select vertical-ish faces by normal at center
+        vert_faces = []
+        for f in s.Faces():
+            try:
+                n = f.normalAt(f.Center())
+            except Exception:
+                continue
+            if abs(n.z) < 0.2:
+                vert_faces.append(f)
+
+        print(f"[DBG] Draft vertical-face candidates: {len(vert_faces)}")
+        if not vert_faces:
+            return s
+
+        ang = math.radians(angle_deg)
+
+        def _do(angle_rad):
+            da = BRepOffsetAPI_DraftAngle(s.wrapped)
+            for ff in vert_faces:
+                da.Add(ff.wrapped, pull_dir, angle_rad, neutral)
+            da.Build()
+            try:
+                done = da.IsDone()
+            except Exception:
+                done = True
+            if not done:
+                return None
+            out = cq.Shape.cast(da.Shape())
+            try:
+                out = cq.Workplane(obj=out).combineSolids().val()
+            except Exception:
+                pass
+            return out
+
+        out = _do(ang)
+        if out is None:
+            print("[DBG] WARN: Draft (+) failed; trying negative angle")
+            out = _do(-ang)
+
+        if out is None:
+            print("[DBG] WARN: Draft failed both signs; continuing without draft")
+            return s
+
+        print("[DBG] Draft applied")
+        return out
+
+    solid = apply_draft_occ(solid, 2.0)
+
+    # -----------------------------
+    # 3 & 4) Fillets: inner R=1, outer R=3; exclude edges on flat bottom plane
+    # Use point-driven per-edge filleting via NearestToPointSelector to avoid global failure
+    # -----------------------------
+    bb = solid.BoundingBox()
+    zmin = bb.zmin
+    zmax = bb.zmax
+    xmax = max(abs(bb.xmin), abs(bb.xmax))
+    ymax = max(abs(bb.ymin), abs(bb.ymax))
+
+    # Collect sharp edge midpoints and classify outer vs inner by position.
+    # Also skip near-tangent edges (already smooth) by checking face-normal angle.
+    # NOTE: face adjacency is not directly exposed cleanly; we approximate sharpness via
+    #       trying to infer from edge type/length and leaving selection conservative.
+
+    tol_xy = 0.65
+    tol_top = 1.2
+    min_len = 0.25
+
+    # Precompute candidate points from current topology
+    outer_pts = []
+    inner_pts = []
+
+    for e in solid.Edges():
+        if edge_on_bottom(e, zmin, tol=1e-3):
+            continue
+        try:
+            if e.Length() < min_len:
+                continue
+        except Exception:
+            pass
+
+        m = v_mid_edge(e)
+
+        is_outer = (abs(m.x) > (xmax - tol_xy)) or (abs(m.y) > (ymax - tol_xy)) or (m.z > (zmax - tol_top))
+        # Prefer to keep bosses/holes as inner features unless clearly exterior
+        if is_outer:
+            outer_pts.append((m.x, m.y, m.z))
+        else:
+            inner_pts.append((m.x, m.y, m.z))
+
+    print(f"[DBG] Candidate edge points (excluding bottom): outer={len(outer_pts)} inner={len(inner_pts)}")
+
+    def fillet_by_points(s, pts_list, radius, label, max_ops=500, pick_tol=2.5):
+        done = 0
+        fail = 0
+        for i, pt in enumerate(pts_list[:max_ops]):
+            # skip points too close to bottom plane (safety)
+            if abs(pt[2] - s.BoundingBox().zmin) < 1e-3:
+                continue
+            try:
+                # identify the nearest edge
+                wp = cq.Workplane(obj=s)
+                sel = cqs.NearestToPointSelector(pt)
+                # get the selected edge and validate it's not bottom
+                e = wp.edges(sel).val()
+                if edge_on_bottom(e, s.BoundingBox().zmin, tol=1e-3):
+                    continue
+
+                # Ensure selection point is still near the edge (avoid snapping to unrelated edges)
+                try:
+                    em = v_mid_edge(e)
+                    d = math.sqrt((em.x - pt[0]) ** 2 + (em.y - pt[1]) ** 2 + (em.z - pt[2]) ** 2)
+                    if d > pick_tol:
+                        continue
+                except Exception:
+                    pass
+
+                s = cq.Workplane(obj=s).edges(sel).fillet(radius).val()
+                done += 1
+            except Exception:
+                fail += 1
+                continue
+
+        print(f"[DBG] Fillet {label}: attempted={min(len(pts_list), max_ops)} success={done} fail={fail}")
+        return s
+
+    # 4) Outer fillets R=3 (exclude bottom by construction)
+    # Sort points for stability: start with highest Z then extremes
+    outer_pts_sorted = sorted(outer_pts, key=lambda p: (-p[2], -abs(p[0]) - abs(p[1])))
+    solid = fillet_by_points(solid, outer_pts_sorted, 3.0, "outer R3", max_ops=400, pick_tol=3.0)
+
+    # 3) Inner fillets R=1
+    # Sort: prioritize larger Z (pocket ceiling) then interior
+    inner_pts_sorted = sorted(inner_pts, key=lambda p: (-p[2], abs(p[0]) + abs(p[1])))
+    solid = fillet_by_points(solid, inner_pts_sorted, 1.0, "inner R1", max_ops=800, pick_tol=2.5)
+
+    bb_end = solid.BoundingBox()
+    print(f"[DBG] End bbox: x=({bb_end.xmin:.3f},{bb_end.xmax:.3f}) y=({bb_end.ymin:.3f},{bb_end.ymax:.3f}) z=({bb_end.zmin:.3f},{bb_end.zmax:.3f})")
+
+    return cq.Workplane(obj=solid)
+
+
+Program output:
+stdout: Loading function from: /home/adml/Research/Hackathon2026/IDETC26-Hackathon-Autodesk-neuralCAD-Edit/output/gpt-5.2-ours-full48/gpt-5.2-ours_cadquery-script_1787034171.768457/brep_end/1787034171.768457/temp_script.py
+[DBG] Imported shape type: <class 'cadquery.occ_impl.shapes.Solid'>
+[DBG] After scale bbox: x=(-10.000,10.000) y=(-30.000,30.000) z=(-7.500,7.500)
+[DBG] Boss at (0.0,15.0) height=10.259 (bottom_z=-7.500 -> z_top=2.759)
+[DBG] Boss at (0.0,-15.0) height=10.259 (bottom_z=-7.500 -> z_top=2.759)
+[DBG] Draft vertical-face candidates: 12
+[DBG] Draft applied
+[DBG] Candidate edge points (excluding bottom): outer=14 inner=34
+[DBG] Fillet outer R3: attempted=14 success=10 fail=4
+[DBG] Fillet inner R1: attempted=34 success=8 fail=26
+[DBG] End bbox: x=(-10.000,10.000) y=(-30.000,30.000) z=(-7.500,7.500)
+Exported shape to: /home/adml/Research/Hackathon2026/IDETC26-Hackathon-Autodesk-neuralCAD-Edit/output/gpt-5.2-ours-full48/gpt-5.2-ours_cadquery-script_1787034171.768457/brep_end/1787034171.768457/tmp.step
+Exported STL to: /home/adml/Research/Hackathon2026/IDETC26-Hackathon-Autodesk-neuralCAD-Edit/output/gpt-5.2-ours-full48/gpt-5.2-ours_cadquery-script_1787034171.768457/brep_end/1787034171.768457/tmp.stl
+Exported PNG image to: /home/adml/Research/Hackathon2026/IDETC26-Hackathon-Autodesk-neuralCAD-Edit/output/gpt-5.2-ours-full48/gpt-5.2-ours_cadquery-script_1787034171.768457/brep_end/1787034171.768457/tmp.png
+Script completed.
+
+stderr: 
+
+Exported this iteration:
+tmp.step, tmp.stl, tmp.png, tmp_front.png, tmp_back.png, tmp_left.png, tmp_right.png, tmp_top.png, tmp_bottom.png, tmp_toprightiso.png

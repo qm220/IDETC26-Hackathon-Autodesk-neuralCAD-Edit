@@ -1,0 +1,86 @@
+{
+  "request": "Left side of the whistle is missing radii. Add radii to the edges of the bigger part of the whistle. Radii must be same as the ones on the other side",
+  "request_wording": {
+    "action_words": [
+      "Add",
+      "radii",
+      "Radii",
+      "same"
+    ],
+    "referenced_feature_words": [
+      "Left",
+      "side",
+      "whistle",
+      "radii",
+      "edges",
+      "bigger",
+      "part",
+      "whistle",
+      "ones",
+      "other",
+      "side"
+    ],
+    "intention_words": [
+      "missing"
+    ],
+    "grammatical_words": [
+      "of",
+      "the",
+      "is",
+      "to",
+      "the",
+      "of",
+      "the",
+      "of",
+      "the",
+      "must",
+      "be",
+      "as",
+      "the",
+      "on",
+      "the",
+      "other",
+      "side"
+    ]
+  },
+  "actions": [
+    {
+      "operation": "Add fillets (radii) to specified edges",
+      "parameters": {
+        "radius": "Match the radius value(s) used on the other side (use existing head-corner radii as the reference set; primary reference appears to be the large external head rounds R≈30 and the spherical corner blend R≈30).",
+        "propagation": "Tangent propagation ON where applicable to maintain continuous blends around the head perimeter; keep blend continuity consistent with existing head rounds."
+      },
+      "target": "External sharp/under-radiused edges on the left-side larger mass (rounded head) that should match the opposite side’s rounded treatment",
+      "relational_constraint": "Fillet radii on left side must be the same as corresponding radii on the other side (mirror/consistent treatment across sides of the large head). Prefer mirroring/copying the existing edge treatment where symmetry applies; do not alter the clearance pocket or the right-end nose interface.",
+      "unresolved_reference": "Images and model metadata indicate the large head already contains multiple R≈30-class rounds, but the request indicates some left-side edges still appear sharp/under-treated. Confirm exactly which head perimeter edges are missing radii (most likely the left-end/top perimeter and/or left-end/side perimeter edges adjacent to the left end face). If the intent is to replace an existing chamfer/flat with a fillet, identify that feature/edge chain explicitly before applying fillets to avoid fillet failure or double-blending.",
+      "target section code": [
+        "S1",
+        "S2"
+      ],
+      "target face code": [
+        "0000",
+        "0001",
+        "0008",
+        "0013",
+        "0005",
+        "0002",
+        "0007",
+        "0004",
+        "0006",
+        "0003"
+      ],
+      "steps": [
+        "Reference identification (to satisfy 'same as the other side'): Inspect existing rounded treatment on the head that represents the correct radius set. Use the already-blended exterior faces of the head as the radius source: Front-left vertical round (face_code 0002 / Brep FACE 27, R≈30), Back-left vertical round (face_code 0007 / Brep FACE 36, R≈30), Bottom-front head round (face_code 0004 / Brep FACE 28, R≈30), Bottom-side head round (face_code 0006 / Brep FACE 37, R≈30), and the tri-corner spherical blend (face_code 0003 / Brep FACE 33, R≈30). Measure/confirm the exact radius value used (nominally 30) from these faces or their generating feature.",
+        "Localize the missing-radii edge chain on the left head: In the shaded multiviews, the issue presents on the left-side of the larger head mass. In the B-Rep, focus on edges bordering the Left end face (face_code 0000 / Brep FACE 32) where it meets the global Top face (face_code 0013 / Brep FACE 10), the Front head face (face_code 0001 / Brep FACE 26), the Back head face (face_code 0008 / Brep FACE 31), and the Head bottom face (face_code 0005 / Brep FACE 34). These intersections define the left head perimeter where missing fillets would manifest visually.",
+        "Pre-cleanup (only if needed): If any of the target perimeter edges currently have a chamfer/flat or a non-matching small round causing the 'missing radii' appearance, remove/suppress that local edge treatment feature (direct edit: Delete Face/Heal or remove chamfer feature) so the edge returns to a clean intersection between the two adjacent faces. This prevents partial/stacked blends and improves fillet robustness.",
+        "Create the fillet feature (constant radius, match-other-side): Apply an Edge Fillet to the identified sharp perimeter edges around the left head. Set fillet radius equal to the reference value confirmed in Step 1 (nominally R≈30 for the primary head corner treatment). Enable tangent propagation so the fillet follows the full edge chain until it naturally terminates at existing blend faces (e.g., spherical corner blend 0003) or at geometric boundaries.",
+        "Blend continuity control: Where the new fillet meets existing head blends (faces 0002/0007/0004/0006 and 0003), ensure the solver produces a smooth G1 (tangent) transition without creating sliver faces. If the CAD system supports it, use 'Curvature continuous' (G2) only if it matches the existing head blend strategy; otherwise keep G1 consistent with the current model.",
+        "Symmetry/mirroring (preferred when applicable): If the 'other side' is a mirrored counterpart of the left head edge chain (front vs back about the part longitudinal mid-plane), mirror the newly created fillet feature across the appropriate mid-plane to guarantee identical radii and edge extents. Use the arm/head mid-plane derived from opposing side faces (front/back) as the mirror reference (do not mirror features that would affect the clearance pocket S5).",
+        "Validation: Re-check front/back/left/right renders to confirm the left-side head perimeter now has the same highlight roll-off and silhouette radius as the opposite side. Confirm no changes occurred to functional interfaces: the head-to-arm shoulder plane (face_code 0012 / Brep FACE 13) and the mounting bore interface (S4) must remain unchanged."
+      ]
+    }
+  ],
+  "intention": [
+    "Restore missing edge radii on the left side and ensure both sides of the whistle have matching radii for consistent/symmetric geometry."
+  ]
+}

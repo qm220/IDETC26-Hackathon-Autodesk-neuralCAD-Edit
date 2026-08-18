@@ -1,0 +1,103 @@
+def my_cad_function(args):
+    import os
+    import math
+    import cadquery as cq
+
+    input_file = os.path.expanduser(args["input_file"])
+    lever = cq.importers.importStep(input_file)
+    lever_shape = lever.val() if hasattr(lever, "val") else lever
+    bbox = lever_shape.BoundingBox()
+
+    print(f"Loaded lever: valid={lever_shape.isValid()}, faces={len(lever_shape.Faces())}")
+    print(f"Lever bounds: x=({bbox.xmin:.3f},{bbox.xmax:.3f}), y=({bbox.ymin:.3f},{bbox.ymax:.3f}), z=({bbox.zmin:.3f},{bbox.zmax:.3f})")
+
+    # Find complete radius-3 circular bore edges lying in planes normal to Y.
+    # Bounding-box dimensions are used because STEP cylindrical faces do not
+    # consistently expose a radius() method through CadQuery.
+    bore_candidates = []
+    for index, edge in enumerate(lever_shape.Edges()):
+        try:
+            eb = edge.BoundingBox()
+            dx = eb.xmax - eb.xmin
+            dy = eb.ymax - eb.ymin
+            dz = eb.zmax - eb.zmin
+            length = edge.Length()
+            cx = 0.5 * (eb.xmin + eb.xmax)
+            cy = 0.5 * (eb.ymin + eb.ymax)
+            cz = 0.5 * (eb.zmin + eb.zmax)
+
+            is_radius_three_circle = (
+                abs(dx - 6.0) < 0.20 and
+                abs(dz - 6.0) < 0.20 and
+                dy < 0.05 and
+                abs(length - 2.0 * math.pi * 3.0) < 0.35
+            )
+            is_at_clevis_end = cx < bbox.xmin + 20.0
+
+            if is_radius_three_circle and is_at_clevis_end:
+                bore_candidates.append((cx, cy, cz))
+                print(f"Bore edge {index}: center=({cx:.4f},{cy:.4f},{cz:.4f}), length={length:.4f}")
+        except Exception:
+            pass
+
+    if bore_candidates:
+        pin_x = sum(item[0] for item in bore_candidates) / len(bore_candidates)
+        pin_z = sum(item[2] for item in bore_candidates) / len(bore_candidates)
+        print(f"Bearing axis extracted from {len(bore_candidates)} circular edges.")
+    else:
+        # Supplied geometry: the 7.5 mm crown runs from z=0 to z=15, so the
+        # transverse bore center is z=7.5. Its x center is 7.5 mm behind the
+        # slot termination at x=-60.75.
+        pin_x = -68.25
+        pin_z = 7.50
+        print("Circular-edge extraction was inconclusive; using planned bearing axis x=-68.25, z=7.50.")
+
+    # Span both cheeks and project slightly beyond their outer side surfaces.
+    end_projection = 1.50
+    pin_ymin = bbox.ymin - end_projection
+    pin_ymax = bbox.ymax + end_projection
+    pin_length = pin_ymax - pin_ymin
+
+    # The nominal bore is diameter 6 mm. A diameter 5.8 mm pin supplies
+    # 0.1 mm radial running clearance and remains a separate solid.
+    pin_radius = 2.90
+    pin_solid = cq.Solid.makeCylinder(
+        pin_radius,
+        pin_length,
+        cq.Vector(pin_x, pin_ymin, pin_z),
+        cq.Vector(0, 1, 0)
+    )
+    pin = cq.Workplane(obj=pin_solid)
+
+    # Chamfer only the two circular end edges to aid insertion.
+    try:
+        circular_end_edges = []
+        for edge in pin_solid.Edges():
+            eb = edge.BoundingBox()
+            if (eb.ymax - eb.ymin) < 0.01 and abs(edge.Length() - 2.0 * math.pi * pin_radius) < 0.20:
+                circular_end_edges.append(edge)
+        if circular_end_edges:
+            pin = cq.Workplane(obj=pin_solid).newObject(circular_end_edges).chamfer(0.35)
+    except Exception as exc:
+        print(f"Pin-end chamfer skipped: {exc}")
+        pin = cq.Workplane(obj=pin_solid)
+
+    pin_bbox = pin.val().BoundingBox()
+    print(
+        f"Created separate pin: axis=(x={pin_x:.4f}, z={pin_z:.4f}), "
+        f"actual y=({pin_bbox.ymin:.4f},{pin_bbox.ymax:.4f}), "
+        f"diameter={2.0 * pin_radius:.3f}"
+    )
+
+    result = cq.Assembly(name="clevis_lever_with_rotating_pin")
+    result.add(
+        lever_shape,
+        name="tapered_clevis_hook_lever",
+        color=cq.Color(0.27, 0.51, 0.71)
+    )
+    result.add(
+        pin,
+        name="rotating_cylindrical_pin",
+        color=cq.Color(0.82, 0.82, 0.84)
+    )
+    return result

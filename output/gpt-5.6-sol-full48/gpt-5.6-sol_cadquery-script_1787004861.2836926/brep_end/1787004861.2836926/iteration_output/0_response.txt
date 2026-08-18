@@ -1,0 +1,149 @@
+Thinking text:
+**Evaluating modeling tasks**
+
+I’m considering how the pedestal extends to y=10 to 28 while the wheel center is at y=22. I suspect the bottom housing surface is around 0 for the coordinates. I’ll need to inspect the bounding box and print the faces for the original task, but since I’m generating modeling tasks, I'll start iterating. This requires me to code information about solid shapes, focusing on the y-min face and setting up the capsule dimensions. Overall, this will help build the structure correctly.
+**Constructing assemblies**
+
+I need to think about using the .cut function carefully, as it could accidentally slice the wheel if there's no relevant overlap. I should build an assembly using a modified version with a slider and consider color during export. I’m wondering about the image orientation as well. For constructing a capsule on the XZ plane, I’ll set the workplane to "XZ", making sure to center it correctly. The local coordinates will adjust, and I'll extrude along the negative Y-axis. That should work out well!
+
+Generated script:
+def my_cad_function(args):
+    input_file = os.path.expanduser(args["input_file"])
+    imported = cq.importers.importStep(input_file)
+    base_shape = imported.val()
+
+    bbox = base_shape.BoundingBox()
+    cx = (bbox.xmin + bbox.xmax) * 0.5
+    cy = (bbox.ymin + bbox.ymax) * 0.5
+    cz = (bbox.zmin + bbox.zmax) * 0.5
+
+    print("Imported model valid:", base_shape.isValid())
+    print("Bounding box: x=(%.3f, %.3f), y=(%.3f, %.3f), z=(%.3f, %.3f)" %
+          (bbox.xmin, bbox.xmax, bbox.ymin, bbox.ymax, bbox.zmin, bbox.zmax))
+    print("Bounding-box center: (%.3f, %.3f, %.3f)" % (cx, cy, cz))
+    print("Solid count:", len(base_shape.Solids()))
+    print("Face count:", len(base_shape.Faces()))
+
+    # Report the faces nearest the bottom for refinement after the first render.
+    face_data = []
+    for i, face in enumerate(base_shape.Faces()):
+        fb = face.BoundingBox()
+        fc = face.Center()
+        face_data.append((fc.y, i, fc.x, fc.z, fb.xlen, fb.ylen, fb.zlen))
+    for item in sorted(face_data)[:8]:
+        print("Bottom candidate face %d: center=(%.3f, %.3f, %.3f), size=(%.3f, %.3f, %.3f)" %
+              (item[1], item[2], item[0], item[3], item[4], item[5], item[6]))
+
+    # The planning data establishes Y as the shallow vertical direction and Z as
+    # the enclosure longitudinal direction. Place the switch on the broad -Y base.
+    body_length = bbox.zmax - bbox.zmin
+    switch_x = cx
+    switch_z = bbox.zmin + 0.36 * body_length
+    bottom_y = bbox.ymin
+
+    slot_length = 18.0
+    slot_width = 5.0
+    travel = 8.0
+    pad_length = 28.0
+    pad_width = 10.0
+    pad_height = 2.0
+    neck_length = 5.0
+    neck_width = 3.2
+    current_offset = -travel * 0.5  # Displayed in the OFF endpoint position.
+
+    # Capsule opening, normal to a datum plane parallel to XZ. The symmetric
+    # extrusion reliably passes through the subtly curved lower shell only.
+    slot_cutter = (
+        cq.Workplane("XZ", origin=(0, bottom_y, 0))
+        .center(switch_x, switch_z)
+        .slot2D(slot_length, slot_width, 90)
+        .extrude(12.0, both=True)
+    )
+    modified_housing = imported.cut(slot_cutter)
+
+    # Add a shallow internal clearance pocket for the actuator carrier. It is
+    # intentionally wider than the neck but remains local to the underside.
+    pocket = (
+        cq.Workplane("XZ", origin=(0, bottom_y + 2.2, 0))
+        .center(switch_x, switch_z)
+        .slot2D(slot_length + 4.0, slot_width + 4.0, 90)
+        .extrude(2.4, both=True)
+    )
+    modified_housing = modified_housing.cut(pocket)
+
+    slider_z = switch_z + current_offset
+
+    # External rounded finger pad. On the XZ plane, positive extrusion points
+    # toward -Y, i.e. outward from the enclosure bottom.
+    pad = (
+        cq.Workplane("XZ", origin=(0, bottom_y - 0.10, 0))
+        .center(switch_x, slider_z)
+        .slot2D(pad_length, pad_width, 90)
+        .extrude(pad_height)
+    )
+    try:
+        pad = pad.edges().fillet(0.65)
+    except Exception as exc:
+        print("Pad edge fillet skipped:", exc)
+
+    # Narrow actuator neck passing through the housing slot.
+    neck = (
+        cq.Workplane("XZ", origin=(0, bottom_y + 1.8, 0))
+        .center(switch_x, slider_z)
+        .slot2D(neck_length, neck_width, 90)
+        .extrude(3.8, both=True)
+    )
+
+    # Internal carrier couples the external pad to a commercial two-position
+    # slide-switch actuator while providing broad guide surfaces beneath the shell.
+    carrier = (
+        cq.Workplane("XZ", origin=(0, bottom_y + 3.1, 0))
+        .center(switch_x, slider_z)
+        .slot2D(10.0, 7.2, 90)
+        .extrude(1.2, both=True)
+    )
+
+    slider = pad.union(neck).union(carrier)
+
+    result = cq.Assembly(name="enclosure_with_bottom_slide_switch")
+    result.add(modified_housing, name="modified_existing_model",
+               color=cq.Color(0.32, 0.66, 0.82))
+    result.add(slider, name="S04_bottom_ON_OFF_slider_OFF_position",
+               color=cq.Color(0.92, 0.42, 0.10))
+
+    print("Switch center: x=%.3f, y=%.3f, z=%.3f" %
+          (switch_x, bottom_y, switch_z))
+    print("Created capsule slot %.1f x %.1f mm and separate %.1f x %.1f mm slider." %
+          (slot_length, slot_width, pad_length, pad_width))
+    print("Slider travel axis is parallel to global Z; modeled at OFF endpoint.")
+    return result
+
+Program output:
+stdout: Loading function from: /home/adml/Research/Hackathon2026/IDETC26-Hackathon-Autodesk-neuralCAD-Edit/output/gpt-5.6-sol-full48/gpt-5.6-sol_cadquery-script_1787004861.2836926/brep_end/1787004861.2836926/temp_script.py
+Imported model valid: True
+Bounding box: x=(-5.890, 59.655), y=(2.160, 34.059), z=(-24.899, 77.619)
+Bounding-box center: (26.883, 18.110, 26.360)
+Solid count: 2
+Face count: 15
+Bottom candidate face 9: center=(26.897, 2.319, 31.569), size=(48.349, 1.136, 76.052)
+Bottom candidate face 5: center=(26.886, 7.561, 74.067), size=(58.900, 13.262, 8.867)
+Bottom candidate face 4: center=(27.771, 10.000, 51.400), size=(5.683, 0.000, 15.771)
+Bottom candidate face 8: center=(26.877, 11.807, -18.201), size=(48.833, 20.601, 19.393)
+Bottom candidate face 7: center=(-1.098, 13.727, 25.805), size=(10.749, 28.648, 94.446)
+Bottom candidate face 10: center=(54.843, 13.845, 25.805), size=(10.810, 28.649, 94.446)
+Bottom candidate face 3: center=(27.956, 15.571, 59.222), size=(5.313, 11.160, 0.126)
+Bottom candidate face 2: center=(30.413, 17.467, 50.725), size=(0.370, 17.979, 15.646)
+Switch center: x=26.883, y=2.160, z=12.007
+Created capsule slot 18.0 x 5.0 mm and separate 28.0 x 10.0 mm slider.
+Slider travel axis is parallel to global Z; modeled at OFF endpoint.
+Exported assembly to: /home/adml/Research/Hackathon2026/IDETC26-Hackathon-Autodesk-neuralCAD-Edit/output/gpt-5.6-sol-full48/gpt-5.6-sol_cadquery-script_1787004861.2836926/brep_end/1787004861.2836926/tmp.step
+Exported STL to: /home/adml/Research/Hackathon2026/IDETC26-Hackathon-Autodesk-neuralCAD-Edit/output/gpt-5.6-sol-full48/gpt-5.6-sol_cadquery-script_1787004861.2836926/brep_end/1787004861.2836926/tmp.stl
+Exported PNG image to: /home/adml/Research/Hackathon2026/IDETC26-Hackathon-Autodesk-neuralCAD-Edit/output/gpt-5.6-sol-full48/gpt-5.6-sol_cadquery-script_1787004861.2836926/brep_end/1787004861.2836926/tmp.png
+Script completed.
+
+stderr: /home/adml/Research/Hackathon2026/IDETC26-Hackathon-Autodesk-neuralCAD-Edit/.venv/lib/python3.12/site-packages/cadquery/utils.py:82: FutureWarning: save will be removed in the next release.
+  warn(f"{f.__name__} will be removed in the next release.", FutureWarning)
+
+
+Exported this iteration:
+tmp.step, tmp.stl, tmp.png, tmp_front.png, tmp_back.png, tmp_left.png, tmp_right.png, tmp_top.png, tmp_bottom.png, tmp_toprightiso.png

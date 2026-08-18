@@ -1,0 +1,341 @@
+Now use all the given information:
+1. model.json file
+2. operation.json file
+3. Multiview images
+
+Decide which sections of the original model should be modified, removed, interacted with or if new sections should be created. Use as much information from the Multiview images, model.json files and operation.json as possible.
+
+Make this decision from several perspectives. If target clearly identify geometry, locate the corresponding section(s) and face(s) in model.json. If there is no clear geometry identified, use the referenced features and relational_constraint to identify potential sections and features. Additionally, consider the intention of the edit. Based on the function and behavior associated with each section and features, decide which section require the action the most. Then, find the corresponding section and face code from model.json.
+
+Plan out the modeling procedure needed to perform each action. Describe them in professional CAD modelling languages from choosing the plane, draw sketches to extrusion, add chamfers. Be thorough and detailed.
+
+face_code values in model.json are visual labels from shaded renders. Brep_id is the CadQuery Faces() index from the STEP analysis report (for example FACE 0).
+
+Edit operation.json accordingly. Keep the previous request_wording and actions, and add localization plus steps.
+
+OUTPUT FORMAT (JSON, operation.json, no markdown fences, use this schema):
+{
+  "request": "",
+  "request_wording": {
+    "action_words": ["..."],
+    "referenced_feature_words": ["..."],
+    "intention_words": ["..."],
+    "grammatical_words": ["..."]
+  },
+  "actions": [
+    {
+      "operation": "...",
+      "parameters": {
+        "parameter_name": "..."
+      },
+      "target": "...",
+      "relational_constraint": "...",
+      "unresolved_reference": "...",
+      "target section code": ["..."],
+      "target face code": ["..."],
+      "steps": [
+        "...",
+        "..."
+      ]
+    }
+  ],
+  "intention": ["..."]
+}
+
+The model.json, operation.json, and labeled multi-view images follow.
+
+
+model.json:
+
+{
+  "part": {
+    "name": "Offset blind-socket lever arm",
+    "description": "Single-piece part comprising a long rectangular beam with one rounded end, a locally blended pedestal near that end, and a transverse cylindrical boss containing a blind axial socket. The beam provides leverage and load transfer, while the boss forms the principal mating interface.",
+    "source_views": [
+      "front",
+      "back",
+      "left",
+      "right",
+      "top",
+      "bottom",
+      "toprightiso"
+    ],
+    "symmetry_note": "The part is approximately mirror-symmetric about the z=4 mm mid-thickness plane passing through the beam and boss axes. It is not symmetric along its length because one beam end is rounded, the opposite end is square, and the boss is longitudinally offset."
+  },
+  "Section": [
+    {
+      "id": "SEC-01",
+      "name": "Lever beam",
+      "features included": [
+        "Long structural arm",
+        "Rectangular beam body",
+        "Rounded free end",
+        "Square terminal end",
+        "Broad load-carrying faces",
+        "Narrow longitudinal side faces",
+        "Local side interruptions around the boss transition"
+      ],
+      "function intent": "Provides the main structural span and lever length, carries loads between the square terminal region and the blind-socket boss, and presents broad surfaces that may act as reference or contact faces.",
+      "physical behavior": "Behaves primarily as a constant-thickness beam. It resists bending through its longitudinal span, carries axial and shear loads, and transmits torque toward the boss. The rounded end removes sharp external corners and reduces snagging and localized edge stress.",
+      "geometry": "A long prismatic rectangular bar extending approximately from x=-25 mm to x=80 mm, y=11 mm to y=23 mm, and z=2 mm to z=6 mm. Its positive-x end is planar and square. Its negative-x end transitions into a cylindrical-radius rounded nose. The y=23 mm side is interrupted by the blended boss pedestal.",
+      "location": "Main longitudinal body of the part, extending from the rounded negative-x end to the square positive-x end; the boss is positioned near the rounded end.",
+      "colour": {
+        "R": 72,
+        "G": 126,
+        "B": 196
+      },
+      "major_faces": [
+        {
+          "face_code": "0000",
+          "name": "Boss-side longitudinal wall",
+          "Brep_id": "FACE 8",
+          "description": "Long planar y=23 mm side wall extending from the boss-transition region to the square x=80 mm end."
+        },
+        {
+          "face_code": "0001",
+          "name": "Square terminal face",
+          "Brep_id": "FACE 7",
+          "description": "Planar x=80 mm end face closing the rectangular beam and adjoining both longitudinal walls and both broad faces."
+        },
+        {
+          "face_code": "0002",
+          "name": "Opposite longitudinal wall",
+          "Brep_id": "FACE 5",
+          "description": "Continuous planar y=11 mm wall running along the full beam length."
+        },
+        {
+          "face_code": "0003",
+          "name": "Lower broad beam face",
+          "Brep_id": "FACE 1",
+          "description": "Large planar z=2 mm face forming one broad side of the beam and trimmed locally by the rounded end and boss transition."
+        },
+        {
+          "face_code": "0004",
+          "name": "Rounded nose wall",
+          "Brep_id": "FACE 0",
+          "description": "Cylindrical radius-17.5 mm patch forming the rounded negative-x end through the beam thickness."
+        },
+        {
+          "face_code": "0005",
+          "name": "Short boss-side shoulder",
+          "Brep_id": "FACE 2",
+          "description": "Small planar remnant on the y=23 mm side between the rounded nose and the blended pedestal."
+        },
+        {
+          "face_code": "0006",
+          "name": "Upper broad beam face",
+          "Brep_id": "FACE 6",
+          "description": "Large planar z=6 mm face forming the opposite broad side of the beam and surrounding the local boss-transition attachment."
+        }
+      ],
+      "minor_faces_Brep_id": [],
+      "relationships": [
+        {
+          "source id": "SEC-01",
+          "target id": "SEC-02",
+          "function relationship": "transmits_load, distributes_stress",
+          "structural relationship": "attached_to, shares_face, supports"
+        }
+      ]
+    },
+    {
+      "id": "SEC-02",
+      "name": "Blended boss pedestal",
+      "features included": [
+        "Three-dimensional transition shell",
+        "Boss-to-beam root",
+        "Load-spreading blend",
+        "Local clearance contour around the boss"
+      ],
+      "function intent": "Joins the cylindrical socket boss to the thin lever beam while spreading boss loads into a wider beam area and avoiding an abrupt sharp-cornered junction.",
+      "physical behavior": "Acts as a stress-distribution region between sections of substantially different thickness and curvature. Its smooth compound curvature reduces stress concentration under boss bending, socket reaction forces, and torsion transmitted into the beam.",
+      "geometry": "A compound BSpline transition centered near x=0 mm on the y=23 mm edge of the beam. It expands around the boss root over approximately x=-7 mm to x=7 mm and z=-3 mm to z=11 mm, blending from the beam surfaces into the outer cylindrical boss.",
+      "location": "At the beam edge near the rounded end, directly between the lever beam and cylindrical socket boss.",
+      "colour": {
+        "R": 236,
+        "G": 151,
+        "B": 54
+      },
+      "major_faces": [
+        {
+          "face_code": "0007",
+          "name": "Compound pedestal blend",
+          "Brep_id": "FACE 9",
+          "description": "Continuous BSpline patch wrapping around the boss root and smoothly transitioning into the interrupted side and broad faces of the beam."
+        }
+      ],
+      "minor_faces_Brep_id": [],
+      "relationships": [
+        {
+          "source id": "SEC-02",
+          "target id": "SEC-01",
+          "function relationship": "distributes_stress, transmits_load",
+          "structural relationship": "blends_into, attached_to"
+        },
+        {
+          "source id": "SEC-02",
+          "target id": "SEC-03",
+          "function relationship": "supports, transmits_load, constrains_dof",
+          "structural relationship": "supports, blends_into, coaxial_with"
+        }
+      ]
+    },
+    {
+      "id": "SEC-03",
+      "name": "Blind socket boss",
+      "features included": [
+        "Cylindrical mounting boss",
+        "Blind cylindrical socket",
+        "Annular opening rim",
+        "Internal cylindrical locating wall",
+        "Planar blind-hole stop face"
+      ],
+      "function intent": "Receives and radially locates a cylindrical mating pin, shaft, tool, or joint member. The blind bottom controls insertion depth, while the annular rim provides an entry and potential axial contact surface.",
+      "physical behavior": "The outer cylindrical wall provides section thickness and hoop stiffness around the socket. The internal wall reacts radial bearing loads and constrains lateral translation of a mating cylindrical part. The blind floor reacts axial insertion force and sets axial position. Loads are passed through the outer boss and pedestal into the beam.",
+      "geometry": "A transverse cylindrical boss centered at approximately x=0 mm and z=4 mm, with its axis along y. The outer radius is 7 mm and extends approximately from y=24 mm to y=34 mm. A concentric radius-5 mm blind socket opens at y=34 mm and terminates at the planar floor at y=25 mm.",
+      "location": "Projects outward from the y=23 mm side of the beam near its rounded end, centered through the beam mid-thickness.",
+      "colour": {
+        "R": 78,
+        "G": 174,
+        "B": 112
+      },
+      "major_faces": [
+        {
+          "face_code": "0008",
+          "name": "Outer boss cylinder",
+          "Brep_id": "FACE 10",
+          "description": "Radius-7 mm cylindrical exterior of the boss, extending from the blended root to the open annular end."
+        },
+        {
+          "face_code": "0009",
+          "name": "Annular socket rim",
+          "Brep_id": "FACE 11",
+          "description": "Planar y=34 mm annulus between the outer boss diameter and the concentric socket opening."
+        },
+        {
+          "face_code": "0010",
+          "name": "Blind socket wall",
+          "Brep_id": "FACE 3",
+          "description": "Radius-5 mm internal cylindrical locating surface extending inward from the annular opening."
+        },
+        {
+          "face_code": "0011",
+          "name": "Socket bottom",
+          "Brep_id": "FACE 4",
+          "description": "Circular planar face at y=25 mm closing the blind socket and providing an axial insertion stop."
+        }
+      ],
+      "minor_faces_Brep_id": [],
+      "relationships": [
+        {
+          "source id": "SEC-03",
+          "target id": "SEC-02",
+          "function relationship": "transmits_load, constrains_dof",
+          "structural relationship": "attached_to, supported_by, blends_into"
+        }
+      ]
+    }
+  ]
+}
+
+operation.json:
+
+{
+  "request": "Multiply amount of cylindrical feature to 4. Imagine this is a system of plant pots, so you need to add stability to that afterwards by adding another legs or ribs on the sides.",
+  "request_wording": {
+    "action_words": [
+      "Multiply",
+      "amount",
+      "4",
+      "add",
+      "afterwards",
+      "adding",
+      "another",
+      "legs",
+      "ribs",
+      "on"
+    ],
+    "referenced_feature_words": [
+      "cylindrical",
+      "feature",
+      "this",
+      "that",
+      "sides"
+    ],
+    "intention_words": [
+      "system",
+      "plant",
+      "pots",
+      "stability"
+    ],
+    "grammatical_words": [
+      "of",
+      "to",
+      "Imagine",
+      "is",
+      "a",
+      "of",
+      "so",
+      "you",
+      "need",
+      "to",
+      "to",
+      "by",
+      "or",
+      "the"
+    ]
+  },
+  "actions": [
+    {
+      "operation": "Increase the quantity of the existing cylindrical feature to a total of four instances.",
+      "parameters": {
+        "total_instance_count": "4"
+      },
+      "target": "Existing cylindrical feature",
+      "relational_constraint": "The resulting model must contain four instances of the referenced cylindrical feature.",
+      "unresolved_reference": "Identify the cylindrical feature in the original CAD model; the arrangement, spacing, and duplication method are not specified."
+    },
+    {
+      "operation": "Add additional leg or rib support features.",
+      "parameters": {
+        "support_feature_type": "legs or ribs",
+        "quantity": "Additional; exact count not specified"
+      },
+      "target": "The sides of the model resulting from the first action",
+      "relational_constraint": "Place the added support features on the sides, after increasing the cylindrical-feature count.",
+      "unresolved_reference": "Identify which faces constitute the sides, determine whether legs or ribs are intended, and resolve the number, dimensions, positions, and attachment geometry of the supports."
+    }
+  ],
+  "intention": [
+    "Make the model function as or represent a system of plant pots.",
+    "Improve the stability of the model after increasing the number of cylindrical features."
+  ]
+}
+
+View: front
+
+[IMAGE 0: /home/adml/Research/Hackathon2026/IDETC26-Hackathon-Autodesk-neuralCAD-Edit/data/edit_192_external/breps/3YH2WFSRM22W7DKT_1769175693.6429307_front.jpg]
+
+View: back
+
+[IMAGE 1: /home/adml/Research/Hackathon2026/IDETC26-Hackathon-Autodesk-neuralCAD-Edit/data/edit_192_external/breps/3YH2WFSRM22W7DKT_1769175693.6429307_back.jpg]
+
+View: left
+
+[IMAGE 2: /home/adml/Research/Hackathon2026/IDETC26-Hackathon-Autodesk-neuralCAD-Edit/data/edit_192_external/breps/3YH2WFSRM22W7DKT_1769175693.6429307_left.jpg]
+
+View: right
+
+[IMAGE 3: /home/adml/Research/Hackathon2026/IDETC26-Hackathon-Autodesk-neuralCAD-Edit/data/edit_192_external/breps/3YH2WFSRM22W7DKT_1769175693.6429307_right.jpg]
+
+View: top
+
+[IMAGE 4: /home/adml/Research/Hackathon2026/IDETC26-Hackathon-Autodesk-neuralCAD-Edit/data/edit_192_external/breps/3YH2WFSRM22W7DKT_1769175693.6429307_top.jpg]
+
+View: bottom
+
+[IMAGE 5: /home/adml/Research/Hackathon2026/IDETC26-Hackathon-Autodesk-neuralCAD-Edit/data/edit_192_external/breps/3YH2WFSRM22W7DKT_1769175693.6429307_bottom.jpg]
+
+View: toprightiso
+
+[IMAGE 6: /home/adml/Research/Hackathon2026/IDETC26-Hackathon-Autodesk-neuralCAD-Edit/data/edit_192_external/breps/3YH2WFSRM22W7DKT_1769175693.6429307_toprightiso.jpg]

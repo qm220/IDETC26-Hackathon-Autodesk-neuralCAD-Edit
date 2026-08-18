@@ -1,0 +1,67 @@
+def my_cad_function(args):
+    input_file = os.path.expanduser(args["input_file"])
+    imported = cq.importers.importStep(input_file)
+    root = imported.val() if hasattr(imported, "val") else imported
+    solids = list(root.Solids())
+
+    print(f"Loaded {len(solids)} solids")
+    for i, solid in enumerate(solids):
+        bb = solid.BoundingBox()
+        print(
+            f"Solid {i}: x=({bb.xmin:.3f},{bb.xmax:.3f}) "
+            f"y=({bb.ymin:.3f},{bb.ymax:.3f}) "
+            f"z=({bb.zmin:.3f},{bb.zmax:.3f}), "
+            f"size=({bb.xlen:.3f},{bb.ylen:.3f},{bb.zlen:.3f})"
+        )
+
+    candidates = []
+    for i, solid in enumerate(solids):
+        bb = solid.BoundingBox()
+        cx = (bb.xmin + bb.xmax) * 0.5
+        cy = (bb.ymin + bb.ymax) * 0.5
+        if cy < -50.0 and cx > 20.0 and bb.zlen > 18.0:
+            candidates.append((i, solid))
+
+    if len(candidates) != 1:
+        raise ValueError(f"Expected one long Volcano nozzle, found {len(candidates)}")
+
+    target_index, target = candidates[0]
+    old_bb = target.BoundingBox()
+    old_height = old_bb.zlen
+    new_zmax = old_bb.zmax - 1.0
+
+    margin = 5.0
+    cutter = cq.Solid.makeBox(
+        old_bb.xlen + 2.0 * margin,
+        old_bb.ylen + 2.0 * margin,
+        1.0 + margin,
+        cq.Vector(old_bb.xmin - margin, old_bb.ymin - margin, new_zmax)
+    )
+    shortened = target.cut(cutter)
+
+    if shortened.ShapeType() == "Compound":
+        shortened_solids = shortened.Solids()
+        if len(shortened_solids) != 1:
+            raise ValueError("Nozzle shortening did not produce one solid")
+        shortened = shortened_solids[0]
+
+    if not shortened.isValid():
+        raise ValueError("Shortened nozzle is not a valid watertight solid")
+
+    new_bb = shortened.BoundingBox()
+    print(f"Selected target solid index: {target_index}")
+    print(f"Old nozzle height: {old_height:.6f} mm")
+    print(f"New nozzle height: {new_bb.zlen:.6f} mm")
+    print(f"Height reduction: {old_height - new_bb.zlen:.6f} mm")
+    print(f"New upper threaded-end Z: {new_bb.zmax:.6f} mm")
+    print(f"Shortened nozzle valid: {shortened.isValid()}")
+
+    if abs((old_height - new_bb.zlen) - 1.0) > 1.0e-5:
+        raise ValueError("Resulting nozzle height reduction is not exactly 1 mm")
+
+    output_solids = [shortened if i == target_index else solid
+                     for i, solid in enumerate(solids)]
+    result = cq.Compound.makeCompound(output_solids)
+    print(f"Output solid count: {len(result.Solids())}")
+    print(f"Output valid: {result.isValid()}")
+    return result

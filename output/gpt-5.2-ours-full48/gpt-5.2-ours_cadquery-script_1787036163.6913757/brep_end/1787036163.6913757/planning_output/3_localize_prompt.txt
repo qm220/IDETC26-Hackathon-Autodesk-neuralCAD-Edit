@@ -1,0 +1,376 @@
+Now use all the given information:
+1. model.json file
+2. operation.json file
+3. Multiview images
+
+Decide which sections of the original model should be modified, removed, interacted with or if new sections should be created. Use as much information from the Multiview images, model.json files and operation.json as possible.
+
+Make this decision from several perspectives. If target clearly identify geometry, locate the corresponding section(s) and face(s) in model.json. If there is no clear geometry identified, use the referenced features and relational_constraint to identify potential sections and features. Additionally, consider the intention of the edit. Based on the function and behavior associated with each section and features, decide which section require the action the most. Then, find the corresponding section and face code from model.json.
+
+Plan out the modeling procedure needed to perform each action. Describe them in professional CAD modelling languages from choosing the plane, draw sketches to extrusion, add chamfers. Be thorough and detailed.
+
+face_code values in model.json are visual labels from shaded renders. Brep_id is the CadQuery Faces() index from the STEP analysis report (for example FACE 0).
+
+Edit operation.json accordingly. Keep the previous request_wording and actions, and add localization plus steps.
+
+OUTPUT FORMAT (JSON, operation.json, no markdown fences, use this schema):
+{
+  "request": "",
+  "request_wording": {
+    "action_words": ["..."],
+    "referenced_feature_words": ["..."],
+    "intention_words": ["..."],
+    "grammatical_words": ["..."]
+  },
+  "actions": [
+    {
+      "operation": "...",
+      "parameters": {
+        "parameter_name": "..."
+      },
+      "target": "...",
+      "relational_constraint": "...",
+      "unresolved_reference": "...",
+      "target section code": ["..."],
+      "target face code": ["..."],
+      "steps": [
+        "...",
+        "..."
+      ]
+    }
+  ],
+  "intention": ["..."]
+}
+
+The model.json, operation.json, and labeled multi-view images follow.
+
+
+model.json:
+
+{
+  "part": {
+    "name": "Saddle block with open-bottom pocket",
+    "description": "Rectangular block (approx. 2 x 6 x 1.5) featuring a concave cylindrical cradle on the top and an open-bottom rectangular pocket with a cylindrical ceiling offset from the cradle (thin-wall condition).",
+    "source_views": [
+      "front",
+      "back",
+      "left",
+      "right",
+      "top",
+      "bottom",
+      "toprightiso"
+    ],
+    "symmetry_note": "Geometry appears symmetric about the YZ plane (x=0) and the XZ plane (y=0). Top cradle and inner pocket are centered and concentric about an x-axis cylinder."
+  },
+  "Section": [
+    {
+      "id": "S1",
+      "name": "Outer frame / base body",
+      "features included": [
+        "Outer rectangular prism envelope",
+        "Outer side faces (x=±1, y=±3)",
+        "Bottom rim face with inner opening (frame around pocket opening)"
+      ],
+      "function intent": "Provide the main structural body to support loads from the cradle region and provide external datum/mating faces for placement in an assembly.",
+      "physical behavior": "Acts as a stiff perimeter beam/frame carrying bending and compressive loads from the top cradle into the outer side walls; the continuous outer walls resist twisting while the bottom rim provides hoop-like stiffness around the pocket opening.",
+      "geometry": "Rectangular prism outer boundary with flat external side faces and a planar underside rim (annular rectangular face) due to the open-bottom pocket.",
+      "location": "Perimeter of the part; includes all external vertical faces and the underside border surrounding the pocket opening.",
+      "colour": {
+        "R": 200,
+        "G": 80,
+        "B": 80
+      },
+      "major_faces": [
+        {
+          "face_code": "0000",
+          "name": "Bottom rim (underside frame)",
+          "Brep_id": "FACE 11",
+          "description": "Planar underside face at z=-0.75 with an inner rectangular loop (opening into the pocket)."
+        },
+        {
+          "face_code": "0001",
+          "name": "Outer right face",
+          "Brep_id": "FACE 10",
+          "description": "External planar side face at x=+1 spanning full length and height."
+        },
+        {
+          "face_code": "0002",
+          "name": "Outer front face",
+          "Brep_id": "FACE 13",
+          "description": "External planar end face at y=+3 spanning width and height."
+        },
+        {
+          "face_code": "0003",
+          "name": "Outer left face",
+          "Brep_id": "FACE 12",
+          "description": "External planar side face at x=-1 spanning full length and height."
+        },
+        {
+          "face_code": "0004",
+          "name": "Outer back face",
+          "Brep_id": "FACE 14",
+          "description": "External planar end face at y=-3 spanning width and height."
+        }
+      ],
+      "minor_faces_Brep_id": [],
+      "relationships": [
+        {
+          "source id": "S2",
+          "target id": "S1",
+          "function relationship": "transmits_load",
+          "structural relationship": "attached_to"
+        },
+        {
+          "source id": "S3",
+          "target id": "S1",
+          "function relationship": "provides_clearance",
+          "structural relationship": "contained_in"
+        }
+      ]
+    },
+    {
+      "id": "S2",
+      "name": "Top cradle interface",
+      "features included": [
+        "Concave cylindrical saddle surface (object seat)",
+        "Two flat top end pads (landing faces)",
+        "Sharp/near-sharp transitions between pads and saddle (visible edges)"
+      ],
+      "function intent": "Provide a locating/support interface for a cylindrical or round component (e.g., pipe/shaft) while offering end pads as stable flats for contact, clamping, or datum setup.",
+      "physical behavior": "The concave cylindrical surface distributes contact pressure over a larger area, reducing local stress; the end pads provide stable planar support and may take clamp loads or prevent rocking at the ends.",
+      "geometry": "One large concave cylindrical surface running along the x-axis over the middle span, bounded by two planar top pads at z=+0.75 on the ends.",
+      "location": "Top of the part; central saddle region between y≈-2.4 and y≈+2.4, plus top pads near y≈±(2.4 to 3.0).",
+      "colour": {
+        "R": 80,
+        "G": 200,
+        "B": 80
+      },
+      "major_faces": [
+        {
+          "face_code": "0005",
+          "name": "Top back pad",
+          "Brep_id": "FACE 8",
+          "description": "Planar top pad at z=+0.75 near y≈-2.7 (end flat)."
+        },
+        {
+          "face_code": "0006",
+          "name": "Top saddle (concave)",
+          "Brep_id": "FACE 7",
+          "description": "Concave cylindrical surface (axis along x) forming the main cradle, spanning the central length."
+        },
+        {
+          "face_code": "0007",
+          "name": "Top front pad",
+          "Brep_id": "FACE 9",
+          "description": "Planar top pad at z=+0.75 near y≈+2.7 (end flat)."
+        }
+      ],
+      "minor_faces_Brep_id": [],
+      "relationships": [
+        {
+          "source id": "S2",
+          "target id": "S1",
+          "function relationship": "distributes_stress",
+          "structural relationship": "attached_to"
+        },
+        {
+          "source id": "S2",
+          "target id": "S3",
+          "function relationship": "provides_clearance",
+          "structural relationship": "coaxial_with"
+        }
+      ]
+    },
+    {
+      "id": "S3",
+      "name": "Open-bottom pocket & inner ceiling",
+      "features included": [
+        "Open-bottom rectangular pocket (undercut/recess)",
+        "Inner vertical pocket walls (x=±0.8, y=±2.8)",
+        "Inner cylindrical ceiling surface (offset from top saddle)",
+        "Small planar ceiling shelves at pocket ends"
+      ],
+      "function intent": "Reduce mass and material while maintaining an approximately uniform wall thickness under the cradle; provide clearance for adjacent components or tooling and avoid excessive section thickness under the saddle.",
+      "physical behavior": "The pocket removes low-stress core material, lowering weight and potentially improving thermal behavior; the concentric inner cylindrical ceiling maintains near-constant thickness under the saddle, improving stiffness-to-weight and controlling deflection under cradle loading.",
+      "geometry": "Rectangular opening from the bottom with four planar inner walls; the pocket’s top/ceiling is mostly a concave cylindrical surface concentric with the top saddle, plus two small planar ceiling patches near the ends.",
+      "location": "Centered on underside; pocket opening bounded approximately by x=±0.8 and y=±2.8, extending upward until it meets the inner ceiling surfaces.",
+      "colour": {
+        "R": 80,
+        "G": 80,
+        "B": 200
+      },
+      "major_faces": [
+        {
+          "face_code": "0008",
+          "name": "Pocket ceiling back shelf",
+          "Brep_id": "FACE 1",
+          "description": "Small planar ceiling patch at z≈+0.55 near y≈-2.63 inside the pocket."
+        },
+        {
+          "face_code": "0009",
+          "name": "Pocket ceiling (concave cylinder)",
+          "Brep_id": "FACE 0",
+          "description": "Concave cylindrical ceiling surface inside pocket (axis along x), concentric with the top saddle and offset radially."
+        },
+        {
+          "face_code": "0010",
+          "name": "Pocket ceiling front shelf",
+          "Brep_id": "FACE 2",
+          "description": "Small planar ceiling patch at z≈+0.55 near y≈+2.63 inside the pocket."
+        },
+        {
+          "face_code": "0011",
+          "name": "Pocket back wall (inner)",
+          "Brep_id": "FACE 6",
+          "description": "Planar inner wall at y=-2.8 (pocket end wall), spanning z from -0.75 up to the ceiling intersection."
+        },
+        {
+          "face_code": "0012",
+          "name": "Pocket right wall (inner)",
+          "Brep_id": "FACE 3",
+          "description": "Planar inner wall at x=+0.8 (pocket side wall), spanning y and z."
+        },
+        {
+          "face_code": "0013",
+          "name": "Pocket front wall (inner)",
+          "Brep_id": "FACE 5",
+          "description": "Planar inner wall at y=+2.8 (pocket end wall), spanning z from -0.75 up to the ceiling intersection."
+        },
+        {
+          "face_code": "0014",
+          "name": "Pocket left wall (inner)",
+          "Brep_id": "FACE 4",
+          "description": "Planar inner wall at x=-0.8 (pocket side wall), spanning y and z."
+        }
+      ],
+      "minor_faces_Brep_id": [],
+      "relationships": [
+        {
+          "source id": "S3",
+          "target id": "S1",
+          "function relationship": "provides_clearance",
+          "structural relationship": "contained_in"
+        },
+        {
+          "source id": "S3",
+          "target id": "S2",
+          "function relationship": "distributes_stress",
+          "structural relationship": "coaxial_with"
+        },
+        {
+          "source id": "S3",
+          "target id": "S1",
+          "function relationship": "distributes_stress",
+          "structural relationship": "attached_to"
+        }
+      ]
+    }
+  ]
+}
+
+operation.json:
+
+{
+  "request": "Add flange with thickness of 0,5mm and width of 2mm that starts on the flat bottom surface. Do not fill the central part. Add four mounting holes with D=0,5mm which are spaced 0,6mm from outer edges of the flange",
+  "request_wording": {
+    "action_words": [
+      "Add",
+      "flange",
+      "thickness",
+      "0,5mm",
+      "width",
+      "2mm",
+      "starts",
+      "Do",
+      "not",
+      "fill",
+      "Add",
+      "four",
+      "mounting",
+      "holes",
+      "D=0,5mm",
+      "spaced",
+      "0,6mm"
+    ],
+    "referenced_feature_words": [
+      "flat",
+      "bottom",
+      "surface",
+      "central",
+      "part",
+      "outer",
+      "edges",
+      "flange"
+    ],
+    "intention_words": [
+      "mounting"
+    ],
+    "grammatical_words": [
+      "with",
+      "of",
+      "and",
+      "that",
+      "on",
+      "the",
+      "which",
+      "are",
+      "from",
+      "of",
+      "the"
+    ]
+  },
+  "actions": [
+    {
+      "operation": "Create a flange feature (boss/extrude-type) starting from an existing face, with specified thickness and width, while leaving the central region open (annular flange / not a full fill).",
+      "parameters": {
+        "thickness": "0,5mm",
+        "width": "2mm"
+      },
+      "target": "flat bottom surface (existing model face)",
+      "relational_constraint": "Flange starts on the flat bottom surface; central part must not be filled (flange must not be a solid fill across the center).",
+      "unresolved_reference": "Identify which face is the 'flat bottom surface'; determine the flange path/outline (what perimeter the flange follows) and what constitutes the 'central part' boundary that must remain open."
+    },
+    {
+      "operation": "Add (cut) four mounting holes.",
+      "parameters": {
+        "quantity": "4",
+        "diameter": "0,5mm",
+        "edge_distance_from_outer_edge_of_flange": "0,6mm"
+      },
+      "target": "the flange created in the previous action",
+      "relational_constraint": "Each hole center located such that the hole is spaced 0,6mm from the outer edges of the flange.",
+      "unresolved_reference": "Define the hole termination/depth (through flange only vs through all); identify which specific 'outer edges' are referenced if multiple edges exist; define the distribution/orientation of the 4 holes (pattern/locations not explicitly specified beyond the 0,6mm edge spacing)."
+    }
+  ],
+  "intention": [
+    "Provide a mounting flange and mounting holes while keeping the central region open (not filled)."
+  ]
+}
+
+View: front
+
+[IMAGE 0: /home/adml/Research/Hackathon2026/IDETC26-Hackathon-Autodesk-neuralCAD-Edit/data/edit_192_external/breps/F332D3FXML85WLR2_1770205919.6615195_front.jpg]
+
+View: back
+
+[IMAGE 1: /home/adml/Research/Hackathon2026/IDETC26-Hackathon-Autodesk-neuralCAD-Edit/data/edit_192_external/breps/F332D3FXML85WLR2_1770205919.6615195_back.jpg]
+
+View: left
+
+[IMAGE 2: /home/adml/Research/Hackathon2026/IDETC26-Hackathon-Autodesk-neuralCAD-Edit/data/edit_192_external/breps/F332D3FXML85WLR2_1770205919.6615195_left.jpg]
+
+View: right
+
+[IMAGE 3: /home/adml/Research/Hackathon2026/IDETC26-Hackathon-Autodesk-neuralCAD-Edit/data/edit_192_external/breps/F332D3FXML85WLR2_1770205919.6615195_right.jpg]
+
+View: top
+
+[IMAGE 4: /home/adml/Research/Hackathon2026/IDETC26-Hackathon-Autodesk-neuralCAD-Edit/data/edit_192_external/breps/F332D3FXML85WLR2_1770205919.6615195_top.jpg]
+
+View: bottom
+
+[IMAGE 5: /home/adml/Research/Hackathon2026/IDETC26-Hackathon-Autodesk-neuralCAD-Edit/data/edit_192_external/breps/F332D3FXML85WLR2_1770205919.6615195_bottom.jpg]
+
+View: toprightiso
+
+[IMAGE 6: /home/adml/Research/Hackathon2026/IDETC26-Hackathon-Autodesk-neuralCAD-Edit/data/edit_192_external/breps/F332D3FXML85WLR2_1770205919.6615195_toprightiso.jpg]

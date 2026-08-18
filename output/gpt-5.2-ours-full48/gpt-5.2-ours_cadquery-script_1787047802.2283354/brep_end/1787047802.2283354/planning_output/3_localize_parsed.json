@@ -1,0 +1,98 @@
+{
+  "request": "Add two horizontal buttons to the front panel. One above existing one, the other below - all approximately equally distanced. Buttons should be copies of existing one.",
+  "request_wording": {
+    "action_words": [
+      "Add",
+      "two",
+      "horizontal",
+      "above",
+      "below",
+      "approximately",
+      "equally",
+      "distanced",
+      "copies"
+    ],
+    "referenced_feature_words": [
+      "buttons",
+      "front",
+      "panel",
+      "existing",
+      "one",
+      "Buttons"
+    ],
+    "intention_words": [],
+    "grammatical_words": [
+      "to",
+      "the",
+      "One",
+      "the",
+      "other",
+      "all",
+      "should",
+      "be",
+      "of"
+    ]
+  },
+  "actions": [
+    {
+      "operation": "Copy/duplicate existing button feature to create a new button instance on the front panel",
+      "parameters": {
+        "quantity": "1",
+        "orientation": "horizontal",
+        "spacing": "approximately equal distance relative to the other buttons"
+      },
+      "target": "Existing button (source geometry) on the front panel",
+      "relational_constraint": "Place the copied button above the existing button on the front panel; keep it horizontal; align with existing button such that spacing is approximately equal among the three buttons (top, existing/middle, bottom).",
+      "unresolved_reference": "The model.json does not explicitly label the existing front-panel horizontal button with a face_code. Based on multiview imagery, the likely source is the single horizontal pill-shaped button on the left side of the front control panel near the dial (within S6 minor faces FACE 419-451). Final identification requires selecting that pill-shaped button solid/feature in CAD and confirming its mating face is on the front-facing control panel surface.",
+      "target section code": [
+        "S6",
+        "S1"
+      ],
+      "target face code": [
+        "0004",
+        "unlabeled_minor_faces_FACE_419-451"
+      ],
+      "steps": [
+        "Localize the edit region: use the multiview (\"top\" image showing the appliance front) to identify the existing single horizontal pill-shaped button left of the rotary dial. In the model, this button is most likely one of the small control/indicator solids captured under S6 minor faces (Brep FACE 419-451) because S6 explicitly includes small local features near the dial cluster.",
+        "Establish the front-panel reference plane for placement/alignment: select the front-facing reference face of the housing in the control area. If an explicit outer front control-panel face is not separately labeled, use S1 face_code 0004 (Brep FACE 11, front-facing normal ≈ -Y) as the primary front-direction reference, then create an offset datum plane to the actual outer skin/control face as needed (offset distance = measured thickness between FACE 11 and the exterior control surface).",
+        "Identify the source button feature/body: select the existing horizontal pill button solid (or the feature that created it) by picking its largest outward-facing planar/near-planar face and its surrounding blend faces; confirm it lies on/flush with the front control surface and is oriented with its long axis horizontal (left-right). Record its placement reference (button center point and long-axis direction).",
+        "Create a vertical placement direction: define a construction axis in global +Z (vertical) passing through the existing button center. (+Z is consistent with the model z-range [0..~320] and with the visual vertical direction in the front control-panel view.)",
+        "Define equal spacing (pitch): measure the available vertical clearance on the front control panel for a 3-button stack (top clearance to nearest top boundary/fillet or nearby control features, and bottom clearance to the next boundary/feature). Set pitch so that the three button centerlines are equally spaced: pitch = (Z_top_limit - Z_bottom_limit) / 2, where Z_top_limit and Z_bottom_limit are chosen to maintain the same edge/feature clearance as the existing middle button (use the existing middle button’s clearance as the design intent).",
+        "Duplicate the button: perform a Move/Copy Body (or Pattern Feature if the button is a parametric feature) of the identified existing horizontal button. Translation vector = +pitch * Ẑ (upward). Keep X and Y positions identical to the existing button so the three buttons are vertically aligned in a column and remain on the same front control surface.",
+        "Boolean/assembly behavior: if the button is modeled as a separate solid cap, keep it as a separate solid/component consistent with the existing one; if it is modeled as a boss feature integrated into a panel solid, merge/boolean-union the copied boss into the same parent body as the original (typically the control panel/housing body).",
+        "Verify: confirm the new (upper) button remains horizontal, is flush/mated to the front control surface, does not intersect the rotary dial assembly (S6 major faces 0037-0043) and maintains similar edge radii/fillets as the source button."
+      ]
+    },
+    {
+      "operation": "Copy/duplicate existing button feature to create a new button instance on the front panel",
+      "parameters": {
+        "quantity": "1",
+        "orientation": "horizontal",
+        "spacing": "approximately equal distance relative to the other buttons"
+      },
+      "target": "Existing button (source geometry) on the front panel",
+      "relational_constraint": "Place the copied button below the existing button on the front panel; keep it horizontal; align with existing button such that spacing is approximately equal among the three buttons (top, existing/middle, bottom).",
+      "unresolved_reference": "The model.json does not explicitly label the existing front-panel horizontal button with a face_code. Based on multiview imagery, the likely source is the single horizontal pill-shaped button on the left side of the front control panel near the dial (within S6 minor faces FACE 419-451). Final identification requires selecting that pill-shaped button solid/feature in CAD and confirming its mating face is on the front-facing control panel surface.",
+      "target section code": [
+        "S6",
+        "S1"
+      ],
+      "target face code": [
+        "0004",
+        "unlabeled_minor_faces_FACE_419-451"
+      ],
+      "steps": [
+        "Reuse the same source button identification and the same front-panel reference plane/datum plane established for the upper-button action (S6 minor faces likely contain the existing button; S1 face_code 0004 provides a stable front-direction reference).",
+        "Reuse the same vertical construction axis through the existing button center (global +Z).",
+        "Reuse the same pitch definition used to place the upper button so spacing is equal among all three. (Do not independently dimension the lower copy; drive both upper and lower offsets with the same pitch parameter to preserve equal spacing when the design changes.)",
+        "Duplicate the button: perform Move/Copy Body (or Pattern Feature) of the existing horizontal button with translation vector = -pitch * Ẑ (downward). Keep X and Y positions identical to the existing button so all three are vertically aligned and remain on the same front control surface.",
+        "Boolean/assembly behavior: match the original modeling intent—separate solid/component if the original is separate; boolean-union into the same parent body if the original is a boss/feature integrated into the panel.",
+        "Edge/finish continuity: ensure the lower copy inherits the same corner radii/fillets/chamfers as the original button. If the original button is seated in a recess (cut), pattern/copy the recess-cut feature as well to maintain the same fit and flushness.",
+        "Verify: check for interference with the cavity opening region (S1 cavity ceiling/inner roof face_code 0005 and nearby inner frame geometry) and ensure the lower button stays on the front control-panel region rather than crossing into the open cavity boundary. Confirm equal center-to-center spacing between (top, middle) and (middle, bottom)."
+      ]
+    }
+  ],
+  "intention": [
+    "Add two additional front-panel buttons by replicating the existing button, creating a vertically arranged set with roughly equal spacing."
+  ]
+}

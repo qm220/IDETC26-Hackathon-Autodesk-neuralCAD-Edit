@@ -1,0 +1,52 @@
+def my_cad_function(args):
+    import os
+    import cadquery as cq
+
+    input_file = os.path.expanduser(args["input_file"])
+    imported = cq.importers.importStep(input_file)
+    base_shape = imported.val()
+
+    thickness = 2.54
+    radius = 7.62
+    width = 50.8
+    height = 50.8
+    front_y = base_shape.BoundingBox().ymax
+    rear_y = base_shape.BoundingBox().ymin
+
+    def make_cover(seating_y, direction):
+        x0 = -width / 2.0
+        z0 = -height / 2.0
+        y0 = seating_y if direction > 0 else seating_y - thickness
+
+        horizontal = cq.Solid.makeBox(
+            width, thickness, height - 2.0 * radius,
+            cq.Vector(x0, y0, z0 + radius)
+        )
+        vertical = cq.Solid.makeBox(
+            width - 2.0 * radius, thickness, height,
+            cq.Vector(x0 + radius, y0, z0)
+        )
+        cover = horizontal.fuse(vertical)
+
+        axis = cq.Vector(0, direction, 0)
+        cylinder_base_y = seating_y
+        for cx, cz in [
+            (x0 + radius, z0 + radius),
+            (x0 + width - radius, z0 + radius),
+            (x0 + width - radius, z0 + height - radius),
+            (x0 + radius, z0 + height - radius)
+        ]:
+            cover = cover.fuse(cq.Solid.makeCylinder(
+                radius, thickness,
+                cq.Vector(cx, cylinder_base_y, cz), axis
+            ))
+        return cover
+
+    front_cover = make_cover(front_y, 1)
+    rear_cover = make_cover(rear_y, -1)
+
+    result = cq.Assembly(name="crossed_arm_with_covers")
+    result.add(base_shape, name="existing_model", color=cq.Color(0.72, 0.72, 0.76))
+    result.add(front_cover, name="front_cover", color=cq.Color(0.20, 0.65, 0.85))
+    result.add(rear_cover, name="rear_cover", color=cq.Color(0.20, 0.65, 0.85))
+    return result

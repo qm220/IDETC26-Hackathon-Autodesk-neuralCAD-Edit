@@ -1,0 +1,348 @@
+Now use all the given information:
+1. model.json file
+2. operation.json file
+3. Multiview images
+
+Decide which sections of the original model should be modified, removed, interacted with or if new sections should be created. Use as much information from the Multiview images, model.json files and operation.json as possible.
+
+Make this decision from several perspectives. If target clearly identify geometry, locate the corresponding section(s) and face(s) in model.json. If there is no clear geometry identified, use the referenced features and relational_constraint to identify potential sections and features. Additionally, consider the intention of the edit. Based on the function and behavior associated with each section and features, decide which section require the action the most. Then, find the corresponding section and face code from model.json.
+
+Plan out the modeling procedure needed to perform each action. Describe them in professional CAD modelling languages from choosing the plane, draw sketches to extrusion, add chamfers. Be thorough and detailed.
+
+face_code values in model.json are visual labels from shaded renders. Brep_id is the CadQuery Faces() index from the STEP analysis report (for example FACE 0).
+
+Edit operation.json accordingly. Keep the previous request_wording and actions, and add localization plus steps.
+
+OUTPUT FORMAT (JSON, operation.json, no markdown fences, use this schema):
+{
+  "request": "",
+  "request_wording": {
+    "action_words": ["..."],
+    "referenced_feature_words": ["..."],
+    "intention_words": ["..."],
+    "grammatical_words": ["..."]
+  },
+  "actions": [
+    {
+      "operation": "...",
+      "parameters": {
+        "parameter_name": "..."
+      },
+      "target": "...",
+      "relational_constraint": "...",
+      "unresolved_reference": "...",
+      "target section code": ["..."],
+      "target face code": ["..."],
+      "steps": [
+        "...",
+        "..."
+      ]
+    }
+  ],
+  "intention": ["..."]
+}
+
+The model.json, operation.json, and labeled multi-view images follow.
+
+
+model.json:
+
+{
+  "part": {
+    "name": "Tapered clevis-to-hook lever",
+    "description": "A single-piece elongated lever with a two-lug clevis and transverse pivot bore at one end, a tapered load-carrying arm, and an open curved hook or catch interface at the opposite end.",
+    "source_views": [
+      "front",
+      "back",
+      "left",
+      "right",
+      "top",
+      "bottom",
+      "toprightiso"
+    ],
+    "symmetry_note": "The part is substantially symmetric about the longitudinal mid-plane y=0. The two clevis lugs, split pivot bore, arm width, and hook are mirrored across this plane; the profile is not symmetric through the thickness direction z."
+  },
+  "Section": [
+    {
+      "id": "SEC_01",
+      "name": "Clevis pivot end",
+      "features included": [
+        "two parallel clevis lugs",
+        "transverse split pivot bore",
+        "central mating-part slot",
+        "rounded lug ends",
+        "slot termination wall"
+      ],
+      "function intent": "Provides a pinned joint that locates a mating link or bracket between two lugs while allowing rotation about the transverse pin axis.",
+      "physical behavior": "The two lugs react pin shear and bearing loads on opposite sides of the central slot. Their separation stabilizes the mating member against lateral motion, while the rounded outer profiles distribute bearing and bending stress into the tapered arm.",
+      "geometry": "A forked end composed of two parallel rounded lugs separated by a rectangular slot. Coaxial cylindrical bore segments pass through the lugs, and the slot ends at a flat transverse wall toward the arm.",
+      "location": "At the broad negative-x end of the part; shown at the left in the front and isometric views.",
+      "colour": {
+        "R": 224,
+        "G": 92,
+        "B": 92
+      },
+      "major_faces": [
+        {
+          "face_code": "0000",
+          "name": "Negative-side lug outer arc",
+          "Brep_id": "FACE 6",
+          "description": "Radius-7.5 cylindrical outer surface forming the rounded perimeter of the negative-y clevis lug."
+        },
+        {
+          "face_code": "0001",
+          "name": "Negative-side slot wall",
+          "Brep_id": "FACE 3",
+          "description": "Planar inner face of the negative-y lug, including the circular opening around the pivot bore."
+        },
+        {
+          "face_code": "0002",
+          "name": "Clevis slot end wall",
+          "Brep_id": "FACE 2",
+          "description": "Flat transverse wall at x=-60.75 that terminates the central clevis slot and joins both lugs to the arm."
+        },
+        {
+          "face_code": "0003",
+          "name": "Positive-side slot wall",
+          "Brep_id": "FACE 4",
+          "description": "Planar inner face of the positive-y lug, including the circular opening around the pivot bore."
+        },
+        {
+          "face_code": "0004",
+          "name": "Positive-side lug outer arc",
+          "Brep_id": "FACE 15",
+          "description": "Radius-7.5 cylindrical outer surface forming the rounded perimeter of the positive-y clevis lug."
+        },
+        {
+          "face_code": "0005",
+          "name": "Positive-lug pivot bore",
+          "Brep_id": "FACE 0",
+          "description": "Radius-3 cylindrical bore patch through the positive-y lug, coaxial with the opposite bore patch."
+        },
+        {
+          "face_code": "0006",
+          "name": "Negative-lug pivot bore",
+          "Brep_id": "FACE 1",
+          "description": "Radius-3 cylindrical bore patch through the negative-y lug, completing the transverse pin interface."
+        }
+      ],
+      "minor_faces_Brep_id": [],
+      "relationships": [
+        {
+          "source id": "SEC_01",
+          "target id": "SEC_02",
+          "function relationship": "transmits_load, distributes_stress",
+          "structural relationship": "attached_to, blends_into, supports"
+        },
+        {
+          "source id": "SEC_01",
+          "target id": "SEC_03",
+          "function relationship": "constrains_dof; cooperates with the hook end to define the lever's two external interfaces",
+          "structural relationship": "offset_from; connected through SEC_02"
+        }
+      ]
+    },
+    {
+      "id": "SEC_02",
+      "name": "Tapered lever arm",
+      "features included": [
+        "long tapered spine",
+        "broad opposing side facets",
+        "sloped upper surface",
+        "sloped lower surface",
+        "load transition into both end interfaces"
+      ],
+      "function intent": "Maintains the required separation between the pivot and hook interfaces and transmits tensile, compressive, bending, and torsional loads between them with reduced mass.",
+      "physical behavior": "The deep, gradually tapered solid section behaves as a beam. Its broad side faces resist in-plane bending, its top and bottom surfaces provide section depth, and the increasing width toward the clevis lowers stress near the more highly loaded pinned joint.",
+      "geometry": "A long solid prismatic arm whose width and thickness vary gradually along x. Four dominant planar patches form its top, bottom, and two side surfaces and continue into the unpartitioned end regions.",
+      "location": "Central portion of the part between the clevis pivot end and the hook end.",
+      "colour": {
+        "R": 78,
+        "G": 156,
+        "B": 224
+      },
+      "major_faces": [
+        {
+          "face_code": "0007",
+          "name": "Upper sloped arm face",
+          "Brep_id": "FACE 5",
+          "description": "Large planar upper surface, slightly inclined along the arm and extending toward both end transitions."
+        },
+        {
+          "face_code": "0008",
+          "name": "Negative-side arm face",
+          "Brep_id": "FACE 9",
+          "description": "Large longitudinal planar side face on the negative-y side, including continuous coplanar regions at the ends."
+        },
+        {
+          "face_code": "0009",
+          "name": "Lower sloped arm face",
+          "Brep_id": "FACE 11",
+          "description": "Large planar lower surface with a slight longitudinal inclination and tapered outline."
+        },
+        {
+          "face_code": "0010",
+          "name": "Positive-side arm face",
+          "Brep_id": "FACE 16",
+          "description": "Large longitudinal planar side face on the positive-y side, mirrored from FACE 9."
+        }
+      ],
+      "minor_faces_Brep_id": [],
+      "relationships": [
+        {
+          "source id": "SEC_02",
+          "target id": "SEC_01",
+          "function relationship": "transmits_load, distributes_stress",
+          "structural relationship": "attached_to, blends_into"
+        },
+        {
+          "source id": "SEC_02",
+          "target id": "SEC_03",
+          "function relationship": "transmits_load, provides_clearance, distributes_stress",
+          "structural relationship": "attached_to, blends_into, supports"
+        }
+      ]
+    },
+    {
+      "id": "SEC_03",
+      "name": "Hook catch end",
+      "features included": [
+        "open hook throat",
+        "concave engagement seat",
+        "rounded outer heel",
+        "upright terminal nose",
+        "flat terminal cap",
+        "small side transition facets"
+      ],
+      "function intent": "Engages a mating pin, edge, cable, or catch element through an open throat and retains it against the concave seat while allowing rapid lateral insertion or release.",
+      "physical behavior": "Contact load from the mating element is reacted by compression and bearing on the concave seat. The curved heel redirects this load into the arm, while the upright nose constrains escape in the hook-opening direction and the open throat supplies assembly clearance.",
+      "geometry": "A compact J-shaped end with a radius-3 concave seat, a larger radius-9 outer heel, a narrow upright cylindrical nose, and a planar top cap. Small planar and cylindrical transition patches resolve the intersections with the arm side faces.",
+      "location": "At the narrow positive-x end of the part; shown at the right in the front and isometric views.",
+      "colour": {
+        "R": 104,
+        "G": 196,
+        "B": 126
+      },
+      "major_faces": [
+        {
+          "face_code": "0011",
+          "name": "Hook concave seat",
+          "Brep_id": "FACE 7",
+          "description": "Radius-3 cylindrical concave surface forming the principal mating and retention seat inside the hook."
+        },
+        {
+          "face_code": "0012",
+          "name": "Upper throat transition",
+          "Brep_id": "FACE 8",
+          "description": "Small radius-3 cylindrical transition surface at the upper side of the hook throat."
+        },
+        {
+          "face_code": "0013",
+          "name": "Terminal nose cap",
+          "Brep_id": "FACE 17",
+          "description": "Flat horizontal top face capping the upright hook nose."
+        },
+        {
+          "face_code": "0014",
+          "name": "Terminal nose cylinder",
+          "Brep_id": "FACE 13",
+          "description": "Vertical-axis radius-3 cylindrical outer surface forming the rounded free end of the hook nose."
+        },
+        {
+          "face_code": "0015",
+          "name": "Hook outer heel",
+          "Brep_id": "FACE 10",
+          "description": "Radius-9 cylindrical convex surface forming the lower outer heel and load-return path into the arm."
+        }
+      ],
+      "minor_faces_Brep_id": [
+        "FACE 12",
+        "FACE 14"
+      ],
+      "relationships": [
+        {
+          "source id": "SEC_03",
+          "target id": "SEC_02",
+          "function relationship": "transmits_load, distributes_stress",
+          "structural relationship": "attached_to, blends_into"
+        },
+        {
+          "source id": "SEC_03",
+          "target id": "SEC_01",
+          "function relationship": "locates_mating_part; forms the lever output interface relative to the pivot interface",
+          "structural relationship": "offset_from; connected through SEC_02"
+        }
+      ]
+    }
+  ]
+}
+
+operation.json:
+
+{
+  "request": "Design simple locking mechanism in the area of the hook to secure carried load.",
+  "request_wording": {
+    "action_words": [
+      "Design",
+      "simple",
+      "locking",
+      "mechanism"
+    ],
+    "referenced_feature_words": [
+      "area",
+      "hook"
+    ],
+    "intention_words": [
+      "secure",
+      "carried",
+      "load"
+    ],
+    "grammatical_words": [
+      "in",
+      "the",
+      "of",
+      "the",
+      "to"
+    ]
+  },
+  "actions": [
+    {
+      "operation": "Create a simple locking mechanism.",
+      "parameters": {},
+      "target": "The area of the existing hook.",
+      "relational_constraint": "The locking mechanism must be located in the area of the hook.",
+      "unresolved_reference": "Identify the hook and the specific area of the hook suitable for the locking mechanism in the original CAD model."
+    }
+  ],
+  "intention": [
+    "Secure the carried load."
+  ]
+}
+
+View: front
+
+[IMAGE 0: /home/adml/Research/Hackathon2026/IDETC26-Hackathon-Autodesk-neuralCAD-Edit/data/edit_192_external/breps/3YH2WFSRM22W7DKT_1769177138.614976_front.jpg]
+
+View: back
+
+[IMAGE 1: /home/adml/Research/Hackathon2026/IDETC26-Hackathon-Autodesk-neuralCAD-Edit/data/edit_192_external/breps/3YH2WFSRM22W7DKT_1769177138.614976_back.jpg]
+
+View: left
+
+[IMAGE 2: /home/adml/Research/Hackathon2026/IDETC26-Hackathon-Autodesk-neuralCAD-Edit/data/edit_192_external/breps/3YH2WFSRM22W7DKT_1769177138.614976_left.jpg]
+
+View: right
+
+[IMAGE 3: /home/adml/Research/Hackathon2026/IDETC26-Hackathon-Autodesk-neuralCAD-Edit/data/edit_192_external/breps/3YH2WFSRM22W7DKT_1769177138.614976_right.jpg]
+
+View: top
+
+[IMAGE 4: /home/adml/Research/Hackathon2026/IDETC26-Hackathon-Autodesk-neuralCAD-Edit/data/edit_192_external/breps/3YH2WFSRM22W7DKT_1769177138.614976_top.jpg]
+
+View: bottom
+
+[IMAGE 5: /home/adml/Research/Hackathon2026/IDETC26-Hackathon-Autodesk-neuralCAD-Edit/data/edit_192_external/breps/3YH2WFSRM22W7DKT_1769177138.614976_bottom.jpg]
+
+View: toprightiso
+
+[IMAGE 6: /home/adml/Research/Hackathon2026/IDETC26-Hackathon-Autodesk-neuralCAD-Edit/data/edit_192_external/breps/3YH2WFSRM22W7DKT_1769177138.614976_toprightiso.jpg]

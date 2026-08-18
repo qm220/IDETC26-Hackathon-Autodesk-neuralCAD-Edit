@@ -214,7 +214,10 @@ if __name__ == "__main__":
     if not os.path.exists(output_dir):
         os.makedirs(output_dir)
 
-    for stale_name in ("tmp.step", "tmp.stl", "tmp.png", "tmp.svg"):
+    # Do not delete tmp.step / tmp.stl from a previous successful iteration.
+    # A later failed or timed-out run must leave the last good solid in place
+    # so ingest/eval still have geometry. Preview files can be replaced.
+    for stale_name in ("tmp.png", "tmp.svg"):
         stale_path = os.path.join(output_dir, stale_name)
         if os.path.exists(stale_path):
             os.remove(stale_path)

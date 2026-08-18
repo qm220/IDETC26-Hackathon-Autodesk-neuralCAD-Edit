@@ -1,0 +1,102 @@
+Thinking text:
+**Evaluating coordinate orientation**
+
+I’m considering the issue of global coordinate orientation. If there's no exact match, maybe I can rely on model planning instead. I’ll print all the planar normal-Z at the relevant points and ensure to handle cases where none returns the original. Fortunately, I can select the nearest to -10 and the area, so it doesn't have to fail silently. Let’s keep exploring this further!
+
+Generated script:
+def my_cad_function(args):
+    input_file = os.path.expanduser(args["input_file"])
+    model_wp = cq.importers.importStep(input_file)
+    model = model_wp.val()
+
+    bbox = model.BoundingBox()
+    print("Original valid:", model.isValid())
+    print(f"Original volume: {model.Volume():.6f} mm^3")
+    print(f"Bounding box: x=({bbox.xmin:.3f}, {bbox.xmax:.3f}), y=({bbox.ymin:.3f}, {bbox.ymax:.3f}), z=({bbox.zmin:.3f}, {bbox.zmax:.3f})")
+
+    # Locate the planar floor of the front blind guide slot. According to the
+    # source geometry, this floor is normal to Z and lies at z=-10 mm.
+    candidates = []
+    for index, face in enumerate(model.Faces()):
+        try:
+            if face.geomType() != "PLANE":
+                continue
+            center = face.Center()
+            normal = face.normalAt(center)
+            if abs(abs(normal.z) - 1.0) > 1.0e-5:
+                continue
+            edge_types = [edge.geomType() for edge in face.outerWire().Edges()]
+            print(f"Z-plane face {index}: z={center.z:.6f}, area={face.Area():.6f}, edges={edge_types}")
+            if abs(center.z + 10.0) < 0.05:
+                # An obround slot floor has two straight edges and two circular arcs.
+                line_count = sum(1 for kind in edge_types if kind == "LINE")
+                circle_count = sum(1 for kind in edge_types if kind == "CIRCLE")
+                if line_count == 2 and circle_count == 2:
+                    candidates.append(face)
+        except Exception as exc:
+            print(f"Skipped face {index}: {exc}")
+
+    if not candidates:
+        raise ValueError("Could not identify the obround front-slot floor at z=-10 mm")
+
+    # Prefer the compact slot floor if more than one matching face is present.
+    slot_floor = min(candidates, key=lambda face: face.Area())
+    slot_center = slot_floor.Center()
+    slot_wire = slot_floor.outerWire()
+    print(f"Selected slot floor: center=({slot_center.x:.6f}, {slot_center.y:.6f}, {slot_center.z:.6f}), area={slot_floor.Area():.6f}")
+
+    # Begin slightly in front of the old floor and extend beyond the complete
+    # rear side. This preserves the exact existing obround profile while
+    # removing both blind-pocket floors and all intervening frame material.
+    start_offset = cq.Vector(0, 0, 0.5)
+    cutter_wire = slot_wire.translate(start_offset)
+    cut_distance = (bbox.zmax - bbox.zmin) + 20.0
+    cutter = cq.Solid.extrudeLinear(
+        cutter_wire,
+        [],
+        cq.Vector(0, 0, -cut_distance)
+    )
+
+    edited = model.cut(cutter)
+    print("Edited valid:", edited.isValid())
+    print(f"Edited volume: {edited.Volume():.6f} mm^3")
+    print(f"Removed volume: {model.Volume() - edited.Volume():.6f} mm^3")
+    print(f"Result solid count: {len(edited.Solids())}")
+
+    if not edited.isValid():
+        raise ValueError("Through-slot Boolean produced an invalid result")
+    if edited.Volume() >= model.Volume():
+        raise ValueError("Through-slot operation did not decrease model volume")
+    if len(edited.Solids()) != 1:
+        raise ValueError("Through-slot operation did not preserve a single bracket solid")
+
+    return cq.Workplane(obj=edited)
+
+Program output:
+stdout: Loading function from: /home/adml/Research/Hackathon2026/IDETC26-Hackathon-Autodesk-neuralCAD-Edit/output/gpt-5.6-sol-full48/gpt-5.6-sol_cadquery-script_1787002347.536292/brep_end/1787002347.536292/temp_script.py
+Original valid: True
+Original volume: 426801.535841 mm^3
+Bounding box: x=(0.000, 168.000), y=(0.000, 180.000), z=(-60.000, 0.000)
+Z-plane face 18: z=-32.000000, area=794.469003, edges=['CIRCLE', 'LINE', 'CIRCLE', 'LINE']
+Z-plane face 23: z=-10.000000, area=794.469003, edges=['CIRCLE', 'LINE', 'CIRCLE', 'LINE']
+Z-plane face 28: z=0.000000, area=10067.168298, edges=['LINE', 'LINE', 'CIRCLE', 'LINE', 'CIRCLE', 'CIRCLE', 'LINE', 'CIRCLE', 'LINE', 'LINE', 'LINE', 'CIRCLE', 'LINE', 'LINE', 'LINE', 'LINE', 'LINE', 'CIRCLE', 'LINE', 'CIRCLE', 'CIRCLE', 'LINE']
+Z-plane face 31: z=-12.000000, area=1546.337140, edges=['LINE', 'LINE', 'LINE', 'CIRCLE', 'LINE', 'LINE']
+Z-plane face 32: z=-12.000000, area=2948.265135, edges=['LINE', 'LINE', 'LINE', 'LINE', 'CIRCLE']
+Z-plane face 34: z=-30.000000, area=1546.337140, edges=['LINE', 'LINE', 'LINE', 'CIRCLE', 'LINE', 'LINE']
+Z-plane face 38: z=-30.000000, area=2948.265135, edges=['LINE', 'CIRCLE', 'LINE', 'LINE', 'LINE']
+Z-plane face 52: z=-42.000000, area=7817.168298, edges=['LINE', 'LINE', 'CIRCLE', 'CIRCLE', 'LINE', 'CIRCLE', 'LINE', 'CIRCLE', 'LINE', 'LINE', 'LINE', 'CIRCLE', 'LINE', 'CIRCLE', 'CIRCLE', 'LINE', 'CIRCLE', 'LINE']
+Z-plane face 61: z=-60.000000, area=2250.000000, edges=['LINE', 'LINE', 'LINE', 'LINE']
+Selected slot floor: center=(113.000000, 55.000000, -10.000000), area=794.469003
+Edited valid: True
+Edited volume: 409323.218633 mm^3
+Removed volume: 17478.317207 mm^3
+Result solid count: 1
+Exported shape to: /home/adml/Research/Hackathon2026/IDETC26-Hackathon-Autodesk-neuralCAD-Edit/output/gpt-5.6-sol-full48/gpt-5.6-sol_cadquery-script_1787002347.536292/brep_end/1787002347.536292/tmp.step
+Exported STL to: /home/adml/Research/Hackathon2026/IDETC26-Hackathon-Autodesk-neuralCAD-Edit/output/gpt-5.6-sol-full48/gpt-5.6-sol_cadquery-script_1787002347.536292/brep_end/1787002347.536292/tmp.stl
+Exported PNG image to: /home/adml/Research/Hackathon2026/IDETC26-Hackathon-Autodesk-neuralCAD-Edit/output/gpt-5.6-sol-full48/gpt-5.6-sol_cadquery-script_1787002347.536292/brep_end/1787002347.536292/tmp.png
+Script completed.
+
+stderr: 
+
+Exported this iteration:
+tmp.step, tmp.stl, tmp.png, tmp_front.png, tmp_back.png, tmp_left.png, tmp_right.png, tmp_top.png, tmp_bottom.png, tmp_toprightiso.png

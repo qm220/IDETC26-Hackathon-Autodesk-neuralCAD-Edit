@@ -1,0 +1,8 @@
+=== thinking_text ===
+
+
+=== response_text ===
+{
+  "complete": false,
+  "my_cad_function": "def my_cad_function(args):\n    input_file = os.path.expanduser(args['input_file'])\n    model = cq.importers.importStep(input_file)\n    shape = model.val()\n    bbox = shape.BoundingBox()\n    print('MODEL valid=', shape.isValid(), 'solids=', len(shape.Solids()), 'faces=', len(shape.Faces()))\n    print('MODEL bbox:', (bbox.xmin, bbox.ymin, bbox.zmin), (bbox.xmax, bbox.ymax, bbox.zmax))\n\n    # Inspect every disconnected solid to localize the existing shallow,\n    # elongated horizontal button and determine the model coordinate system.\n    records = []\n    for i, solid in enumerate(shape.Solids()):\n        b = solid.BoundingBox()\n        c = b.center\n        records.append((i, solid.Volume(), c.x, c.y, c.z, b.xlen, b.ylen, b.zlen))\n    for rec in sorted(records, key=lambda r: r[0]):\n        print('SOLID %02d volume=%10.3f center=(%8.3f,%8.3f,%8.3f) size=(%8.3f,%8.3f,%8.3f)' % rec)\n\n    # List likely button candidates: comparatively small solids having one long,\n    # one medium, and one shallow bounding-box dimension.\n    print('BUTTON CANDIDATES:')\n    for rec in records:\n        dims = sorted(rec[5:8])\n        if 0.3 <= dims[0] <= 8.0 and 2.0 <= dims[1] <= 20.0 and 6.0 <= dims[2] <= 45.0:\n            print('  candidate', rec)\n\n    return model"
+}

@@ -1,0 +1,106 @@
+Thinking text:
+
+
+Generated script:
+def my_cad_function(args):
+    input_file = os.path.expanduser(args["input_file"])
+    imported = cq.importers.importStep(input_file)
+    root = imported.val() if hasattr(imported, "val") else imported
+    solids = list(root.Solids())
+
+    print(f"Loaded {len(solids)} solids")
+    for i, solid in enumerate(solids):
+        bb = solid.BoundingBox()
+        print(
+            f"Solid {i}: x=({bb.xmin:.3f},{bb.xmax:.3f}) "
+            f"y=({bb.ymin:.3f},{bb.ymax:.3f}) "
+            f"z=({bb.zmin:.3f},{bb.zmax:.3f}), "
+            f"size=({bb.xlen:.3f},{bb.ylen:.3f},{bb.zlen:.3f})"
+        )
+
+    # Identify S09: the lower-row nozzle having the approximately 21 mm
+    # axial extent. This distinguishes it from the short and medium nozzles.
+    candidates = []
+    for i, solid in enumerate(solids):
+        bb = solid.BoundingBox()
+        cx = (bb.xmin + bb.xmax) * 0.5
+        cy = (bb.ymin + bb.ymax) * 0.5
+        if cy < -50.0 and cx > 20.0 and bb.zlen > 18.0:
+            candidates.append((i, solid))
+
+    if len(candidates) != 1:
+        raise ValueError(f"Expected one long Volcano nozzle, found {len(candidates)}")
+
+    target_index, target = candidates[0]
+    old_bb = target.BoundingBox()
+    old_height = old_bb.zlen
+    new_zmax = old_bb.zmax - 1.0
+
+    # Remove exactly 1 mm from the free upper end of the threaded shank.
+    # Cutting with a plane-normal box leaves the axial orifice through and
+    # creates a new planar annular end face at the shortened thread boundary.
+    margin = 5.0
+    cutter = cq.Solid.makeBox(
+        old_bb.xlen + 2.0 * margin,
+        old_bb.ylen + 2.0 * margin,
+        1.0 + margin,
+        cq.Vector(old_bb.xmin - margin, old_bb.ymin - margin, new_zmax)
+    )
+    shortened = target.cut(cutter)
+
+    if shortened.ShapeType() == "Compound":
+        shortened_solids = shortened.Solids()
+        if len(shortened_solids) != 1:
+            raise ValueError("Nozzle shortening did not produce one solid")
+        shortened = shortened_solids[0]
+
+    if not shortened.isValid():
+        raise ValueError("Shortened nozzle is not a valid watertight solid")
+
+    new_bb = shortened.BoundingBox()
+    print(f"Selected target solid index: {target_index}")
+    print(f"Old nozzle height: {old_height:.6f} mm")
+    print(f"New nozzle height: {new_bb.zlen:.6f} mm")
+    print(f"Height reduction: {old_height - new_bb.zlen:.6f} mm")
+    print(f"New upper threaded-end Z: {new_bb.zmax:.6f} mm")
+    print(f"Shortened nozzle valid: {shortened.isValid()}")
+
+    if abs((old_height - new_bb.zlen) - 1.0) > 1.0e-5:
+        raise ValueError("Resulting nozzle height reduction is not exactly 1 mm")
+
+    output_solids = [shortened if i == target_index else solid
+                     for i, solid in enumerate(solids)]
+    result = cq.Compound.makeCompound(output_solids)
+    print(f"Output solid count: {len(result.Solids())}")
+    print(f"Output valid: {result.isValid()}")
+    return result
+
+Program output:
+stdout: Loading function from: /home/adml/Research/Hackathon2026/IDETC26-Hackathon-Autodesk-neuralCAD-Edit/output/gpt-5.6-sol-full48/gpt-5.6-sol_cadquery-script_1787017816.0735705/brep_end/1787017816.0735705/temp_script.py
+Loaded 9 solids
+Solid 0: x=(-55.000,-25.000) y=(-21.000,0.000) z=(-0.000,25.000), size=(30.000,21.000,25.000)
+Solid 1: x=(24.000,56.000) y=(-18.000,0.000) z=(-0.000,30.000), size=(32.000,18.000,30.000)
+Solid 2: x=(-57.000,-23.000) y=(-48.000,-30.000) z=(-6.000,7.500), size=(34.000,18.000,13.500)
+Solid 3: x=(-3.450,3.450) y=(-43.450,-36.550) z=(0.400,21.000), size=(6.900,6.900,20.600)
+Solid 4: x=(-15.000,8.000) y=(-8.000,8.000) z=(-0.000,11.500), size=(23.000,16.000,11.500)
+Solid 5: x=(24.500,48.500) y=(-45.750,-34.250) z=(-0.000,20.000), size=(24.000,11.500,20.000)
+Solid 6: x=(-43.000,-37.000) y=(-63.464,-56.536) z=(0.200,8.000), size=(6.000,6.928,7.800)
+Solid 7: x=(-3.500,3.500) y=(-64.041,-55.959) z=(-0.000,12.500), size=(7.000,8.083,12.500)
+Solid 8: x=(36.500,43.500) y=(-64.041,-55.959) z=(-0.000,21.000), size=(7.000,8.083,21.000)
+Selected target solid index: 8
+Old nozzle height: 21.000000 mm
+New nozzle height: 20.000000 mm
+Height reduction: 1.000000 mm
+New upper threaded-end Z: 20.000000 mm
+Shortened nozzle valid: True
+Output solid count: 9
+Output valid: True
+Exported shape to: /home/adml/Research/Hackathon2026/IDETC26-Hackathon-Autodesk-neuralCAD-Edit/output/gpt-5.6-sol-full48/gpt-5.6-sol_cadquery-script_1787017816.0735705/brep_end/1787017816.0735705/tmp.step
+Exported STL to: /home/adml/Research/Hackathon2026/IDETC26-Hackathon-Autodesk-neuralCAD-Edit/output/gpt-5.6-sol-full48/gpt-5.6-sol_cadquery-script_1787017816.0735705/brep_end/1787017816.0735705/tmp.stl
+Exported PNG image to: /home/adml/Research/Hackathon2026/IDETC26-Hackathon-Autodesk-neuralCAD-Edit/output/gpt-5.6-sol-full48/gpt-5.6-sol_cadquery-script_1787017816.0735705/brep_end/1787017816.0735705/tmp.png
+Script completed.
+
+stderr: 
+
+Exported this iteration:
+tmp.step, tmp.stl, tmp.png, tmp_front.png, tmp_back.png, tmp_left.png, tmp_right.png, tmp_top.png, tmp_bottom.png, tmp_toprightiso.png

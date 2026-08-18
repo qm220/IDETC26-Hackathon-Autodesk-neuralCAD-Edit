@@ -1,0 +1,98 @@
+def my_cad_function(args):
+    import os
+
+    input_file = os.path.expanduser(args["input_file"])
+    model = cq.importers.importStep(input_file)
+    base_shape = model.val()
+
+    # Extract reference information from the existing model.
+    bbox = base_shape.BoundingBox()
+    print("Loaded model valid:", base_shape.isValid())
+    print("Existing faces:", len(base_shape.Faces()))
+    print("Existing volume: %.3f mm^3" % base_shape.Volume())
+    print("Bounding box: x=(%.3f, %.3f), y=(%.3f, %.3f), z=(%.3f, %.3f)" %
+          (bbox.xmin, bbox.xmax, bbox.ymin, bbox.ymax, bbox.zmin, bbox.zmax))
+
+    result = model
+
+    # Reconstruct three additional copies of the transverse blind-socket boss.
+    # Together with the original boss at x=0, this produces four instances at
+    # x = 0, 20, 40, and 60 mm.
+    new_centers = [20.0, 40.0, 60.0]
+    axis = cq.Vector(0, 1, 0)
+
+    for x_center in new_centers:
+        # A tapered pedestal penetrates the beam side slightly, providing a
+        # broad, structurally continuous boss-to-beam attachment.
+        pedestal = cq.Solid.makeCone(
+            9.0, 7.0, 5.0,
+            cq.Vector(x_center, 21.0, 4.0), axis
+        )
+        result = result.union(cq.Workplane(obj=pedestal))
+
+        # Outer boss: radius 7, opening plane at y=34. The root begins inside
+        # the beam so the boolean union cannot be merely tangent.
+        boss = cq.Solid.makeCylinder(
+            7.0, 12.5,
+            cq.Vector(x_center, 21.5, 4.0), axis
+        )
+        result = result.union(cq.Workplane(obj=boss))
+
+    # Cut the three new concentric blind sockets. Each opens at y=34 and ends
+    # at y=25, preserving a planar blind floor and 2 mm nominal boss wall.
+    for x_center in new_centers:
+        socket = cq.Solid.makeCylinder(
+            5.0, 9.2,
+            cq.Vector(x_center, 24.9, 4.0), axis
+        )
+        result = result.cut(cq.Workplane(obj=socket))
+
+    # Add four lateral outrigger legs as two opposed pairs. Their contact faces
+    # are all at z=-6, below the lowest boss surfaces, so the legs define the
+    # support plane. Each leg overlaps the beam in both y and z for a robust
+    # joined solid.
+    leg_stations = [-15.0, 74.0]
+    for x_center in leg_stations:
+        positive_leg = (
+            cq.Workplane("XY")
+            .box(8.0, 20.0, 9.0, centered=(True, True, True))
+            .translate((x_center, 31.0, -1.5))
+        )
+        negative_leg = (
+            cq.Workplane("XY")
+            .box(8.0, 20.0, 9.0, centered=(True, True, True))
+            .translate((x_center, 3.0, -1.5))
+        )
+        result = result.union(positive_leg).union(negative_leg)
+
+        # Triangular gusset ribs strengthen each cantilevered leg root.
+        pos_wire = cq.Wire.makePolygon([
+            cq.Vector(x_center - 4.0, 21.0, 2.0),
+            cq.Vector(x_center + 4.0, 21.0, 2.0),
+            cq.Vector(x_center,       21.0, 6.0),
+            cq.Vector(x_center - 4.0, 21.0, 2.0)
+        ])
+        pos_rib = cq.Face.makeFromWires(pos_wire).extrude(cq.Vector(0, 5.0, 0))
+
+        neg_wire = cq.Wire.makePolygon([
+            cq.Vector(x_center - 4.0, 13.0, 2.0),
+            cq.Vector(x_center,       13.0, 6.0),
+            cq.Vector(x_center + 4.0, 13.0, 2.0),
+            cq.Vector(x_center - 4.0, 13.0, 2.0)
+        ])
+        neg_rib = cq.Face.makeFromWires(neg_wire).extrude(cq.Vector(0, -5.0, 0))
+
+        result = result.union(cq.Workplane(obj=pos_rib))
+        result = result.union(cq.Workplane(obj=neg_rib))
+
+    final_shape = result.val()
+    print("Edited model valid:", final_shape.isValid())
+    print("Final solids:", len(final_shape.Solids()))
+    print("Final faces:", len(final_shape.Faces()))
+    print("Final volume: %.3f mm^3" % final_shape.Volume())
+    final_bbox = final_shape.BoundingBox()
+    print("Final bounding box: x=(%.3f, %.3f), y=(%.3f, %.3f), z=(%.3f, %.3f)" %
+          (final_bbox.xmin, final_bbox.xmax, final_bbox.ymin, final_bbox.ymax,
+           final_bbox.zmin, final_bbox.zmax))
+
+    return result

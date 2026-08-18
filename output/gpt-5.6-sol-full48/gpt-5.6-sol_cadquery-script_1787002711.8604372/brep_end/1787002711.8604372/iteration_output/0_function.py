@@ -1,0 +1,104 @@
+def my_cad_function(args):
+    input_file = os.path.expanduser(args["input_file"])
+    bracket = cq.importers.importStep(input_file)
+    bracket_shape = bracket.val() if hasattr(bracket, "val") else bracket
+
+    bbox = bracket_shape.BoundingBox()
+    print("Loaded bracket: valid=%s, faces=%d" % (bracket_shape.isValid(), len(bracket_shape.Faces())))
+    print("Bracket bounds: X %.3f..%.3f, Y %.3f..%.3f, Z %.3f..%.3f" %
+          (bbox.xmin, bbox.xmax, bbox.ymin, bbox.ymax, bbox.zmin, bbox.zmax))
+
+    # Locate the top boss axis from circular edges at the maximum-Y interface.
+    # The fallback values correspond to the documented S05 boss center.
+    boss_x = 67.5
+    boss_z = -21.0
+    circular_candidates = []
+    for edge in bracket_shape.Edges():
+        try:
+            if edge.geomType() == "CIRCLE":
+                center = edge.Center()
+                radius = edge.radius()
+                if center.y > bbox.ymax - 2.0 and 3.0 < radius < 20.0:
+                    circular_candidates.append((radius, center.x, center.y, center.z))
+        except Exception:
+            pass
+
+    if circular_candidates:
+        circular_candidates.sort(reverse=True)
+        radius, boss_x, boss_y_found, boss_z = circular_candidates[0]
+        print("Detected top boss axis from circular edge: center=(%.3f, %.3f, %.3f), radius=%.3f" %
+              (boss_x, boss_y_found, boss_z, radius))
+    else:
+        print("Top circular edge was not detected; using documented S05 axis at X=67.5, Z=-21.0")
+
+    top_y = bbox.ymax
+    arm_axis_y = top_y + 25.0
+    arm_length = 200.0
+    distal_x = boss_x - arm_length
+
+    def cylinder(radius, length, base, direction):
+        solid = cq.Solid.makeCylinder(
+            radius,
+            length,
+            cq.Vector(base[0], base[1], base[2]),
+            cq.Vector(direction[0], direction[1], direction[2])
+        )
+        return cq.Workplane(obj=solid)
+
+    # Coaxial mounting stem, inserted from above into the existing axial bore.
+    # Diameter and engagement are conservative nominal values for the visible boss envelope.
+    stem = cylinder(6.0, 26.0, (boss_x, top_y + 6.0, boss_z), (0, -1, 0))
+    collar = cylinder(13.0, 6.0, (boss_x, top_y, boss_z), (0, 1, 0))
+    riser = cylinder(7.0, arm_axis_y - (top_y + 6.0),
+                     (boss_x, top_y + 6.0, boss_z), (0, 1, 0))
+
+    # The arm length is the horizontal center-to-center distance from the
+    # mounting-bore axis to the distal clamp-spindle axis.
+    arm = cylinder(7.0, arm_length, (boss_x, arm_axis_y, boss_z), (-1, 0, 0))
+    elbow = cq.Workplane(obj=cq.Solid.makeSphere(
+        10.0, cq.Vector(boss_x, arm_axis_y, boss_z)
+    ))
+
+    # Reinforced distal eye for the vertical clamping spindle.
+    distal_eye = cylinder(12.0, 24.0,
+                          (distal_x, arm_axis_y - 12.0, boss_z), (0, 1, 0))
+
+    rod_body = stem.union(collar).union(riser).union(arm).union(elbow).union(distal_eye)
+
+    # Adjustable downward clamp spindle and replaceable pressure pad.
+    spindle_top_y = arm_axis_y + 23.0
+    spindle_bottom_y = top_y - 59.0
+    spindle = cylinder(4.5, spindle_top_y - spindle_bottom_y,
+                       (distal_x, spindle_top_y, boss_z), (0, -1, 0))
+
+    pad = cylinder(15.0, 7.0,
+                   (distal_x, spindle_bottom_y - 7.0, boss_z), (0, 1, 0))
+    pad_blend = cylinder(7.0, 4.0,
+                         (distal_x, spindle_bottom_y, boss_z), (0, 1, 0))
+    clamp_screw = spindle.union(pad).union(pad_blend)
+
+    # Sliding tommy-bar handle for tightening the clamp spindle.
+    handle = cylinder(3.0, 60.0,
+                      (distal_x, spindle_top_y, boss_z - 30.0), (0, 0, 1))
+    handle_end_1 = cq.Workplane(obj=cq.Solid.makeSphere(
+        4.5, cq.Vector(distal_x, spindle_top_y, boss_z - 30.0)
+    ))
+    handle_end_2 = cq.Workplane(obj=cq.Solid.makeSphere(
+        4.5, cq.Vector(distal_x, spindle_top_y, boss_z + 30.0)
+    ))
+    handle = handle.union(handle_end_1).union(handle_end_2)
+
+    print("Created top-mounted fixation rod")
+    print("Mounting axis: X=%.3f, Z=%.3f; arm axis Y=%.3f" %
+          (boss_x, boss_z, arm_axis_y))
+    print("Arm length (mounting axis to clamp axis): %.3f mm" % arm_length)
+    print("Distal clamp axis X=%.3f" % distal_x)
+
+    result = cq.Assembly(name="top_mounted_fixation_rod_assembly")
+    result.add(bracket_shape, name="existing_bracket", color=cq.Color(0.62, 0.66, 0.70))
+    result.add(rod_body.val(), name="fixation_arm_and_mounting_stem",
+               color=cq.Color(0.82, 0.22, 0.12))
+    result.add(clamp_screw.val(), name="adjustable_clamp_spindle_and_pad",
+               color=cq.Color(0.18, 0.24, 0.30))
+    result.add(handle.val(), name="clamp_handle", color=cq.Color(0.95, 0.65, 0.10))
+    return result

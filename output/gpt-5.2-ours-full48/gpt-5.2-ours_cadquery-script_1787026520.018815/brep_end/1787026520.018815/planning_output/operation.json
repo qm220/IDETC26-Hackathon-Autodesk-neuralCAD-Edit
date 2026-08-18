@@ -1,0 +1,68 @@
+{
+  "request": "Add a 1.5 millimetre rib to increase support and make the structure strong.",
+  "request_wording": {
+    "action_words": [
+      "Add",
+      "1.5",
+      "millimetre",
+      "rib"
+    ],
+    "referenced_feature_words": [
+      "structure"
+    ],
+    "intention_words": [
+      "increase",
+      "support",
+      "make",
+      "strong"
+    ],
+    "grammatical_words": [
+      "a",
+      "to",
+      "and",
+      "the"
+    ]
+  },
+  "actions": [
+    {
+      "operation": "Create/add a rib feature",
+      "parameters": {
+        "rib_thickness": "1.5 mm",
+        "thickness_side": "symmetric (mid-plane)",
+        "rib_definition": "sketched centerline + Rib tool",
+        "rib_extent": "Up to face (To Next acceptable if Up-to-face fails)",
+        "rib_merge_result": "Join",
+        "suggested_root_fillet": "0.75 mm (optional, for stress reduction)"
+      },
+      "target": "Underside pocket region to stiffen the central bridge between mounting pads and clevis (torsion/bending stiffness increase without affecting external interfaces).",
+      "relational_constraint": "Place the new rib centrally within the underside pocket, running along the part longitudinal direction (X) to tie the pocket floor into the internal roof/web; keep it symmetric about the part mid-width (between the two outer sloped bridge faces) and contained inside the pocket boundary (no breakthrough to the exterior).",
+      "unresolved_reference": "Exact rib path endpoints are not explicitly specified. Assumption used: a longitudinal rib along the underside pocket centerline (mid-width), spanning most of the pocket length while stopping short of filleted/transition regions near the mounting pads to avoid thin-wall intersections and preserving clearances.",
+      "target section code": [
+        "S5",
+        "S3"
+      ],
+      "target face code": [
+        "0003",
+        "0040",
+        "0004",
+        "0033"
+      ],
+      "steps": [
+        "Identify the underside pocket as the most functionally relevant strengthening area (Section S5) because it is explicitly designed for stiffness via ribs/webs and directly supports the main load path in Section S3 (bridge).",
+        "Set the sketch plane on the pocket floor / internal shelf plane: face_code 0003 (Brep_id FACE 103). This provides a stable, planar reference inside the pocket for defining a rib location without altering external mounting/clevis interfaces.",
+        "Create a new sketch on face_code 0003. Project/convert the pocket inner boundary edges into the sketch (use the pocket perimeter edges as reference geometry) to ensure the rib remains fully inside the cavity.",
+        "Create a construction midline to locate the pocket mid-width: define it as the plane/midline equidistant from the two outer bridge side faces (Section S3 left/right outer sloped side planes: face_code 0001 and 0002) or, if those are not usable for sketch constraints, use the two pocket side boundaries as references and constrain the rib sketch line to be centered between them.",
+        "Draw a single straight line (rib centerline) along the longitudinal direction (X) on the pocket floor. Constrain it to be coincident with the mid-width construction line. Set its endpoints to lie inside the pocket, trimmed back from the pocket end transitions so the rib does not collide with fillets/blends near the mounting pads.",
+        "Invoke the CAD Rib feature using the sketched line as the rib profile definition. Set rib thickness = 1.5 mm with symmetric thickness about the sketch line (mid-plane rib). Set the rib to grow normal to the sketch plane (normal to face_code 0003).",
+        "Set rib extent to terminate 'Up to Face' by selecting the internal roof-like rib surface within the pocket: prefer face_code 0040 (Brep_id FACE 92). If selection is ambiguous or fails, use face_code 0004 (Brep_id FACE 99) or the main inclined internal face face_code 0033 (Brep_id FACE 100) as the limiting face, whichever is intersected first by the rib in the intended direction.",
+        "Ensure the rib boolean operation is 'Join' to merge with the existing solid, reinforcing the pocket structure (Section S5) and increasing stiffness in the main bridge (Section S3).",
+        "Optional but recommended for strength/fatigue: apply a root fillet along the rib-to-floor intersection edges (and rib-to-roof intersection if sharp) with a small radius (suggest 0.75 mm) to reduce stress concentration while preserving clearance inside the pocket.",
+        "Regenerate/rebuild and visually validate in bottom/back views that: (1) the rib is fully contained inside the pocket opening, (2) it does not break through the exterior shell (no changes to face_code 0000 global bottom datum), and (3) it does not interfere with clevis/mounting interfaces (Sections S4, S1, S2)."
+      ]
+    }
+  ],
+  "intention": [
+    "Increase support",
+    "Make the structure strong"
+  ]
+}

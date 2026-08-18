@@ -1,0 +1,305 @@
+Thinking text:
+**Considering face orientation**
+
+I'm planning to modify the function to make it more robust by focusing on different faces. I need to identify the bottom face as the largest planar one with the minimum Y-value, but I'm a bit unclear on the axes. CadQuery retains orientation upon import, so I can use the bounding box to help determine vertical axes. If the base bottom is indeed along Y, I’ll search for the bottom base plane that's aligned with global -Z, but I can’t assume that’s the case. My approach includes finding candidate faces and computing their areas and normals to pinpoint the correct face.
+**Determining axis and holes**
+
+I need to figure out the principal thickness axis using the bounding box dimensions. It looks like the smallest dimension might represent the thickness, probably along Y, despite the bracket being elongated in X and Z. I’ll define this axis as upAxis. The bottom face will have the minimal coordinate along this axis and should be a large planar area. I’ll also need to create a hole from the pocket floor to the outside. Using a workplane from the pocket floor, I’ll drill up along upAxis, but oh no, I need to ensure it doesn’t go downward since we want it going upward instead. CadQuery might not support this direction with depth specifications.
+**Understanding hole cutting**
+
+I need to clarify how the workplane.hole function operates, especially regarding its cutting direction. If I remember correctly, it cuts along the negative Z-axis of the workplane, moving in the normal direction. CadQuery uses the current plane's normal for this. I can set the orientation using .workplane(invert=True) if needed. It seems cutting through all from the pocket floor face would be the way to go. With .cutThruAll(), I can confirm it cuts in both directions, so it sounds like that’s the safest option to employ. Let’s test it out!
+**Identifying hole centers and grooves**
+
+I'm considering using .faces(pocket_face).workplane(centerOption="CenterOfBoundBox") to position my holes correctly. I also need to add 0.1 mm deep grooves around the four mounting holes on the bottom face. To find these hole centers, I’ll look for the four smallest diameter cylindrical faces that correspond to the through holes. These mounting holes are stepped with small bore segments, so I want cylindrical faces aligned with upAxis and with a radius of about 3-5 mm. I’ll also need to filter for pin holes, making sure they align correctly before computing the centers using the bottom face.
+**Selecting edges and computing centers**
+
+I’m looking to find the four circular edges from the holes on the bottom face. Using .edges().filter, I'll select edges that are circular. I need small radii, probably between 2-5 mm to avoid the outer fillets, while also considering pocket opening edges. To get the centers of these circles, I’ll compute the radius and use properties like edge.Center() to find their positions. 
+
+For the grooves, I’ll lay them around the mounting holes, calculating coordinates based on the bottom face. I'll then find the largest planar face along the upAxis for the pocket floor, ensuring it’s parallel to the bottom and within the pocket with a suitable area. I plan to use workplane functionality effectively for the connecting hole and confirm everything with try/except when incorporating OCP methods. If needed, I can adjust cut directions using .cutThruAll and ensure proper placements and orientations.
+**Creating cylinders and locating grooves**
+
+I’m planning to create a cylinder along the upAxis starting from the pocket floor center to the top, using CadQuery’s `makeCylinder`. First, I’ll determine the upAxis and create it with enough height to ensure it spans the entire part. 
+
+Next, I want to carve out grooves on the bottom face. I'll determine the face's normal direction and use it to cut into the part. I’ll focus on making ring grooves through boolean subtraction, ensuring I identify the centers of mounting holes and calculating their locations relative to the bottom plane. Each mounting hole involves creating three ring prisms, adjusting radii based on offsets and pitches. I'll work carefully to avoid cutting into the pocket, keeping grooves shallow and on the planar bottom region.
+**Finding faces and creating grooves**
+
+I'm planning to use an OCP surface adaptor to help find the bottom face of the object. My approach involves defining a helper function to determine the axis with the smallest length using the bounding box. Instead of relying solely on the bounding box, I’ll analyze planar faces to find the largest area that’s close to the minimum coordinate along that axis.
+
+From there, I’ll determine the pocket floor and mounting holes, carefully managing radius and count to identify the right cylindrical faces. Finally, I’ll create groove rings and handle the connecting hole, ensuring to keep everything organized and print debug information for clarity.
+
+Generated script:
+def my_cad_function(args):
+    import cadquery as cq
+    import os
+    from math import sqrt
+
+    # --- Helpers (OCP-based for robust geometry interrogation) ---
+    def _unit(v: cq.Vector) -> cq.Vector:
+        L = v.Length
+        if L == 0:
+            return cq.Vector(0, 0, 0)
+        return cq.Vector(v.x / L, v.y / L, v.z / L)
+
+    def _dot(a: cq.Vector, b: cq.Vector) -> float:
+        return a.x * b.x + a.y * b.y + a.z * b.z
+
+    def _dist(a: cq.Vector, b: cq.Vector) -> float:
+        dx, dy, dz = a.x - b.x, a.y - b.y, a.z - b.z
+        return sqrt(dx * dx + dy * dy + dz * dz)
+
+    def _face_plane_normal(face: cq.Face):
+        # Returns (point_on_plane, unit_normal) for planar faces; else (None, None)
+        try:
+            from OCP.BRepAdaptor import BRepAdaptor_Surface
+            from OCP.GeomAbs import GeomAbs_Plane
+
+            ad = BRepAdaptor_Surface(face.wrapped)
+            if ad.GetType() != GeomAbs_Plane:
+                return None, None
+            pln = ad.Plane()
+            loc = pln.Location()
+            n_dir = pln.Axis().Direction()
+            p = cq.Vector(loc.X(), loc.Y(), loc.Z())
+            n = _unit(cq.Vector(n_dir.X(), n_dir.Y(), n_dir.Z()))
+            return p, n
+        except Exception:
+            return None, None
+
+    def _cyl_face_data(face: cq.Face):
+        # Returns (radius, axis_point, axis_dir_unit) for cylindrical faces; else None
+        try:
+            from OCP.BRepAdaptor import BRepAdaptor_Surface
+            from OCP.GeomAbs import GeomAbs_Cylinder
+
+            ad = BRepAdaptor_Surface(face.wrapped)
+            if ad.GetType() != GeomAbs_Cylinder:
+                return None
+            cyl = ad.Cylinder()
+            r = cyl.Radius()
+            ax = cyl.Axis()
+            loc = ax.Location()
+            d = ax.Direction()
+            p = cq.Vector(loc.X(), loc.Y(), loc.Z())
+            v = _unit(cq.Vector(d.X(), d.Y(), d.Z()))
+            return float(r), p, v
+        except Exception:
+            return None
+
+    # --- Load STEP ---
+    if "input_file" not in args:
+        raise ValueError("Expected args['input_file'] for edit operation")
+    input_file = os.path.expanduser(args["input_file"])
+    wp = cq.importers.importStep(input_file)
+    shape = wp.val() if hasattr(wp, "val") else wp
+
+    if not shape.isValid():
+        print("WARNING: imported shape is not valid according to OCC")
+
+    bbox = shape.BoundingBox()
+    xlen, ylen, zlen = bbox.xlen, bbox.ylen, bbox.zlen
+    print(f"BBOX lens: x={xlen:.3f} y={ylen:.3f} z={zlen:.3f}")
+
+    # Thickness axis = smallest bbox dimension (assumption: mounting holes are along this axis)
+    lens = [(xlen, 0), (ylen, 1), (zlen, 2)]
+    t_idx = sorted(lens, key=lambda a: a[0])[0][1]
+    thickness_axis = [cq.Vector(1, 0, 0), cq.Vector(0, 1, 0), cq.Vector(0, 0, 1)][t_idx]
+    print(f"Thickness axis index={t_idx} vec=({thickness_axis.x},{thickness_axis.y},{thickness_axis.z})")
+
+    def _coord_on_axis(p: cq.Vector, axis_idx: int) -> float:
+        return [p.x, p.y, p.z][axis_idx]
+
+    # --- Identify bottom base planar face (large planar face with normal ~ thickness axis and lowest coord) ---
+    faces = list(shape.Faces())
+    planar_candidates = []
+    for f in faces:
+        p0, n = _face_plane_normal(f)
+        if p0 is None:
+            continue
+        # normals near +/- thickness axis
+        if abs(_dot(n, thickness_axis)) < 0.95:
+            continue
+        c = f.Center()
+        planar_candidates.append((f, f.Area(), cq.Vector(c.x, c.y, c.z), n))
+
+    if not planar_candidates:
+        raise RuntimeError("Could not find planar faces aligned to thickness axis")
+
+    planar_candidates.sort(key=lambda t: (_coord_on_axis(t[2], t_idx), -t[1]))
+    bottom_face, bottom_area, bottom_center, bottom_n = planar_candidates[0]
+    print(f"Bottom face area={bottom_area:.2f} center=({bottom_center.x:.2f},{bottom_center.y:.2f},{bottom_center.z:.2f}) normal=({bottom_n.x:.3f},{bottom_n.y:.3f},{bottom_n.z:.3f})")
+
+    # --- Identify underside pocket floor planar face (parallel to bottom, above it, sizable) ---
+    # Expect pocket floor to be offset from bottom along thickness axis.
+    pocket_floor = None
+    pocket_floor_score = None
+    for f, area, ctr, n in planar_candidates[1:]:
+        # same plane normal direction as bottom or opposite is okay; pocket floor is usually internal so might match bottom
+        if abs(_dot(n, bottom_n)) < 0.98:
+            continue
+        d = _coord_on_axis(ctr, t_idx) - _coord_on_axis(bottom_center, t_idx)
+        if d < 0.5:  # must be above the bottom plane by at least 0.5 mm
+            continue
+        if area > bottom_area * 0.95:
+            continue
+        # Prefer larger area and moderate offset
+        score = area
+        if (pocket_floor is None) or (score > pocket_floor_score):
+            pocket_floor = f
+            pocket_floor_score = score
+
+    if pocket_floor is None:
+        print("WARNING: Could not confidently identify pocket floor face; will fall back to second-lowest planar face.")
+        pocket_floor = planar_candidates[1][0]
+
+    pf_c = pocket_floor.Center()
+    pocket_center = cq.Vector(pf_c.x, pf_c.y, pf_c.z)
+    print(f"Pocket floor center=({pocket_center.x:.2f},{pocket_center.y:.2f},{pocket_center.z:.2f}) area={pocket_floor.Area():.2f}")
+
+    # --- Find 4 mounting-hole centers (use cylindrical faces with axis ~ thickness axis; choose smallest-radius group with >=4 uniques) ---
+    cyls = []
+    for f in faces:
+        data = _cyl_face_data(f)
+        if data is None:
+            continue
+        r, ap, av = data
+        if abs(_dot(av, thickness_axis)) < 0.98:
+            continue
+        # Ignore extremely small / huge cylinders
+        if r < 0.3 or r > 20:
+            continue
+        cyls.append((r, ap, av))
+
+    print(f"Cyl faces aligned to thickness axis: {len(cyls)}")
+
+    # Cluster by radius
+    cyls.sort(key=lambda t: t[0])
+    radius_groups = []  # list of (r_nom, items)
+    rtol = 0.15
+    for item in cyls:
+        r = item[0]
+        placed = False
+        for i, (rn, items) in enumerate(radius_groups):
+            if abs(r - rn) <= rtol:
+                items.append(item)
+                # update nominal
+                radius_groups[i] = ((rn * (len(items) - 1) + r) / len(items), items)
+                placed = True
+                break
+        if not placed:
+            radius_groups.append((r, [item]))
+
+    # Determine bottom plane (point and outward normal) for projection
+    bp_p, bp_n = _face_plane_normal(bottom_face)
+    if bp_p is None:
+        bp_p = bottom_center
+        bp_n = bottom_n
+
+    def _project_to_plane(pt: cq.Vector, plane_p: cq.Vector, plane_n_unit: cq.Vector) -> cq.Vector:
+        v = pt - plane_p
+        dist = _dot(v, plane_n_unit)
+        return pt - plane_n_unit * dist
+
+    mounting_centers = []
+    chosen_r = None
+    for rn, items in radius_groups:
+        # Build unique centers by clustering projected axis points
+        centers = []
+        for r, ap, av in items:
+            pp = _project_to_plane(ap, bp_p, bp_n)
+            if all(_dist(pp, c) > 0.8 for c in centers):
+                centers.append(pp)
+        if len(centers) >= 4:
+            chosen_r = rn
+            # take 4 that are farthest apart (simple: sort by x then take extremes; then fill)
+            centers_sorted = sorted(centers, key=lambda v: (v.x, v.y, v.z))
+            # keep first 4 distinct
+            mounting_centers = []
+            for c in centers_sorted:
+                if all(_dist(c, e) > 0.8 for e in mounting_centers):
+                    mounting_centers.append(c)
+                if len(mounting_centers) == 4:
+                    break
+            break
+
+    if len(mounting_centers) != 4:
+        print("WARNING: Did not find 4 mounting hole centers reliably; found:", len(mounting_centers))
+    else:
+        print(f"Chosen mounting-hole small-bore radius ~ {chosen_r:.3f} mm")
+        for i, c in enumerate(mounting_centers):
+            print(f"  mount_center[{i}] = ({c.x:.3f},{c.y:.3f},{c.z:.3f})")
+
+    # Define into-part direction from bottom face: into-part is opposite of outward normal
+    into_part = _unit(bp_n * -1.0)
+
+    # --- Operation 1: Add connecting hole Ø1.7 (through all), centered on pocket floor centroid ---
+    # Create a long cylinder along thickness axis passing through pocket center.
+    diag = sqrt(xlen * xlen + ylen * ylen + zlen * zlen)
+    hole_len = max(5 * diag, 200.0)
+
+    # Ensure drilling direction is aligned with thickness axis (not necessarily into_part)
+    drill_dir = _unit(thickness_axis)
+    # Base point far "below" the pocket center along -drill_dir so it spans through all
+    base_p = pocket_center - drill_dir * hole_len
+    hole_cyl = cq.Solid.makeCylinder(1.7 / 2.0, 2 * hole_len, base_p, drill_dir)
+
+    result = shape.cut(hole_cyl)
+
+    # --- Operation 2: Add 0.1mm deep grooves (3 rings per hole) on bottom base plane ---
+    groove_depth = 0.1
+    groove_w = 0.1
+    rings_per_hole = 3
+    start_offset = 0.3
+    pitch = 0.2
+
+    if chosen_r is None:
+        # fallback guess if we couldn't infer mounting hole radius
+        chosen_r = 2.0
+
+    groove_solids = []
+    for c in mounting_centers:
+        # Base point on bottom plane
+        c0 = _project_to_plane(c, bp_p, bp_n)
+        for i in range(rings_per_hole):
+            inner_r = chosen_r + start_offset + i * pitch
+            outer_r = inner_r + groove_w
+            outer = cq.Solid.makeCylinder(outer_r, groove_depth, c0, into_part)
+            inner = cq.Solid.makeCylinder(inner_r, groove_depth, c0, into_part)
+            ring = outer.cut(inner)
+            groove_solids.append(ring)
+
+    if groove_solids:
+        grooves = groove_solids[0]
+        for s in groove_solids[1:]:
+            grooves = grooves.fuse(s)
+        result = result.cut(grooves)
+        print(f"Grooves created: {len(groove_solids)} rings (expected {len(mounting_centers) * rings_per_hole}).")
+    else:
+        print("WARNING: No groove solids created (mounting centers not found).")
+
+    print("Edit complete (connecting hole + grooves).")
+    return cq.Workplane("XY").newObject([result])
+
+
+Program output:
+stdout: Loading function from: /home/adml/Research/Hackathon2026/IDETC26-Hackathon-Autodesk-neuralCAD-Edit/output/gpt-5.2-ours-full48/gpt-5.2-ours_cadquery-script_1787025535.3731432/brep_end/1787025535.3731432/temp_script.py
+BBOX lens: x=13.280 y=4.920 z=8.250
+Thickness axis index=1 vec=(0.0,1.0,0.0)
+Bottom face area=37.91 center=(6.26,-0.01,0.29) normal=(0.000,1.000,0.000)
+Pocket floor center=(11.95,0.59,1.12) area=1.31
+Cyl faces aligned to thickness axis: 29
+Chosen mounting-hole small-bore radius ~ 0.400 mm
+  mount_center[0] = (0.294,-0.010,-1.526)
+  mount_center[1] = (0.294,-0.010,1.474)
+  mount_center[2] = (11.954,-0.010,-2.986)
+  mount_center[3] = (11.954,-0.010,1.124)
+Grooves created: 12 rings (expected 12).
+Edit complete (connecting hole + grooves).
+Exported shape to: /home/adml/Research/Hackathon2026/IDETC26-Hackathon-Autodesk-neuralCAD-Edit/output/gpt-5.2-ours-full48/gpt-5.2-ours_cadquery-script_1787025535.3731432/brep_end/1787025535.3731432/tmp.step
+Exported STL to: /home/adml/Research/Hackathon2026/IDETC26-Hackathon-Autodesk-neuralCAD-Edit/output/gpt-5.2-ours-full48/gpt-5.2-ours_cadquery-script_1787025535.3731432/brep_end/1787025535.3731432/tmp.stl
+Exported PNG image to: /home/adml/Research/Hackathon2026/IDETC26-Hackathon-Autodesk-neuralCAD-Edit/output/gpt-5.2-ours-full48/gpt-5.2-ours_cadquery-script_1787025535.3731432/brep_end/1787025535.3731432/tmp.png
+Script completed.
+
+stderr: 
+
+Exported this iteration:
+tmp.step, tmp.stl, tmp.png, tmp_front.png, tmp_back.png, tmp_left.png, tmp_right.png, tmp_top.png, tmp_bottom.png, tmp_toprightiso.png

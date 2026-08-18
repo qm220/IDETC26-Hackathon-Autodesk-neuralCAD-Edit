@@ -1,0 +1,459 @@
+Now use all the given information:
+1. model.json file
+2. operation.json file
+3. Multiview images
+
+Decide which sections of the original model should be modified, removed, interacted with or if new sections should be created. Use as much information from the Multiview images, model.json files and operation.json as possible.
+
+Make this decision from several perspectives. If target clearly identify geometry, locate the corresponding section(s) and face(s) in model.json. If there is no clear geometry identified, use the referenced features and relational_constraint to identify potential sections and features. Additionally, consider the intention of the edit. Based on the function and behavior associated with each section and features, decide which section require the action the most. Then, find the corresponding section and face code from model.json.
+
+Plan out the modeling procedure needed to perform each action. Describe them in professional CAD modelling languages from choosing the plane, draw sketches to extrusion, add chamfers. Be thorough and detailed.
+
+face_code values in model.json are visual labels from shaded renders. Brep_id is the CadQuery Faces() index from the STEP analysis report (for example FACE 0).
+
+Edit operation.json accordingly. Keep the previous request_wording and actions, and add localization plus steps.
+
+OUTPUT FORMAT (JSON, operation.json, no markdown fences, use this schema):
+{
+  "request": "",
+  "request_wording": {
+    "action_words": ["..."],
+    "referenced_feature_words": ["..."],
+    "intention_words": ["..."],
+    "grammatical_words": ["..."]
+  },
+  "actions": [
+    {
+      "operation": "...",
+      "parameters": {
+        "parameter_name": "..."
+      },
+      "target": "...",
+      "relational_constraint": "...",
+      "unresolved_reference": "...",
+      "target section code": ["..."],
+      "target face code": ["..."],
+      "steps": [
+        "...",
+        "..."
+      ]
+    }
+  ],
+  "intention": ["..."]
+}
+
+The model.json, operation.json, and labeled multi-view images follow.
+
+
+model.json:
+
+{
+  "part": {
+    "name": "Saddle_Block_With_Bottom_Window",
+    "description": "Rectangular prismatic block (BBox 2 x 6 x 1.5) with a concave cylindrical saddle on the top side and a large rectangular window/pocket opened from the bottom. The bottom window has vertical walls (x=±0.8, y=±2.8) and a mixed ceiling made of a central concave cylindrical patch plus small flat end pads. Identified functional/structural features: top cylindrical cradle interface; top end flats (bearing/stop pads); bottom window/pocket (clearance/lightweighting); pocket ceiling (inner curved relief) and pocket end ceiling flats; outer perimeter structural walls; sharp/implicit edge breaks between pads/saddle and window frame.",
+    "source_views": [
+      "front",
+      "back",
+      "left",
+      "right",
+      "top",
+      "bottom",
+      "toprightiso"
+    ],
+    "symmetry_note": "Geometry is symmetric about the X=0 plane and Y=0 plane (mirrored left/right and end-to-end)."
+  },
+  "Section": [
+    {
+      "id": "S1",
+      "name": "Outer Structural Shell",
+      "features included": [
+        "Outer perimeter load-bearing walls",
+        "Bottom outer frame face (annular face around window opening)",
+        "External end faces",
+        "External side faces"
+      ],
+      "function intent": "Provide overall stiffness, define the outer envelope, and provide the primary load path between the top saddle interface and any external mounting/abutment surfaces.",
+      "physical behavior": "Acts as a short beam/block: carries compressive/bending loads from the top cradle into the full-width end blocks and side walls; the bottom frame around the window behaves as a ring/edge stiffener resisting local bending around the pocket opening.",
+      "geometry": "Prismatic outer block with full-width side faces at x=±1 and end faces at y=±3. Bottom face is a planar frame (outer rectangle with an inner rectangular cutout).",
+      "location": "Entire exterior boundary of the part (all outer faces except the top saddle surfaces).",
+      "colour": {
+        "R": 210,
+        "G": 140,
+        "B": 80
+      },
+      "major_faces": [
+        {
+          "face_code": "0000",
+          "name": "Bottom outer frame",
+          "Brep_id": "FACE 11",
+          "description": "Planar face at z=-0.75 with an inner rectangular opening (frame/ring around the bottom window)."
+        },
+        {
+          "face_code": "0001",
+          "name": "End face (-Y)",
+          "Brep_id": "FACE 14",
+          "description": "Outer planar end face at y=-3 (full width and height)."
+        },
+        {
+          "face_code": "0002",
+          "name": "Outer side face (+X)",
+          "Brep_id": "FACE 10",
+          "description": "Outer planar side face at x=+1 (full length in y and full height in z)."
+        },
+        {
+          "face_code": "0003",
+          "name": "End face (+Y)",
+          "Brep_id": "FACE 13",
+          "description": "Outer planar end face at y=+3 (full width and height)."
+        },
+        {
+          "face_code": "0004",
+          "name": "Outer side face (-X)",
+          "Brep_id": "FACE 12",
+          "description": "Outer planar side face at x=-1 (full length in y and full height in z)."
+        }
+      ],
+      "minor_faces_Brep_id": [],
+      "relationships": [
+        {
+          "source id": "S1",
+          "target id": "S2",
+          "function relationship": "transmits_load",
+          "structural relationship": "attached_to"
+        },
+        {
+          "source id": "S1",
+          "target id": "S3",
+          "function relationship": "provides_clearance",
+          "structural relationship": "contains"
+        }
+      ]
+    },
+    {
+      "id": "S2",
+      "name": "Top Saddle / Contact Interface",
+      "features included": [
+        "Concave cylindrical cradle surface",
+        "Top end flat pads (stop/bearing lands)"
+      ],
+      "function intent": "Locate and support a mating cylindrical/rounded component (or distribute contact pressure) while providing defined end pads that can act as stops or bearing lands.",
+      "physical behavior": "The concave cylindrical patch spreads contact load over a curved area (reducing peak stress) and tends to self-center a mating round component laterally. End flats provide local planar support and limit rocking/overtravel at the ends.",
+      "geometry": "One concave cylindrical surface spanning the central length region, with two planar top pads at the ends (z=+0.75) transitioning to the outer end faces.",
+      "location": "Top side of the part (z near +0.75), central region plus two end pads.",
+      "colour": {
+        "R": 70,
+        "G": 150,
+        "B": 220
+      },
+      "major_faces": [
+        {
+          "face_code": "0005",
+          "name": "Top end pad (-Y)",
+          "Brep_id": "FACE 8",
+          "description": "Planar top surface patch at z=+0.75 near the -Y end (y from -3 to about -2.4)."
+        },
+        {
+          "face_code": "0006",
+          "name": "Top saddle cylinder",
+          "Brep_id": "FACE 7",
+          "description": "Concave cylindrical surface forming the main saddle (cylinder radius 4.215, axis along X)."
+        },
+        {
+          "face_code": "0007",
+          "name": "Top end pad (+Y)",
+          "Brep_id": "FACE 9",
+          "description": "Planar top surface patch at z=+0.75 near the +Y end (y from about +2.4 to +3)."
+        }
+      ],
+      "minor_faces_Brep_id": [],
+      "relationships": [
+        {
+          "source id": "S2",
+          "target id": "S1",
+          "function relationship": "transmits_load",
+          "structural relationship": "shares_face"
+        },
+        {
+          "source id": "S2",
+          "target id": "S3",
+          "function relationship": "provides_clearance",
+          "structural relationship": "offset_from"
+        }
+      ]
+    },
+    {
+      "id": "S3",
+      "name": "Bottom Window / Pocket (Clearance & Lightweighting)",
+      "features included": [
+        "Bottom window opening (rectangular)",
+        "Pocket vertical walls (x=±0.8, y=±2.8)",
+        "Pocket ceiling (inner relief): central concave cylinder + end flats"
+      ],
+      "function intent": "Provide clearance for an underlying component or fastener envelope and reduce mass while preserving a perimeter frame for stiffness.",
+      "physical behavior": "Removes low-stress interior material to reduce weight; remaining vertical walls and ceiling act as local stiffeners defining the cavity boundaries. The concave ceiling can improve clearance to round components and reduce stress concentration compared to a sharp internal corner.",
+      "geometry": "Rectangular opening from the bottom with four vertical planar walls. The pocket ceiling is a central concave cylindrical patch (larger radius than the top saddle) blended by two small planar ceiling pads at the ends (z=+0.55).",
+      "location": "Bottom side interior, centered about the part origin; opening spans roughly x=±0.8 and y=±2.8, rising upward to the ceiling surfaces.",
+      "colour": {
+        "R": 130,
+        "G": 210,
+        "B": 120
+      },
+      "major_faces": [
+        {
+          "face_code": "0008",
+          "name": "Pocket wall (-Y)",
+          "Brep_id": "FACE 6",
+          "description": "Vertical planar wall at y=-2.8 forming the -Y side of the bottom window."
+        },
+        {
+          "face_code": "0009",
+          "name": "Pocket wall (+X)",
+          "Brep_id": "FACE 3",
+          "description": "Vertical planar wall at x=+0.8 forming the +X side of the bottom window."
+        },
+        {
+          "face_code": "0010",
+          "name": "Pocket wall (+Y)",
+          "Brep_id": "FACE 5",
+          "description": "Vertical planar wall at y=+2.8 forming the +Y side of the bottom window."
+        },
+        {
+          "face_code": "0011",
+          "name": "Pocket wall (-X)",
+          "Brep_id": "FACE 4",
+          "description": "Vertical planar wall at x=-0.8 forming the -X side of the bottom window."
+        },
+        {
+          "face_code": "0012",
+          "name": "Pocket ceiling pad (-Y)",
+          "Brep_id": "FACE 1",
+          "description": "Planar ceiling patch at z=+0.55 near the -Y end of the pocket (faces downward into the cavity)."
+        },
+        {
+          "face_code": "0013",
+          "name": "Pocket ceiling cylinder",
+          "Brep_id": "FACE 0",
+          "description": "Concave cylindrical ceiling inside the pocket (cylinder radius 4.415, axis along X), spanning the central pocket length."
+        },
+        {
+          "face_code": "0014",
+          "name": "Pocket ceiling pad (+Y)",
+          "Brep_id": "FACE 2",
+          "description": "Planar ceiling patch at z=+0.55 near the +Y end of the pocket (faces downward into the cavity)."
+        }
+      ],
+      "minor_faces_Brep_id": [],
+      "relationships": [
+        {
+          "source id": "S3",
+          "target id": "S1",
+          "function relationship": "provides_clearance",
+          "structural relationship": "contained_in"
+        },
+        {
+          "source id": "S3",
+          "target id": "S2",
+          "function relationship": "distributes_stress",
+          "structural relationship": "offset_from"
+        }
+      ]
+    }
+  ]
+}
+
+operation.json:
+
+{
+  "request": "Scale the part 10x. Add drafts of 2 degrees to all vertical surfaces, with flat bottom surface as a hinge. Add rounds R=1mm to all inner edges and R=3mm to all outer edges. Exclude edges, inner or outer, on the flat bottom surface. Add two cylinder features with D=6mm and inner hole D=3mm. Cylinders should be spaced 30mm apart and shall be placed centered with respect to the main part. They should start on the flat bottom surface level and reach all the way to the part wall on the top side",
+  "request_wording": {
+    "action_words": [
+      "Scale",
+      "10x",
+      "Add",
+      "drafts",
+      "2",
+      "degrees",
+      "Add",
+      "rounds",
+      "R=1mm",
+      "R=3mm",
+      "Exclude",
+      "Add",
+      "two",
+      "cylinder",
+      "features",
+      "D=6mm",
+      "inner",
+      "hole",
+      "D=3mm",
+      "spaced",
+      "30mm",
+      "apart",
+      "placed",
+      "centered",
+      "respect",
+      "start",
+      "level",
+      "reach",
+      "all",
+      "way"
+    ],
+    "referenced_feature_words": [
+      "part",
+      "vertical",
+      "surfaces",
+      "flat",
+      "bottom",
+      "surface",
+      "inner",
+      "edges",
+      "outer",
+      "edges",
+      "flat",
+      "bottom",
+      "surface",
+      "Cylinders",
+      "main",
+      "part",
+      "flat",
+      "bottom",
+      "surface",
+      "part",
+      "wall",
+      "top",
+      "side"
+    ],
+    "intention_words": [
+      "hinge"
+    ],
+    "grammatical_words": [
+      "the",
+      ".",
+      "of",
+      "to",
+      "all",
+      ",",
+      "with",
+      "as",
+      "a",
+      ".",
+      "to",
+      "all",
+      "and",
+      "to",
+      "all",
+      ".",
+      ",",
+      "or",
+      ",",
+      "on",
+      "the",
+      ".",
+      "with",
+      "and",
+      ".",
+      "should",
+      "be",
+      "and",
+      "shall",
+      "be",
+      "with",
+      "to",
+      "the",
+      ".",
+      "They",
+      "should",
+      "on",
+      "the",
+      "and",
+      "to",
+      "the",
+      "to",
+      "the",
+      "on",
+      "the"
+    ]
+  },
+  "actions": [
+    {
+      "operation": "Scale entire part uniformly",
+      "parameters": {
+        "scale_factor": "10"
+      },
+      "target": "the part",
+      "relational_constraint": "uniform 3D scale",
+      "unresolved_reference": "Scale reference point (e.g., model origin, centroid, or a specified datum) is not specified"
+    },
+    {
+      "operation": "Apply draft to vertical faces",
+      "parameters": {
+        "draft_angle_degrees": "2"
+      },
+      "target": "all vertical surfaces",
+      "relational_constraint": "use flat bottom surface as hinge/neutral plane for the draft",
+      "unresolved_reference": "Identify which faces qualify as 'vertical surfaces' relative to the flat bottom surface; draft pull direction relative to the bottom surface (e.g., normal to bottom) is implied but not explicitly stated"
+    },
+    {
+      "operation": "Apply fillets/rounds to inner edges (excluding bottom-surface edges)",
+      "parameters": {
+        "fillet_radius": "1mm"
+      },
+      "target": "all inner edges",
+      "relational_constraint": "exclude any inner edges that lie on the flat bottom surface",
+      "unresolved_reference": "Determine which edges are 'inner' vs 'outer'; identify the flat bottom surface and which edges are on it"
+    },
+    {
+      "operation": "Apply fillets/rounds to outer edges (excluding bottom-surface edges)",
+      "parameters": {
+        "fillet_radius": "3mm"
+      },
+      "target": "all outer edges",
+      "relational_constraint": "exclude any outer edges that lie on the flat bottom surface",
+      "unresolved_reference": "Determine which edges are 'outer' vs 'inner'; identify the flat bottom surface and which edges are on it"
+    },
+    {
+      "operation": "Create two cylindrical features with concentric inner holes",
+      "parameters": {
+        "quantity": "2",
+        "cylinder_outer_diameter": "6mm",
+        "inner_hole_diameter": "3mm",
+        "spacing_center_to_center": "30mm"
+      },
+      "target": "main part (new features added onto/into it)",
+      "relational_constraint": "two cylinders spaced 30mm apart; placed centered with respect to the main part; cylinder bases start coincident with the flat bottom surface level; cylinders extend upward until they reach the part wall on the top side",
+      "unresolved_reference": "Define 'centered with respect to the main part' (which datum/origin/centroid and which axis the 30mm spacing is along); identify the 'flat bottom surface'; identify the 'part wall on the top side' that sets the cylinder height/termination condition; whether cylinders are bosses added outward from the bottom or internal cylinders is not explicitly stated"
+    }
+  ],
+  "intention": [
+    "Use the flat bottom surface as the neutral/hinge reference for drafting so the bottom remains the controlling reference surface",
+    "Avoid modifying the flat bottom surface edges when adding rounds"
+  ]
+}
+
+View: front
+
+[IMAGE 0: /home/adml/Research/Hackathon2026/IDETC26-Hackathon-Autodesk-neuralCAD-Edit/data/edit_192_external/breps/F332D3FXML85WLR2_1770206316.138211_front.jpg]
+
+View: back
+
+[IMAGE 1: /home/adml/Research/Hackathon2026/IDETC26-Hackathon-Autodesk-neuralCAD-Edit/data/edit_192_external/breps/F332D3FXML85WLR2_1770206316.138211_back.jpg]
+
+View: left
+
+[IMAGE 2: /home/adml/Research/Hackathon2026/IDETC26-Hackathon-Autodesk-neuralCAD-Edit/data/edit_192_external/breps/F332D3FXML85WLR2_1770206316.138211_left.jpg]
+
+View: right
+
+[IMAGE 3: /home/adml/Research/Hackathon2026/IDETC26-Hackathon-Autodesk-neuralCAD-Edit/data/edit_192_external/breps/F332D3FXML85WLR2_1770206316.138211_right.jpg]
+
+View: top
+
+[IMAGE 4: /home/adml/Research/Hackathon2026/IDETC26-Hackathon-Autodesk-neuralCAD-Edit/data/edit_192_external/breps/F332D3FXML85WLR2_1770206316.138211_top.jpg]
+
+View: bottom
+
+[IMAGE 5: /home/adml/Research/Hackathon2026/IDETC26-Hackathon-Autodesk-neuralCAD-Edit/data/edit_192_external/breps/F332D3FXML85WLR2_1770206316.138211_bottom.jpg]
+
+View: toprightiso
+
+[IMAGE 6: /home/adml/Research/Hackathon2026/IDETC26-Hackathon-Autodesk-neuralCAD-Edit/data/edit_192_external/breps/F332D3FXML85WLR2_1770206316.138211_toprightiso.jpg]

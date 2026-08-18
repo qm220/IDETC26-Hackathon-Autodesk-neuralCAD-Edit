@@ -1,0 +1,123 @@
+{
+  "request": "Multiply amount of cylindrical feature to 4. Imagine this is a system of plant pots, so you need to add stability to that afterwards by adding another legs or ribs on the sides.",
+  "request_wording": {
+    "action_words": [
+      "Multiply",
+      "4",
+      "add",
+      "adding",
+      "another"
+    ],
+    "referenced_feature_words": [
+      "cylindrical",
+      "feature",
+      "legs",
+      "ribs",
+      "sides"
+    ],
+    "intention_words": [
+      "Imagine",
+      "system",
+      "plant",
+      "pots",
+      "stability"
+    ],
+    "grammatical_words": [
+      "amount",
+      "of",
+      "to",
+      "this",
+      "is",
+      "a",
+      "of",
+      "so",
+      "you",
+      "need",
+      "to",
+      "that",
+      "afterwards",
+      "by",
+      "or",
+      "on",
+      "the"
+    ]
+  },
+  "actions": [
+    {
+      "operation": "Modify the model so the cylindrical feature occurs 4 times (e.g., change pattern/instance count or duplicate the feature until there are 4 instances).",
+      "parameters": {
+        "instance_count": 4,
+        "pattern_type_assumption": "linear pattern along arm length",
+        "pattern_direction_reference": "arm length direction (parallel to main arm long axis; normal to right end face)",
+        "spacing_assumption": "equal spacing with end offsets to avoid the rounded nose and right end face",
+        "feature_set_to_pattern": "boss outer cylinder + blind bore cut + saddle blend"
+      },
+      "target": "cylindrical feature (existing)",
+      "relational_constraint": "Resulting total amount/count of the cylindrical feature should be 4. Instances should remain laterally centered on the arm and remain normal to the arm mounting surface, matching the existing boss orientation.",
+      "unresolved_reference": "Exact distribution/spacing is not specified; this plan assumes a linear pattern along the arm length while keeping the same lateral centering and boss orientation as the original.",
+      "target section code": [
+        "S3",
+        "S4",
+        "S5",
+        "S1"
+      ],
+      "target face code": [
+        "0008",
+        "0009",
+        "0010",
+        "0011",
+        "0007",
+        "0000",
+        "0004"
+      ],
+      "steps": [
+        "Identify the cylindrical feature intended for multiplication as the socket boss system (outer tube + inner blind bore) rather than the rounded nose: Section S3 (boss outer cylinder FACE 10 / face_code 0008 and boss top annulus FACE 11 / face_code 0009) together with Section S4 (bore wall FACE 3 / face_code 0010 and bore bottom FACE 4 / face_code 0011) and its transition Section S5 (saddle blend FACE 9 / face_code 0007).",
+        "Define/confirm the pattern direction as the main arm length axis by using the right end face plane (Section S1, FACE 7 / face_code 0004) as a reference normal; the pattern direction is parallel to the arm’s longitudinal axis (x direction per model.json notes).",
+        "Create a datum/reference plane for positioning if needed: use the arm top major plane (Section S1, FACE 6 / face_code 0000) as the placement reference so all bosses stay seated on the same arm surface with identical vertical orientation as the existing boss.",
+        "If the CAD history exists: select the boss creation feature(s) (boss extrusion/revolve) and associated bore cut feature(s), and include the boss-to-arm blend/fillet feature that generates the saddle (Section S5). Apply a Linear Feature Pattern with instance_count = 4 along the arm length direction.",
+        "If direct modeling (no stable feature history): create a feature set/body copy of the boss volume including the internal bore removal (i.e., copy the resulting boss-with-bore geometry) and the saddle region if it is part of the solid; then perform a Linear Body Pattern (or 3 copies + translate) along the arm length direction, and Boolean Union (merge) all patterned bosses into the main arm.",
+        "Set pattern extent/spacing so the first boss clears the rounded nose region (Section S2, FACE 0 / face_code 0006) and the last boss clears the right end face (Section S1, FACE 7 / face_code 0004). Use equal spacing between instances; keep each boss centerline laterally centered on the arm mid-plane (consistent with model symmetry note).",
+        "Rebuild/validate: ensure each of the 4 bosses retains the blind bore opening at the boss mouth (face_code 0009) and the bore bottom (face_code 0011) remains blind (does not break through into the arm). Confirm no self-intersections and that blends (face_code 0007) remain continuous at each boss/arm junction."
+      ]
+    },
+    {
+      "operation": "Add stability features by creating additional supports (legs and/or ribs) on the sides of the model.",
+      "parameters": {
+        "support_type_assumption": "paired side ribs (gussets) per boss, symmetric about the arm mid-plane",
+        "rib_profile_assumption": "triangular or trapezoidal web profile with filleted roots",
+        "rib_attachment_assumption": "ribs connect from arm side faces into boss outer cylinder/saddle region",
+        "fillet_assumption": "add edge fillets at rib roots for stress relief and manufacturability"
+      },
+      "target": "sides of the system/plant pot geometry (existing outer side faces/walls)",
+      "relational_constraint": "Supports should be added on the sides; performed after the cylindrical-feature multiplication. Supports should improve stability of the multi-pot system by increasing lateral stiffness and reducing tipping moments at each boss/arm junction.",
+      "unresolved_reference": "Leg vs rib choice and exact dimensions are not given; this plan prioritizes side ribs (gussets) because they directly stabilize each boss-to-arm junction and can be patterned to match the 4 bosses.",
+      "target section code": [
+        "S1",
+        "S3",
+        "S5"
+      ],
+      "target face code": [
+        "0002",
+        "0003",
+        "0008",
+        "0007",
+        "0000"
+      ],
+      "steps": [
+        "After the boss pattern is complete, choose the arm side faces as primary rib sketch planes: Section S1 side planes FACE 8 / face_code 0002 and FACE 5 / face_code 0003. These are the most direct interpretation of “on the sides” and provide stable planar sketch references.",
+        "For each boss location, create a rib (gusset) on each side of the arm (one on face_code 0002 and one on face_code 0003) to keep symmetry and prevent lateral rocking of the ‘plant pot’ bosses.",
+        "On side face_code 0002: start a sketch. Project/intersect key edges for reference: the outline/footprint region where the boss saddle meets the arm (guided by the saddle surface, Section S5 face_code 0007) and the boss outer cylinder silhouette (Section S3 face_code 0008).",
+        "Sketch a triangular/trapezoidal rib profile: base anchored on the arm side face, with the rib apex/upper edge aiming toward the boss/saddle region. Constrain the rib so it blends into the boss area (tangent/near-tangent visually) and spans a practical length along the arm (centered under the boss, extending forward/backward along the arm length).",
+        "Create the rib as an Extrude-Add (Join) normal to the side face sketch plane (i.e., extrude into the arm thickness direction) with ‘Up to Surface’ or ‘Up to Next’ so the rib terminates cleanly at the opposite side wall or a defined thickness. Ensure the rib merges with the main solid.",
+        "Repeat the same rib procedure on the opposite side face_code 0003, mirroring the sketch about the arm mid-plane (use the model symmetry note) so ribs are symmetric and do not shift the pot system’s center of mass.",
+        "Pattern the ribs to match the 4 boss instances: use the same linear pattern definition/direction used for the bosses along the arm length, with instance_count = 4, so each boss gets a left and right side rib pair.",
+        "Add stress-relief fillets along rib-to-arm and rib-to-boss intersections: apply fillets where the ribs meet the arm side faces (0002/0003) and where they approach the boss/saddle region (0008/0007). Use consistent radii to avoid sharp notches and to improve manufacturability and durability for a ‘plant pot’ load case (static weight + tipping moments).",
+        "Validate: check that rib additions do not intersect the bore opening region (boss mouth face_code 0009) and do not block insertion into the socket. Confirm that ribs increase the lateral envelope as intended and that all added features are merged into the single solid."
+      ]
+    }
+  ],
+  "intention": [
+    "Treat the model as a system of plant pots by interpreting the socket boss (outer tube + blind bore) as the pot/socket module to be replicated.",
+    "Increase stability of the overall system after increasing the number of cylindrical features by adding symmetric side ribs that stiffen each boss-to-arm junction and reduce tipping."
+  ]
+}

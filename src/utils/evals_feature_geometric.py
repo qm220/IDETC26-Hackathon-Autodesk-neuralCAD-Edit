@@ -324,6 +324,93 @@ def run_feature_gt_similarity_eval(config: dict, dbm: DatabaseManager, feature_k
             )
 
 
+def _latest_other_human_edit(dbm: DatabaseManager, request: dict):
+    """Latest human edit of this request that is not the requestor (GT)."""
+    gt_user = request.get("user")
+    best = None
+    best_t = -1.0
+    for edit in dbm.edits.find({"request": request["_id"]}):
+        if edit.get("user") == gt_user:
+            continue
+        user = dbm.users.find_one({"_id": edit["user"]})
+        if not user or not user.get("is_human"):
+            continue
+        t = float(edit.get("end_time") or 0)
+        if best is None or t >= best_t:
+            best, best_t = edit, t
+    return best
+
+
+def run_feature_human_similarity_eval(config: dict, dbm: DatabaseManager, feature_key: str = "stl", description: str = "chamfer similarity norm", distance_func=None, request_type: str = "edit", distance_func_kwargs=None, force=False):
+    """Score each non-GT edit against the other-human (human baseline) STL.
+
+    Writes ``{description} human`` onto the edit's ``similarity_eval`` rating.
+    Missing geometry is stored as 0.0 so failed runs are penalized.
+    """
+    if distance_func is None:
+        distance_func = chamfer_similarity_norm
+    human_sim_str = f"{description} human"
+    eval_users = set(config.get("benchmark_eval_users", {}).get(request_type, []))
+
+    for request in dbm.requests.find({"request_type": request_type}):
+        human_edit = _latest_other_human_edit(dbm, request)
+        if human_edit is None:
+            print(f"No other-human edit for request {request['_id']}; skipping human-ref metrics")
+            continue
+        human_brep = dbm.breps.find_one({"_id": human_edit.get("brep_end")})
+        human_feature = human_brep.get(feature_key) if human_brep else None
+        if human_feature is None:
+            print(f"Other-human edit {human_edit['_id']} has no {feature_key}; skipping")
+            continue
+
+        gt_user = request["user"]
+        for edit in dbm.edits.find({"request": request["_id"]}):
+            user = dbm.users.find_one({"_id": edit["user"]})
+            if not user:
+                continue
+            valid = False
+            if user["_id"] in eval_users:
+                valid = True
+            if "other human" in eval_users and user.get("is_human", True) and edit["user"] != gt_user:
+                valid = True
+            if "gt human" in eval_users and edit["user"] == gt_user:
+                valid = True
+            if not valid:
+                continue
+
+            if dbm.rating_exists("similarity_eval", edit["_id"]):
+                rating = dbm.ratings.find_one({"edit": edit["_id"], "user": "similarity_eval"})
+                rating_id = rating["_id"]
+                if not force and human_sim_str in rating:
+                    continue
+            else:
+                rating = {}
+                rating_id = dbm.insert_rating(user="similarity_eval", edit=edit["_id"])
+
+            if edit["_id"] == human_edit["_id"]:
+                score = 1.0
+            else:
+                brep_end = dbm.breps.find_one({"_id": edit.get("brep_end")})
+                edit_feature = brep_end.get(feature_key) if brep_end else None
+                if edit_feature is None:
+                    print(
+                        f"No {feature_key} for edit {edit['_id']}; {description} vs human = 0"
+                    )
+                    score = 0.0
+                else:
+                    print(
+                        f"Computing {description} vs human for edit {edit['_id']} "
+                        f"with human {human_edit['_id']} request {request['_id']}"
+                    )
+                    score = distance_func(
+                        human_feature, edit_feature, db=dbm, **(distance_func_kwargs or {})
+                    )
+                    if score != score:
+                        score = 0.0
+
+            dbm.ratings.update_one({"_id": rating_id}, {"$set": {human_sim_str: score}})
+
+
 def main():
     # Parse command-line arguments
     args = parse_args()

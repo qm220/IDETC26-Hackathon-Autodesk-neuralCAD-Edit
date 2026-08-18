@@ -1,0 +1,319 @@
+{
+  "turn": "3_localize",
+  "response_text": "{\n  \"request\": \"Make the part symmetrical with respect to ZX plane by adding lowered plateau to the bottom. Then add embossed text to the top to distinguish the top (text should be \\\"TOP\\\", Arial, 10mm height, 1mm raised above lowered plateau, not sticking out of the plateau, approximately centered to the middle).\",\n  \"request_wording\": {\n    \"action_words\": [\n      \"Make\",\n      \"symmetrical\",\n      \"adding\",\n      \"lowered\",\n      \"plateau\",\n      \"add\",\n      \"embossed\",\n      \"text\",\n      \"distinguish\",\n      \"text\",\n      \"should\",\n      \"\\\"TOP\\\"\",\n      \"Arial\",\n      \"10mm\",\n      \"height\",\n      \"1mm\",\n      \"raised\",\n      \"above\",\n      \"not\",\n      \"sticking\",\n      \"out\",\n      \"approximately\",\n      \"centered\"\n    ],\n    \"referenced_feature_words\": [\n      \"part\",\n      \"respect\",\n      \"ZX\",\n      \"plane\",\n      \"bottom\",\n      \"top\",\n      \"plateau\",\n      \"middle\"\n    ],\n    \"intention_words\": [\n      \"symmetrical\",\n      \"distinguish\"\n    ],\n    \"grammatical_words\": [\n      \"the\",\n      \"with\",\n      \"to\",\n      \"by\",\n      \"the\",\n      \"Then\",\n      \"to\",\n      \"the\",\n      \"to\",\n      \"the\",\n      \"(\",\n      \"should\",\n      \"be\",\n      \",\",\n      \",\",\n      \",\",\n      \",\",\n      \",\",\n      \",\",\n      \"of\",\n      \"the\",\n      \",\",\n      \"to\",\n      \"the\",\n      \")\",\n      \".\"\n    ]\n  },\n  \"actions\": [\n    {\n      \"operation\": \"Create a lowered plateau on the bottom such that the resulting part geometry is symmetric about the ZX plane (implement as a bottom recessed pocket that mirrors the existing top recessed pocket).\",\n      \"parameters\": {\n        \"plateau_depth\": \"1mm\",\n        \"corner_fillet_radius\": \"1mm\",\n        \"footprint_definition\": \"Mirror/copy of existing top pocket footprint (SEC_POCKET) projected onto bottom face\"\n      },\n      \"target\": \"Bottom side of the part (global bottom face) in the handle region between the ring-end and open-end heads\",\n      \"relational_constraint\": \"Final geometry must be symmetrical with respect to the ZX plane. The added bottom plateau must be the mirrored counterpart of the existing top pocket so that top-vs-bottom features are symmetric through the thickness.\",\n      \"unresolved_reference\": \"Confirm the model's ZX datum plane location. If the default ZX plane is not at the plate mid-thickness, create/use a mid-thickness datum plane (Y-mid) as the symmetry plane. If the intent is symmetry about the default ZX plane at y=0, then the part must be remodeled/repositioned; otherwise proceed assuming symmetry about the mid-thickness plane between top (face_code 0000) and bottom (face_code 0001).\",\n      \"target section code\": [\n        \"SEC_HANDLE\",\n        \"SEC_POCKET\"\n      ],\n      \"target face code\": [\n        \"0001\",\n        \"0000\",\n        \"0004\",\n        \"0005\",\n        \"0006\",\n        \"0007\",\n        \"0008\",\n        \"0009\",\n        \"0010\",\n        \"0011\",\n        \"0012\"\n      ],\n      \"steps\": [\n        \"Establish the symmetry reference: define/use a mid-thickness datum plane parallel to ZX and located halfway between the global top face (face_code 0000, y=15) and global bottom face (face_code 0001, y=0). (If the CAD system’s default ZX plane is already this midplane, reuse it.)\",\n        \"Identify the existing top pocket geometry to mirror: use SEC_POCKET faces as the footprint reference (pocket floor face_code 0004; side walls 0005 and 0009; end walls 0007 and 0011; corner fillets 0006, 0008, 0010, 0012).\",\n        \"Create the bottom lowered plateau by feature mirroring (preferred, robust): Mirror the entire top pocket cut feature (SEC_POCKET) across the mid-thickness ZX symmetry plane to the bottom side. Ensure the mirrored feature is a CUT with the same depth (1mm) and corner fillets (R=1).\",\n        \"If direct feature-mirror is unavailable, recreate by sketch + cut on the global bottom face (face_code 0001):\",\n        \"  a) Start a sketch on the bottom planar face (face_code 0001 / FACE 25).\",\n        \"  b) Project/convert the top pocket perimeter into the sketch (project edges corresponding to the boundary between top face 0000 and pocket walls 0005/0009/0007/0011), or dimension the rectangle using the known wall locations (approx x≈-7.491 to x≈+6.945; z≈-97.400 to z≈-6.152).\",\n        \"  c) Apply 4 sketch fillets radius 1mm at the pocket corners to match SEC_POCKET corner radii.\",\n        \"  d) Perform an extruded cut of 1mm into the part (toward +Y from the bottom face), creating the bottom pocket floor at y=1mm; end condition: Blind = 1mm.\",\n        \"Validate symmetry: run a symmetry check by mirroring the full body about the chosen ZX symmetry plane and comparing/boolean intersecting; confirm the only difference previously (top pocket) is now balanced by the new bottom pocket, producing symmetric top/bottom detailing through thickness.\"\n      ]\n    },\n    {\n      \"operation\": \"Add embossed (raised) text feature on the top recessed pocket floor using sketch text and a boss/extrude.\",\n      \"parameters\": {\n        \"text_string\": \"TOP\",\n        \"font\": \"Arial\",\n        \"text_height\": \"10mm\",\n        \"emboss_height\": \"1mm\",\n        \"emboss_direction\": \"Upward toward global top face\"\n      },\n      \"target\": \"Top side of the part, placed within the existing top recessed pocket (SEC_POCKET) so it does not protrude outside the pocket boundary in plan view\",\n      \"relational_constraint\": \"Text raised 1mm above the lowered plateau (top pocket floor). Text must not stick out of the plateau boundary (must be fully contained within the pocket perimeter). Text should be approximately centered to the middle of the pocket/part.\",\n      \"unresolved_reference\": \"Confirm whether 'middle' means the pocket center (recommended for containment) or the overall part centroid. If overall centroid is required, keep the text within the pocket by shifting only as far as allowed by pocket boundaries. Confirm whether 'not sticking out' refers only to plan-view containment or also to height (recommended: extrude 1mm from pocket floor so the text top is flush with the global top face).\",\n      \"target section code\": [\n        \"SEC_POCKET\",\n        \"SEC_HANDLE\"\n      ],\n      \"target face code\": [\n        \"0004\",\n        \"0000\",\n        \"0005\",\n        \"0007\",\n        \"0009\",\n        \"0011\"\n      ],\n      \"steps\": [\n        \"Select the pocket floor face as the sketch plane: pocket floor (face_code 0004 / FACE 1, planar at y=14).\",\n        \"Create a new sketch on face_code 0004.\",\n        \"Insert sketch text: content = \\\"TOP\\\"; font = Arial; text height = 10mm. Set text as a closed profile suitable for boss extrusion.\",\n        \"Constrain/locate the text:\",\n        \"  a) Define construction centerlines in the sketch aligned with the pocket’s midlines (midpoint between pocket long walls face_codes 0005 and 0009, and midpoint between pocket end walls face_codes 0007 and 0011).\",\n        \"  b) Constrain the text’s bounding box center to the intersection of these midlines (pocket center), yielding an approximately centered placement.\",\n        \"  c) Verify containment: ensure the entire text outline stays inside the pocket perimeter with a small margin to the pocket walls (do not cross the projected edges corresponding to pocket walls 0005/0009/0007/0011). If needed, slightly reduce text width via tracking/spacing or adjust placement while keeping height at 10mm.\",\n        \"Create the emboss as a boss extrusion from the pocket floor: extrude the text profile +1mm (toward +Y). Preferred end condition for robustness: 'Up to Face' selecting the global top face (face_code 0000 / FACE 24) so the raised text ends flush with the original top surface and is exactly 1mm above the pocket floor.\",\n        \"Boolean: Join/merge the embossed text solid with the base part.\",\n        \"Final check: confirm the embossed text is fully inside the pocket footprint in top view, and that the maximum text height does not exceed the global top face (i.e., it does not protrude above y=15 if using 'Up to Face').\"\n      ]\n    }\n  ],\n  \"intention\": [\n    \"Make the part symmetric about the ZX plane by balancing the existing top recessed pocket with an equivalent mirrored bottom recessed plateau, improving visual/functional symmetry through thickness.\",\n    \"Visually distinguish/mark the top side by adding a readable \\\"TOP\\\" emboss contained within the top pocket so it is protected and does not extend beyond the pocket boundary.\"\n  ]\n}",
+  "thinking_text": "**Examining symmetry in design**\n\nI need to output JSON for an updated operation file, focusing on localization and steps. The user wants to make a part symmetric with respect to the ZX plane, which is indeed at y=0 in standard coordinates. \n\nCurrently, the part has a thickness from 0 to 15 in the y-direction, which is not symmetric. They want to add a lowered plateau to the bottom, suggesting we need to shift or add a feature below y=0. But this idea of a \"lowered plateau\" might mean creating a recess that matches the top. It's puzzling how cutting might lead to symmetry; I’ll need to consider that!\n**Clarifying the symmetry issue**\n\nOkay, I realize that the bottom face is at y=0 and if I cut to create a pocket at y=1, that would introduce asymmetry relative to the ZX plane at y=0. For a mirror effect, I’d need a corresponding feature in the negative y direction, which isn’t there. \n\nAlternatively, maybe in their coordinate system, the ZX plane is seen as the midplane at y=7.5. The confusion arises because they mention the ZX plane instead of the XZ plane. If the part goes from y=0 to y=15, I still need to consider if it can be shifted.\n**Creating symmetry in the design**\n\nThe simplest solution involves mirroring the top recess onto the bottom to maintain symmetry around the midplane, which is at y=7.5 for a thickness of 15mm. By cutting inward with the same depth of 1mm and the same footprint, I can create a matching recess on the bottom. This keeps the part symmetric while leaving a web thickness of 13mm.\n\nHowever, the request also mentions adding a lowered plateau, implying I should create a recessed pocket on the bottom similar to the top pocket. So, I’ll proceed with the operation to create that bottom pocket as specified.\n**Defining the plateau outline**\n\nI need to identify the outline for the plateau by using the projected edges from the top pocket or parameters from specific pocket wall faces. However, on the bottom, those faces don’t exist yet, so I might create a new section called SEC_BOTTOM_PLATEAU.\n\nFor localization, I’ll reference the section codes SEC_HANDLE and SEC_POCKET, targeting the bottom face code for my sketch plane. I also need to enforce a relational constraint to ensure symmetry about the ZX plane and express the bottom pocket as a mirror of the top about the midplane. \n\nI’ll create a datum plane at Y=7.5 and plan to include embossed text on the top surface of the plateau, ensuring it’s raised 1mm but centered within the lowered plateau. This all links back to the initial recessed pocket idea.\n**Clarifying the text placement and operations**\n\nThe request specifies adding a lowered plateau on the bottom while also including embossed text raised 1mm above the top surface of the lowered plateau. But it looks like the text should be placed on the pocket floor, within the boundaries, and not simply sticking out. Since the top pocket already creates a plateau, I’ll ensure the text achieves a flush top at y=15.\n\nSo, I’ll create a bottom pocket and will mirror the top pocket's dimensions. I’ll ensure the text \"TOP\" fits within the pocket dimensions, create sketches, and adjust for symmetry where necessary, detailing everything in my JSON output.",
+  "response_json": {
+    "request": "Make the part symmetrical with respect to ZX plane by adding lowered plateau to the bottom. Then add embossed text to the top to distinguish the top (text should be \"TOP\", Arial, 10mm height, 1mm raised above lowered plateau, not sticking out of the plateau, approximately centered to the middle).",
+    "request_wording": {
+      "action_words": [
+        "Make",
+        "symmetrical",
+        "adding",
+        "lowered",
+        "plateau",
+        "add",
+        "embossed",
+        "text",
+        "distinguish",
+        "text",
+        "should",
+        "\"TOP\"",
+        "Arial",
+        "10mm",
+        "height",
+        "1mm",
+        "raised",
+        "above",
+        "not",
+        "sticking",
+        "out",
+        "approximately",
+        "centered"
+      ],
+      "referenced_feature_words": [
+        "part",
+        "respect",
+        "ZX",
+        "plane",
+        "bottom",
+        "top",
+        "plateau",
+        "middle"
+      ],
+      "intention_words": [
+        "symmetrical",
+        "distinguish"
+      ],
+      "grammatical_words": [
+        "the",
+        "with",
+        "to",
+        "by",
+        "the",
+        "Then",
+        "to",
+        "the",
+        "to",
+        "the",
+        "(",
+        "should",
+        "be",
+        ",",
+        ",",
+        ",",
+        ",",
+        ",",
+        ",",
+        "of",
+        "the",
+        ",",
+        "to",
+        "the",
+        ")",
+        "."
+      ]
+    },
+    "actions": [
+      {
+        "operation": "Create a lowered plateau on the bottom such that the resulting part geometry is symmetric about the ZX plane (implement as a bottom recessed pocket that mirrors the existing top recessed pocket).",
+        "parameters": {
+          "plateau_depth": "1mm",
+          "corner_fillet_radius": "1mm",
+          "footprint_definition": "Mirror/copy of existing top pocket footprint (SEC_POCKET) projected onto bottom face"
+        },
+        "target": "Bottom side of the part (global bottom face) in the handle region between the ring-end and open-end heads",
+        "relational_constraint": "Final geometry must be symmetrical with respect to the ZX plane. The added bottom plateau must be the mirrored counterpart of the existing top pocket so that top-vs-bottom features are symmetric through the thickness.",
+        "unresolved_reference": "Confirm the model's ZX datum plane location. If the default ZX plane is not at the plate mid-thickness, create/use a mid-thickness datum plane (Y-mid) as the symmetry plane. If the intent is symmetry about the default ZX plane at y=0, then the part must be remodeled/repositioned; otherwise proceed assuming symmetry about the mid-thickness plane between top (face_code 0000) and bottom (face_code 0001).",
+        "target section code": [
+          "SEC_HANDLE",
+          "SEC_POCKET"
+        ],
+        "target face code": [
+          "0001",
+          "0000",
+          "0004",
+          "0005",
+          "0006",
+          "0007",
+          "0008",
+          "0009",
+          "0010",
+          "0011",
+          "0012"
+        ],
+        "steps": [
+          "Establish the symmetry reference: define/use a mid-thickness datum plane parallel to ZX and located halfway between the global top face (face_code 0000, y=15) and global bottom face (face_code 0001, y=0). (If the CAD system’s default ZX plane is already this midplane, reuse it.)",
+          "Identify the existing top pocket geometry to mirror: use SEC_POCKET faces as the footprint reference (pocket floor face_code 0004; side walls 0005 and 0009; end walls 0007 and 0011; corner fillets 0006, 0008, 0010, 0012).",
+          "Create the bottom lowered plateau by feature mirroring (preferred, robust): Mirror the entire top pocket cut feature (SEC_POCKET) across the mid-thickness ZX symmetry plane to the bottom side. Ensure the mirrored feature is a CUT with the same depth (1mm) and corner fillets (R=1).",
+          "If direct feature-mirror is unavailable, recreate by sketch + cut on the global bottom face (face_code 0001):",
+          "  a) Start a sketch on the bottom planar face (face_code 0001 / FACE 25).",
+          "  b) Project/convert the top pocket perimeter into the sketch (project edges corresponding to the boundary between top face 0000 and pocket walls 0005/0009/0007/0011), or dimension the rectangle using the known wall locations (approx x≈-7.491 to x≈+6.945; z≈-97.400 to z≈-6.152).",
+          "  c) Apply 4 sketch fillets radius 1mm at the pocket corners to match SEC_POCKET corner radii.",
+          "  d) Perform an extruded cut of 1mm into the part (toward +Y from the bottom face), creating the bottom pocket floor at y=1mm; end condition: Blind = 1mm.",
+          "Validate symmetry: run a symmetry check by mirroring the full body about the chosen ZX symmetry plane and comparing/boolean intersecting; confirm the only difference previously (top pocket) is now balanced by the new bottom pocket, producing symmetric top/bottom detailing through thickness."
+        ]
+      },
+      {
+        "operation": "Add embossed (raised) text feature on the top recessed pocket floor using sketch text and a boss/extrude.",
+        "parameters": {
+          "text_string": "TOP",
+          "font": "Arial",
+          "text_height": "10mm",
+          "emboss_height": "1mm",
+          "emboss_direction": "Upward toward global top face"
+        },
+        "target": "Top side of the part, placed within the existing top recessed pocket (SEC_POCKET) so it does not protrude outside the pocket boundary in plan view",
+        "relational_constraint": "Text raised 1mm above the lowered plateau (top pocket floor). Text must not stick out of the plateau boundary (must be fully contained within the pocket perimeter). Text should be approximately centered to the middle of the pocket/part.",
+        "unresolved_reference": "Confirm whether 'middle' means the pocket center (recommended for containment) or the overall part centroid. If overall centroid is required, keep the text within the pocket by shifting only as far as allowed by pocket boundaries. Confirm whether 'not sticking out' refers only to plan-view containment or also to height (recommended: extrude 1mm from pocket floor so the text top is flush with the global top face).",
+        "target section code": [
+          "SEC_POCKET",
+          "SEC_HANDLE"
+        ],
+        "target face code": [
+          "0004",
+          "0000",
+          "0005",
+          "0007",
+          "0009",
+          "0011"
+        ],
+        "steps": [
+          "Select the pocket floor face as the sketch plane: pocket floor (face_code 0004 / FACE 1, planar at y=14).",
+          "Create a new sketch on face_code 0004.",
+          "Insert sketch text: content = \"TOP\"; font = Arial; text height = 10mm. Set text as a closed profile suitable for boss extrusion.",
+          "Constrain/locate the text:",
+          "  a) Define construction centerlines in the sketch aligned with the pocket’s midlines (midpoint between pocket long walls face_codes 0005 and 0009, and midpoint between pocket end walls face_codes 0007 and 0011).",
+          "  b) Constrain the text’s bounding box center to the intersection of these midlines (pocket center), yielding an approximately centered placement.",
+          "  c) Verify containment: ensure the entire text outline stays inside the pocket perimeter with a small margin to the pocket walls (do not cross the projected edges corresponding to pocket walls 0005/0009/0007/0011). If needed, slightly reduce text width via tracking/spacing or adjust placement while keeping height at 10mm.",
+          "Create the emboss as a boss extrusion from the pocket floor: extrude the text profile +1mm (toward +Y). Preferred end condition for robustness: 'Up to Face' selecting the global top face (face_code 0000 / FACE 24) so the raised text ends flush with the original top surface and is exactly 1mm above the pocket floor.",
+          "Boolean: Join/merge the embossed text solid with the base part.",
+          "Final check: confirm the embossed text is fully inside the pocket footprint in top view, and that the maximum text height does not exceed the global top face (i.e., it does not protrude above y=15 if using 'Up to Face')."
+        ]
+      }
+    ],
+    "intention": [
+      "Make the part symmetric about the ZX plane by balancing the existing top recessed pocket with an equivalent mirrored bottom recessed plateau, improving visual/functional symmetry through thickness.",
+      "Visually distinguish/mark the top side by adding a readable \"TOP\" emboss contained within the top pocket so it is protected and does not extend beyond the pocket boundary."
+    ]
+  },
+  "parsed_response": {
+    "request": "Make the part symmetrical with respect to ZX plane by adding lowered plateau to the bottom. Then add embossed text to the top to distinguish the top (text should be \"TOP\", Arial, 10mm height, 1mm raised above lowered plateau, not sticking out of the plateau, approximately centered to the middle).",
+    "request_wording": {
+      "action_words": [
+        "Make",
+        "symmetrical",
+        "adding",
+        "lowered",
+        "plateau",
+        "add",
+        "embossed",
+        "text",
+        "distinguish",
+        "text",
+        "should",
+        "\"TOP\"",
+        "Arial",
+        "10mm",
+        "height",
+        "1mm",
+        "raised",
+        "above",
+        "not",
+        "sticking",
+        "out",
+        "approximately",
+        "centered"
+      ],
+      "referenced_feature_words": [
+        "part",
+        "respect",
+        "ZX",
+        "plane",
+        "bottom",
+        "top",
+        "plateau",
+        "middle"
+      ],
+      "intention_words": [
+        "symmetrical",
+        "distinguish"
+      ],
+      "grammatical_words": [
+        "the",
+        "with",
+        "to",
+        "by",
+        "the",
+        "Then",
+        "to",
+        "the",
+        "to",
+        "the",
+        "(",
+        "should",
+        "be",
+        ",",
+        ",",
+        ",",
+        ",",
+        ",",
+        ",",
+        "of",
+        "the",
+        ",",
+        "to",
+        "the",
+        ")",
+        "."
+      ]
+    },
+    "actions": [
+      {
+        "operation": "Create a lowered plateau on the bottom such that the resulting part geometry is symmetric about the ZX plane (implement as a bottom recessed pocket that mirrors the existing top recessed pocket).",
+        "parameters": {
+          "plateau_depth": "1mm",
+          "corner_fillet_radius": "1mm",
+          "footprint_definition": "Mirror/copy of existing top pocket footprint (SEC_POCKET) projected onto bottom face"
+        },
+        "target": "Bottom side of the part (global bottom face) in the handle region between the ring-end and open-end heads",
+        "relational_constraint": "Final geometry must be symmetrical with respect to the ZX plane. The added bottom plateau must be the mirrored counterpart of the existing top pocket so that top-vs-bottom features are symmetric through the thickness.",
+        "unresolved_reference": "Confirm the model's ZX datum plane location. If the default ZX plane is not at the plate mid-thickness, create/use a mid-thickness datum plane (Y-mid) as the symmetry plane. If the intent is symmetry about the default ZX plane at y=0, then the part must be remodeled/repositioned; otherwise proceed assuming symmetry about the mid-thickness plane between top (face_code 0000) and bottom (face_code 0001).",
+        "target section code": [
+          "SEC_HANDLE",
+          "SEC_POCKET"
+        ],
+        "target face code": [
+          "0001",
+          "0000",
+          "0004",
+          "0005",
+          "0006",
+          "0007",
+          "0008",
+          "0009",
+          "0010",
+          "0011",
+          "0012"
+        ],
+        "steps": [
+          "Establish the symmetry reference: define/use a mid-thickness datum plane parallel to ZX and located halfway between the global top face (face_code 0000, y=15) and global bottom face (face_code 0001, y=0). (If the CAD system’s default ZX plane is already this midplane, reuse it.)",
+          "Identify the existing top pocket geometry to mirror: use SEC_POCKET faces as the footprint reference (pocket floor face_code 0004; side walls 0005 and 0009; end walls 0007 and 0011; corner fillets 0006, 0008, 0010, 0012).",
+          "Create the bottom lowered plateau by feature mirroring (preferred, robust): Mirror the entire top pocket cut feature (SEC_POCKET) across the mid-thickness ZX symmetry plane to the bottom side. Ensure the mirrored feature is a CUT with the same depth (1mm) and corner fillets (R=1).",
+          "If direct feature-mirror is unavailable, recreate by sketch + cut on the global bottom face (face_code 0001):",
+          "  a) Start a sketch on the bottom planar face (face_code 0001 / FACE 25).",
+          "  b) Project/convert the top pocket perimeter into the sketch (project edges corresponding to the boundary between top face 0000 and pocket walls 0005/0009/0007/0011), or dimension the rectangle using the known wall locations (approx x≈-7.491 to x≈+6.945; z≈-97.400 to z≈-6.152).",
+          "  c) Apply 4 sketch fillets radius 1mm at the pocket corners to match SEC_POCKET corner radii.",
+          "  d) Perform an extruded cut of 1mm into the part (toward +Y from the bottom face), creating the bottom pocket floor at y=1mm; end condition: Blind = 1mm.",
+          "Validate symmetry: run a symmetry check by mirroring the full body about the chosen ZX symmetry plane and comparing/boolean intersecting; confirm the only difference previously (top pocket) is now balanced by the new bottom pocket, producing symmetric top/bottom detailing through thickness."
+        ]
+      },
+      {
+        "operation": "Add embossed (raised) text feature on the top recessed pocket floor using sketch text and a boss/extrude.",
+        "parameters": {
+          "text_string": "TOP",
+          "font": "Arial",
+          "text_height": "10mm",
+          "emboss_height": "1mm",
+          "emboss_direction": "Upward toward global top face"
+        },
+        "target": "Top side of the part, placed within the existing top recessed pocket (SEC_POCKET) so it does not protrude outside the pocket boundary in plan view",
+        "relational_constraint": "Text raised 1mm above the lowered plateau (top pocket floor). Text must not stick out of the plateau boundary (must be fully contained within the pocket perimeter). Text should be approximately centered to the middle of the pocket/part.",
+        "unresolved_reference": "Confirm whether 'middle' means the pocket center (recommended for containment) or the overall part centroid. If overall centroid is required, keep the text within the pocket by shifting only as far as allowed by pocket boundaries. Confirm whether 'not sticking out' refers only to plan-view containment or also to height (recommended: extrude 1mm from pocket floor so the text top is flush with the global top face).",
+        "target section code": [
+          "SEC_POCKET",
+          "SEC_HANDLE"
+        ],
+        "target face code": [
+          "0004",
+          "0000",
+          "0005",
+          "0007",
+          "0009",
+          "0011"
+        ],
+        "steps": [
+          "Select the pocket floor face as the sketch plane: pocket floor (face_code 0004 / FACE 1, planar at y=14).",
+          "Create a new sketch on face_code 0004.",
+          "Insert sketch text: content = \"TOP\"; font = Arial; text height = 10mm. Set text as a closed profile suitable for boss extrusion.",
+          "Constrain/locate the text:",
+          "  a) Define construction centerlines in the sketch aligned with the pocket’s midlines (midpoint between pocket long walls face_codes 0005 and 0009, and midpoint between pocket end walls face_codes 0007 and 0011).",
+          "  b) Constrain the text’s bounding box center to the intersection of these midlines (pocket center), yielding an approximately centered placement.",
+          "  c) Verify containment: ensure the entire text outline stays inside the pocket perimeter with a small margin to the pocket walls (do not cross the projected edges corresponding to pocket walls 0005/0009/0007/0011). If needed, slightly reduce text width via tracking/spacing or adjust placement while keeping height at 10mm.",
+          "Create the emboss as a boss extrusion from the pocket floor: extrude the text profile +1mm (toward +Y). Preferred end condition for robustness: 'Up to Face' selecting the global top face (face_code 0000 / FACE 24) so the raised text ends flush with the original top surface and is exactly 1mm above the pocket floor.",
+          "Boolean: Join/merge the embossed text solid with the base part.",
+          "Final check: confirm the embossed text is fully inside the pocket footprint in top view, and that the maximum text height does not exceed the global top face (i.e., it does not protrude above y=15 if using 'Up to Face')."
+        ]
+      }
+    ],
+    "intention": [
+      "Make the part symmetric about the ZX plane by balancing the existing top recessed pocket with an equivalent mirrored bottom recessed plateau, improving visual/functional symmetry through thickness.",
+      "Visually distinguish/mark the top side by adding a readable \"TOP\" emboss contained within the top pocket so it is protected and does not extend beyond the pocket boundary."
+    ]
+  },
+  "token_counts": {
+    "input_tokens": 13274,
+    "output_tokens": 4007,
+    "total_tokens": 17281,
+    "cached_tokens": 0
+  }
+}

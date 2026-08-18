@@ -1,0 +1,122 @@
+def my_cad_function(args):
+    import cadquery as cq
+    import os
+
+    # --- Parameters (mm) ---
+    W = 200.0   # 20 cm
+    H = 100.0   # 10 cm
+    DEPTH = 30.0  # 3 cm
+    R = 10.0    # 1 cm corner radius
+
+    if "input_file" not in args:
+        raise ValueError("Expected args['input_file'] for edit operation")
+
+    input_file = os.path.expanduser(args["input_file"])
+    model = cq.importers.importStep(input_file)
+
+    # Underlying shape
+    shp = model.val() if hasattr(model, "val") else model
+    if shp is None:
+        raise ValueError("Failed to import STEP shape")
+
+    bbox = shp.BoundingBox()
+    print(f"BBox: xmin={bbox.xmin:.3f} xmax={bbox.xmax:.3f} xlen={bbox.xlen:.3f}")
+    print(f"      ymin={bbox.ymin:.3f} ymax={bbox.ymax:.3f} ylen={bbox.ylen:.3f}")
+    print(f"      zmin={bbox.zmin:.3f} zmax={bbox.zmax:.3f} zlen={bbox.zlen:.3f}")
+    c_model = bbox.center
+    print(f"BBox center: ({c_model.x:.3f}, {c_model.y:.3f}, {c_model.z:.3f})")
+
+    # --- Find a suitable rear planar face (normal ~ +/-Y) at either y-extreme ---
+    y_axis = cq.Vector(0, 1, 0)
+    tol_y = max(2.0, bbox.ylen * 0.01)  # mm
+
+    planar_y_faces = []  # (face, area, center, normal)
+    for f in shp.Faces():
+        try:
+            if f.geomType() != "PLANE":
+                continue
+            n = f.normalAt()  # usually ok at face center
+            if abs(n.dot(y_axis)) < 0.80:
+                continue
+            ctr = f.Center()
+            planar_y_faces.append((f, float(f.Area()), ctr, n))
+        except Exception:
+            continue
+
+    print(f"Candidate planar +/-Y faces: {len(planar_y_faces)}")
+    if not planar_y_faces:
+        # Fallback: just return original model with debug
+        print("No suitable planar +/-Y faces found; returning original model")
+        return model
+
+    def best_at_y(target_y):
+        near = [t for t in planar_y_faces if abs(t[2].y - target_y) <= tol_y]
+        if not near:
+            return None
+        return max(near, key=lambda t: t[1])
+
+    best_ymax = best_at_y(bbox.ymax)
+    best_ymin = best_at_y(bbox.ymin)
+
+    # Choose the side that has the larger planar face near the extreme
+    chosen = None
+    if best_ymax and best_ymin:
+        chosen = best_ymax if best_ymax[1] >= best_ymin[1] else best_ymin
+    else:
+        chosen = best_ymax or best_ymin
+
+    rear_face, rear_area, rear_ctr, rear_n = chosen
+    print(f"Chosen rear candidate: area={rear_area:.2f} at center=({rear_ctr.x:.2f},{rear_ctr.y:.2f},{rear_ctr.z:.2f}) normal=({rear_n.x:.3f},{rear_n.y:.3f},{rear_n.z:.3f})")
+
+    # Ensure the workplane normal points INTO the model (toward bbox center)
+    v_to_center = cq.Vector(c_model.x - rear_ctr.x, c_model.y - rear_ctr.y, c_model.z - rear_ctr.z)
+    n_in = rear_n
+    if n_in.dot(v_to_center) < 0:
+        n_in = n_in.multiply(-1)
+    print(f"Using cut normal (into model): ({n_in.x:.3f},{n_in.y:.3f},{n_in.z:.3f})")
+
+    # --- Compute placement: centered in X; bottom margin approx side margin ---
+    side_margin = (bbox.xlen - W) / 2.0
+    # If model is smaller than requested, keep margins non-negative
+    if side_margin < 0:
+        side_margin = 0.0
+    bottom_margin = side_margin
+
+    x_center = bbox.center.x
+    z_center = bbox.zmin + bottom_margin + H / 2.0
+
+    # Clamp to keep the rectangle within overall Z extent
+    z_min_allowed = bbox.zmin + H / 2.0 + 1.0
+    z_max_allowed = bbox.zmax - H / 2.0 - 1.0
+    if z_center < z_min_allowed:
+        z_center = z_min_allowed
+    if z_center > z_max_allowed:
+        z_center = z_max_allowed
+
+    print(f"Computed margins: side_margin={side_margin:.2f} bottom_margin={bottom_margin:.2f}")
+    print(f"Opening center target: x={x_center:.2f}, z={z_center:.2f}")
+
+    # Define a plane on the rear face (origin set to desired opening center)
+    # Choose xDir robustly (avoid near-parallel with normal)
+    x_dir = cq.Vector(1, 0, 0)
+    if abs(n_in.dot(x_dir)) > 0.95:
+        x_dir = cq.Vector(0, 0, 1)
+
+    # Use the rear face Y position (approx) for the sketch origin.
+    origin = cq.Vector(x_center, rear_ctr.y, z_center)
+    plane = cq.Plane(origin=origin, normal=n_in, xDir=x_dir)
+
+    # Build cutter: rounded rectangle extruded inward
+    cutter = (
+        cq.Workplane(plane)
+        .rect(W, H)
+        .vertices()
+        .fillet(R)
+        .extrude(DEPTH)
+    )
+
+    # Subtract from whole imported model (will open vent panel and pocket housing behind)
+    result = model.cut(cutter)
+
+    print("Applied rear opening cut.")
+    return result

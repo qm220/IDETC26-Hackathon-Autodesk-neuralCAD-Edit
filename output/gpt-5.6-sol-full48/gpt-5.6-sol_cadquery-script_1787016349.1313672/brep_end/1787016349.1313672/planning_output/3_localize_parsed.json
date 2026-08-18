@@ -1,0 +1,121 @@
+{
+  "request": "Design cylindrical bearing on the flat end of the part (the one without fillet). Create another 7 instances of this design and rotate them around the bearing axis.",
+  "request_wording": {
+    "action_words": [
+      "Design",
+      "cylindrical",
+      "Create",
+      "another",
+      "7",
+      "instances",
+      "rotate"
+    ],
+    "referenced_feature_words": [
+      "on",
+      "flat",
+      "end",
+      "part",
+      "one",
+      "without",
+      "fillet",
+      "this",
+      "design",
+      "them",
+      "around",
+      "bearing",
+      "axis"
+    ],
+    "intention_words": [
+      "bearing"
+    ],
+    "grammatical_words": [
+      "the",
+      "of",
+      "the",
+      "the",
+      "of",
+      "and",
+      "the"
+    ]
+  },
+  "actions": [
+    {
+      "operation": "Create a cylindrical bearing feature",
+      "parameters": {
+        "shape": "cylindrical"
+      },
+      "target": "The flat end of the existing part",
+      "relational_constraint": "Place the bearing on the flat end that is not filleted.",
+      "unresolved_reference": "The target is resolved as the square terminal face at x=80 mm. Bearing axial length, fit class, entry chamfer, and whether the bore is through or blind remain unspecified. If no separate bearing specification is supplied, the existing cylindrical mounting boss may be used as the dimensional precedent, with 14 mm outer diameter and 10 mm bore diameter.",
+      "target section code": [
+        "S01"
+      ],
+      "target face code": [
+        "0002"
+      ],
+      "steps": [
+        "Localize the non-filleted end as Section S01, Main arm, face code 0002, Brep_id FACE 7. This is the planar square terminal face at x=80 mm. The opposite end is excluded because it is the rounded nose formed by face code 0000, Brep_id FACE 0.",
+        "Use face 0002 as the sketch support plane. Orient the sketch in the local yz plane so that the bearing axis is normal to the terminal face and parallel to the global x direction.",
+        "Project or convert the perimeter of face 0002 into the sketch for reference. Locate the bearing center at the geometric center of the terminal face, nominally y=17 mm and z=4 mm based on the arm limits y=11 to 23 mm and z=2 to 6 mm.",
+        "Create two concentric circles for an annular cylindrical bearing or sleeve. Fully constrain both circles concentric to the terminal-face center. If the new bearing is intended to match the existing mounting interface in Section S03, use the existing boss dimensions as the initial design values: outer radius 7 mm and bore radius 5 mm.",
+        "Extrude the annular profile outward from face 0002 in the positive x direction. Use the specified bearing length when available; otherwise retain the length as a named design parameter rather than assigning an unsupported fixed value.",
+        "Use an additive extrusion joined to S01 when the bearing is intended to be integral with the arm. If it represents a replaceable bearing insert, create it as a separate solid or component and constrain its seating face coincident with face 0002.",
+        "If the bearing is modeled in two operations, first extrude the outer circular profile and then create a concentric bore cut along the same x-axis. Apply a through-all cut for a sleeve bearing unless a blind bearing seat is explicitly required.",
+        "Add a small lead-in chamfer to the exposed bore edge and, if required by manufacturing practice, to the exposed outer cylindrical edge. Keep the seating edge against face 0002 sharp unless a relief or transition fillet is specified.",
+        "Check that the bearing remains coaxial with the face-center datum and that the connection to S01 has sufficient material. The 14 mm precedent diameter is larger than the arm thickness, so the bearing will project above and below the broad arm faces, as expected for a terminal bearing housing.",
+        "Create a new logical feature or section for the terminal bearing while preserving S01 as the modified supporting section. Do not alter S02 or S03; S03 is only a functional and dimensional precedent for the new bearing interface."
+      ]
+    },
+    {
+      "operation": "Create additional instances of the bearing design",
+      "parameters": {
+        "additional_instance_count": "7"
+      },
+      "target": "The cylindrical bearing feature created by the previous action",
+      "relational_constraint": "Each new instance must be an instance of the same bearing design.",
+      "unresolved_reference": "The source feature is resolved as the new cylindrical bearing attached to S01 face 0002. A purely cylindrical bearing rotated about its own coaxial axis produces coincident geometry, so the practical interpretation is to instance the complete bearing-equipped design, or any non-axisymmetric bearing details, rather than duplicating only the rotationally symmetric sleeve.",
+      "target section code": [
+        "S01"
+      ],
+      "target face code": [
+        "0002"
+      ],
+      "steps": [
+        "Complete and validate the seed cylindrical bearing feature before creating the pattern. Use the bearing sketch center and extrusion direction to define a persistent bearing-axis datum.",
+        "Group the seed bearing and its dependent bore and chamfer features into a single patternable feature set so every occurrence remains parametrically identical.",
+        "Interpret the requested count as seven additional occurrences plus the original seed, producing eight total instances.",
+        "Where the design is an assembly, create seven linked component occurrences rather than independent copied solids so changes to the seed bearing propagate to every occurrence.",
+        "Where the design is a single multibody part, use a circular feature or body pattern. Select the complete bearing-equipped design as the pattern scope if distinct rotated results are required.",
+        "Do not Boolean-union exact duplicate cylindrical bearing bodies before checking the pattern result. Cylindrical sleeves sharing the same axis and location will overlap exactly and add no new geometry.",
+        "If the intended result is eight radial copies of the entire bossed mounting arm, include S01 and the newly created terminal bearing in the pattern scope while keeping S02 and S03 associated with each copied arm. If only the bearing is selected, retain the pattern parametrically but flag the coincident-instance condition for design review."
+      ]
+    },
+    {
+      "operation": "Rotate the additional bearing instances",
+      "parameters": {},
+      "target": "The 7 additional bearing instances",
+      "relational_constraint": "Rotate the instances around the bearing axis.",
+      "unresolved_reference": "The rotation axis is resolved as the cylindrical bearing axis normal to face 0002 and parallel to global x. The request does not explicitly state angular spacing; an equal 360-degree circular distribution is the standard interpretation, giving 45-degree spacing for eight total instances. Confirmation is required if a partial-angle distribution or a nonzero pattern radius was intended.",
+      "target section code": [
+        "S01"
+      ],
+      "target face code": [
+        "0002"
+      ],
+      "steps": [
+        "Select the persistent bearing-axis datum created from the center normal of S01 face 0002. Verify that it passes through the bearing center at the square terminal end and is parallel to global x.",
+        "Create a circular pattern about this bearing axis with eight total occurrences, comprising the original design and seven additional instances.",
+        "Use an equal full-circle distribution over 360 degrees. Set the angular increment to 45 degrees, placing the additional occurrences at 45, 90, 135, 180, 225, 270, and 315 degrees relative to the seed.",
+        "Maintain identical orientation through a rotational pattern rather than a translational copy. Preserve all concentric, coincident, and bore-axis relationships inherited from the seed.",
+        "If the patterned scope is the complete bearing-equipped arm, keep the occurrences as separate linked bodies or assembly components unless a merged radial structure is explicitly required.",
+        "If only the axisymmetric cylindrical bearing is patterned, run an interference and duplicate-geometry check. Exact overlap is expected because rotation about the bearing's own axis does not change its occupied volume.",
+        "Regenerate the model and inspect front, back, left, right, top, bottom, and isometric views. Confirm that the seed remains attached to face 0002, all occurrences share the same bearing axis, and the original rounded nose, boss transition, and existing boss geometry remain unchanged.",
+        "Perform a final clearance and manufacturability review. Confirm whether coincident bearings should be represented by one shared bearing with eight rotated arm occurrences, or whether the intended pattern requires a radial offset not supplied in the request."
+      ]
+    }
+  ],
+  "intention": [
+    "Provide bearing functionality at the non-filleted flat end of the part.",
+    "Create eight total parametrically identical occurrences distributed around the terminal bearing axis."
+  ]
+}

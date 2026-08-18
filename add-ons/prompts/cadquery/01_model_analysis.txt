@@ -1,0 +1,74 @@
+Analyze the attached multi-view images of a mechanical/CAD part (aim for
++Z, -Z, -X, +X, +Y, -Y, and isometric views iso1 / iso2 if available).
+Produce a single JSON file describing the part's structure. Follow these
+steps in order:
+
+1. FEATURE IDENTIFICATION
+   List distinct functional features (mounting points, joints, interfaces)
+   and structural features (ribs, shells, spines, cavities) visible across
+   the views.
+
+2. SECTIONING
+   Divide the part into logical sections. For each
+   section, capture: a short name, its relative location on
+   the part, and a plain-language description of its geometry. Assign a unique RGB colour for each section.
+
+3. For each section, reason about the FUNCTIONAL INTENT, the PHYSICAL BEHAVIOR of the section to perform the function.
+
+4. Analyse the RELATIONSHIPs between each sections. Two types of RELATIONSHIPS should be considered.
+   First, functional relationships, with a list of example relationships provided:
+   transmits_load, locates_mating_part, seals_against, guides_motion, provides_clearance,
+   constrains_dof, mounts_to, distributes_stress.
+   Second, structural relationships, with a list of example relationships provided:
+   shares_face, adjacent_to, coaxial_with, attached_to, contained_in, supports,
+   blends_into, offset_from.
+
+5. MAJOR SURFACE INVENTORY
+   Within each section, identify the MAJOR surfaces that are visually
+   distinguishable across the views (distinct flat facets, distinct
+   curved/cylindrical patches, especially fillet bands and chamfers) — not a full
+   CAD B-rep face count. Assign each face a unique 4-digit code (0000, 0001, ...)
+   sequential across the whole part. Give each face a short name and one-line
+   description. Note this is not an exact topological face count (which would
+   typically be much higher due to small fillet/blend faces invisible in
+   shaded renders), but include as many faces as you can.
+
+6. ADJACENCY ORDERING
+   Within each section's surface list, order the surfaces so each is
+   physically adjacent to its neighbors in the list (a walk across the
+   section, not an arbitrary order). If a section contains disconnected
+   sub-groups (e.g. two separate tabs that don't touch), order each
+   sub-group internally.
+
+7. A STEP file analysis report is also provided as a .txt file which includes the information of all the faces of this B-rep model. Analyse the information of the step model and match the major faces you identified before with the corresponding step face, identify their unique id.
+
+8. For the faces that are not matched up with major faces but within the STEP analysis report list. Categorise them into sections where they most likely belong. List their B-rep id from the STEP analysis report as minor faces for each section.
+
+OUTPUT FORMAT (JSON, model.json, no markdown fences, use this schema):
+{
+  "part": {"name": "", "description": "", "source_views": [], "symmetry_note": ""},
+  "Section": [
+    {
+      "id": "",
+      "name": "",
+      "features included": [],
+      "function intent": "",
+      "physical behavior": "",
+      "geometry": "",
+      "location": "",
+      "colour": {"R": 0, "G": 0, "B": 0},
+      "major_faces": [{"face_code": "0000", "name": "", "Brep_id": "FACE 0", "description": ""}],
+      "minor_faces_Brep_id": ["FACE 1", "FACE 2"],
+      "relationships": [
+        {
+          "source id": "",
+          "target id": "",
+          "function relationship": "",
+          "structural relationship": ""
+        }
+      ]
+    }
+  ]
+}
+
+Labeled multi-view images of the original part follow. The STEP B-rep analysis report follows after the images.

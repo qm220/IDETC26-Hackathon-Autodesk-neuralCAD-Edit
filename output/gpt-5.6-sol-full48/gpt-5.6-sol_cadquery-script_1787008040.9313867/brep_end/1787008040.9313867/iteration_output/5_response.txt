@@ -1,0 +1,300 @@
+Thinking text:
+**Diagnosing extrusion issues**
+
+I need to output JSON code for diagnosing two solids with potential issues in extrusion direction or coplanar overlap. The outer loop is set 0.5 beyond the aperture, which extrudes away. At the datum, the cross-section overlaps the frame’s volume, but there’s no volumetric overlap since the frame lies in the opposite direction. Fusion should occur if the outer annulus overlaps the frame area. I’ll need to consider adjustments and support offsets to ensure proper overlap and fusion.
+**Enhancing solid extrusion support**
+
+I need to better support solid extrusion from -0.5 to +5, focusing on the upper exposed edge at the datum. The geometry shows outer vertical overlaps, and the inner upper edge requires a fillet at the datum. However, if support starts at -0.5, the edge may disappear after fusion. I’ll create support from 0 to +5 and fuse it with a connector collar. Also, I want to extend the extrusion backward to help with the fillet at the top edge.
+**Fusing support and applying fillet**
+
+I could fuse the unfilleted support with overlap and then select the inner edge separating the S01 wall and support shelf to apply a fillet. This is a robust approach based on edge positions. The support prism starts at -0.5 and ends at +5, which results in an inner sidewall of 5.5. The transition edge might align with the source aperture boundary, as the support annulus appears to extend beyond the aperture and inward. The support blocks the aperture from -0.5 to +5, forming a solid union.
+**Evaluating solid dimensions**
+
+I’m analyzing how two solids support each other when located opposite. Usually, when they touch, they fuse into one, but here they only overlap at 0.5 in plane. The outer and inner apertures create some complexity. The dimensions seem huge, with a rear face that appears oddly shaped. I suspect the selected face area is too small, and I need to check the normal and identify the planar annular faces more robustly. This might involve some coding to select candidates correctly.
+**Identifying geometric features**
+
+I can create a geometry-based bounding box to identify the planar annular face using normals and area measurements. I need to select the likely rear face, which has two wires, while the model shows a broad front annular and a rear annular. Their areas seem to be around 107k and 65k, which makes me question the small area of 2569. The thin seating land might only be about 2.5k, but it should be consistent with the aperture dimensions. Also, it seems like the solids aren't fully attached. I should increase the attachment overlap by about 10 mm outward.
+
+Generated script:
+def my_cad_function(args):
+    import os
+    import math
+    import cadquery as cq
+
+    model = cq.importers.importStep(os.path.expanduser(args["input_file"]))
+    source = model.val()
+    if not source.isValid():
+        raise RuntimeError("Imported source model is invalid")
+
+    source_volume = source.Volume()
+    print("INPUT_VALID", source.isValid(), "VOLUME", source_volume)
+
+    # Identify the opposed planar sidewalls of the central aperture.
+    x_inner_faces = []
+    for face in source.Faces():
+        if face.geomType() != "PLANE" or face.Area() < 5000.0:
+            continue
+        center = face.Center()
+        try:
+            normal = face.normalAt(center).normalized()
+        except Exception:
+            continue
+        if abs(normal.x) > 0.99:
+            x_inner_faces.append(face)
+
+    if len(x_inner_faces) < 2:
+        raise RuntimeError("Could not identify both opposed aperture sidewalls")
+
+    x_inner_faces.sort(key=lambda f: f.Center().x)
+    left_center = x_inner_faces[0].Center()
+    right_center = x_inner_faces[-1].Center()
+    aperture_half_width = 0.5 * abs(right_center.x - left_center.x)
+    frame_center = cq.Vector(
+        0.5 * (left_center.x + right_center.x),
+        0.5 * (left_center.y + right_center.y),
+        0.5 * (left_center.z + right_center.z)
+    )
+
+    # Select the smaller planar annular face as the rear/bottom datum.
+    annular_faces = [
+        face for face in source.Faces()
+        if face.geomType() == "PLANE" and len(face.Wires()) >= 2
+    ]
+    if not annular_faces:
+        raise RuntimeError("Could not identify a planar rear annular datum")
+
+    print("ANNULAR_FACE_CANDIDATES", [round(f.Area(), 3) for f in annular_faces])
+    rear_face = min(annular_faces, key=lambda f: f.Area())
+    rear_center = rear_face.Center()
+    rear_normal = rear_face.normalAt(rear_center).normalized()
+
+    plane_constant = rear_center.dot(rear_normal)
+    datum_origin = frame_center + rear_normal.multiply(
+        plane_constant - frame_center.dot(rear_normal)
+    )
+
+    x_direction = cq.Vector(1.0, 0.0, 0.0)
+    y_direction = rear_normal.cross(x_direction).normalized()
+
+    # Recover the other aperture dimension from the long opposed sidewalls.
+    y_inner_faces = []
+    for face in source.Faces():
+        if face.geomType() != "PLANE" or face.Area() < 9000.0:
+            continue
+        center = face.Center()
+        try:
+            normal = face.normalAt(center).normalized()
+        except Exception:
+            continue
+        if abs(normal.dot(y_direction)) > 0.95:
+            y_inner_faces.append(face)
+
+    if len(y_inner_faces) >= 2:
+        y_positions = [
+            (face.Center() - frame_center).dot(y_direction)
+            for face in y_inner_faces
+        ]
+        aperture_half_height = 0.5 * (max(y_positions) - min(y_positions))
+    else:
+        aperture_half_height = 280.0
+        print("WARNING_USING_FALLBACK_APERTURE_HALF_HEIGHT", aperture_half_height)
+
+    print("REAR_DATUM_AREA", rear_face.Area())
+    print("REAR_NORMAL", rear_normal.x, rear_normal.y, rear_normal.z)
+    print("APERTURE_HALF_DIMS", aperture_half_width, aperture_half_height)
+
+    aperture_radius = 50.0
+    inward_offset = 20.0
+    support_height = 5.0
+    upper_fillet_radius = 2.0
+
+    support_inner_half_width = aperture_half_width - inward_offset
+    support_inner_half_height = aperture_half_height - inward_offset
+    support_inner_radius = aperture_radius - inward_offset
+
+    if support_inner_radius <= 0.0:
+        raise RuntimeError("The requested offset produces a nonpositive corner radius")
+    if support_inner_half_width <= support_inner_radius:
+        raise RuntimeError("The requested offset self-intersects across the aperture width")
+    if support_inner_half_height <= support_inner_radius:
+        raise RuntimeError("The requested offset self-intersects across the aperture height")
+
+    sketch_plane = cq.Plane(
+        origin=datum_origin,
+        xDir=x_direction,
+        normal=rear_normal
+    )
+
+    def rounded_rectangle_wire(half_width, half_height, radius, axial_offset=0.0):
+        if radius <= 0.0 or radius >= min(half_width, half_height):
+            raise ValueError("Invalid rounded-rectangle dimensions")
+
+        d = radius / math.sqrt(2.0)
+        local_points = [
+            (-half_width + radius, -half_height),
+            ( half_width - radius, -half_height),
+            ( half_width - radius + d, -half_height + radius - d),
+            ( half_width, -half_height + radius),
+            ( half_width,  half_height - radius),
+            ( half_width - radius + d, half_height - radius + d),
+            ( half_width - radius, half_height),
+            (-half_width + radius, half_height),
+            (-half_width + radius - d, half_height - radius + d),
+            (-half_width, half_height - radius),
+            (-half_width, -half_height + radius),
+            (-half_width + radius - d, -half_height + radius - d),
+            (-half_width + radius, -half_height)
+        ]
+        shift = rear_normal.multiply(axial_offset)
+        points = [
+            sketch_plane.toWorldCoords(cq.Vector(x, y, 0.0)) + shift
+            for x, y in local_points
+        ]
+        edges = [
+            cq.Edge.makeLine(points[0], points[1]),
+            cq.Edge.makeThreePointArc(points[1], points[2], points[3]),
+            cq.Edge.makeLine(points[3], points[4]),
+            cq.Edge.makeThreePointArc(points[4], points[5], points[6]),
+            cq.Edge.makeLine(points[6], points[7]),
+            cq.Edge.makeThreePointArc(points[7], points[8], points[9]),
+            cq.Edge.makeLine(points[9], points[10]),
+            cq.Edge.makeThreePointArc(points[10], points[11], points[12])
+        ]
+        return cq.Wire.assembleEdges(edges)
+
+    # Main 5 mm support. Its outer boundary extends only 2 mm into the existing
+    # frame footprint, while its inner boundary is offset 20 mm into the opening.
+    main_outer_allowance = 2.0
+    main_outer_wire = rounded_rectangle_wire(
+        aperture_half_width + main_outer_allowance,
+        aperture_half_height + main_outer_allowance,
+        aperture_radius + main_outer_allowance
+    )
+    main_inner_wire = rounded_rectangle_wire(
+        support_inner_half_width,
+        support_inner_half_height,
+        support_inner_radius
+    )
+
+    support = cq.Solid.extrudeLinear(
+        main_outer_wire,
+        [main_inner_wire],
+        rear_normal.multiply(support_height)
+    )
+    if not support.isValid():
+        raise RuntimeError("The unfilleted support extrusion is invalid")
+
+    # Apply R2 only to the inner edge of the support's upper cap. The two edge
+    # loops on the terminal underside are not selected and therefore stay sharp.
+    upper_caps = []
+    for face in support.Faces():
+        if face.geomType() != "PLANE" or len(face.Wires()) < 2:
+            continue
+        distance = (face.Center() - datum_origin).dot(rear_normal)
+        if abs(distance) < 1.0e-4:
+            upper_caps.append(face)
+
+    if not upper_caps:
+        raise RuntimeError("Could not identify the support upper cap")
+
+    upper_cap = max(upper_caps, key=lambda f: f.Area())
+    upper_inner_wire = min(
+        upper_cap.Wires(),
+        key=lambda w: sum(e.Length() for e in w.Edges())
+    )
+    upper_edges = upper_inner_wire.Edges()
+    print("TOP_FILLET_EDGE_COUNT", len(upper_edges))
+
+    support = cq.Workplane(obj=support).newObject(upper_edges).fillet(
+        upper_fillet_radius
+    ).val()
+    if not support.isValid():
+        raise RuntimeError("The support became invalid after the upper R2 fillet")
+
+    # A narrow hidden bonding collar crosses the rear datum. This creates true
+    # volumetric overlap with both the source and the main support, avoiding the
+    # unreliable face-only contact that left two solids in the previous result.
+    collar_inner_allowance = 0.75
+    collar_outer_allowance = 1.75
+    collar_back_depth = 3.0
+    collar_forward_depth = 1.0
+
+    collar_outer_wire = rounded_rectangle_wire(
+        aperture_half_width + collar_outer_allowance,
+        aperture_half_height + collar_outer_allowance,
+        aperture_radius + collar_outer_allowance,
+        axial_offset=-collar_back_depth
+    )
+    collar_inner_wire = rounded_rectangle_wire(
+        aperture_half_width + collar_inner_allowance,
+        aperture_half_height + collar_inner_allowance,
+        aperture_radius + collar_inner_allowance,
+        axial_offset=-collar_back_depth
+    )
+    collar = cq.Solid.extrudeLinear(
+        collar_outer_wire,
+        [collar_inner_wire],
+        rear_normal.multiply(collar_back_depth + collar_forward_depth)
+    )
+    if not collar.isValid():
+        raise RuntimeError("The hidden bonding collar is invalid")
+
+    source_with_collar = source.fuse(collar).clean()
+    print("SOURCE_COLLAR_SOLIDS", len(source_with_collar.Solids()))
+    if len(source_with_collar.Solids()) != 1:
+        raise RuntimeError("Bonding collar does not intersect the original frame")
+
+    result = source_with_collar.fuse(support).clean()
+
+    print("RESULT_VALID", result.isValid())
+    print("RESULT_SOLIDS", len(result.Solids()))
+    print("RESULT_VOLUME", result.Volume())
+    print("ADDED_VOLUME", result.Volume() - source_volume)
+    print("RESULT_FACES", len(result.Faces()), "RESULT_EDGES", len(result.Edges()))
+
+    if not result.isValid():
+        raise RuntimeError("The modified frame is not a valid solid")
+    if len(result.Solids()) != 1:
+        raise RuntimeError("The supporting step still did not fuse into one solid")
+    if result.Volume() <= source_volume:
+        raise RuntimeError("No supporting material was added")
+
+    # Check for a planar terminal face exactly 5 mm from the rear datum.
+    bottom_faces = []
+    for face in result.Faces():
+        if face.geomType() != "PLANE":
+            continue
+        distance = (face.Center() - datum_origin).dot(rear_normal)
+        if abs(distance - support_height) < 1.0e-3:
+            bottom_faces.append(face)
+    print("FLAT_BOTTOM_FACE_COUNT", len(bottom_faces))
+    if not bottom_faces:
+        raise RuntimeError("No flat support underside was found at the required 5 mm depth")
+
+    return cq.Workplane(obj=result)
+
+
+Program output:
+stdout: Loading function from: /home/adml/Research/Hackathon2026/IDETC26-Hackathon-Autodesk-neuralCAD-Edit/output/gpt-5.6-sol-full48/gpt-5.6-sol_cadquery-script_1787008040.9313867/brep_end/1787008040.9313867/temp_script.py
+INPUT_VALID True VOLUME 611785.5001093379
+ANNULAR_FACE_CANDIDATES [23355.0, 2569.867]
+REAR_DATUM_AREA 2569.8672286268556
+REAR_NORMAL 1.0087683573881802e-16 0.9659258262890682 -0.2588190451025211
+APERTURE_HALF_DIMS 380.0 280.0000000000002
+TOP_FILLET_EDGE_COUNT 8
+SOURCE_COLLAR_SOLIDS 1
+RESULT_VALID True
+RESULT_SOLIDS 1
+RESULT_VOLUME 884877.7341838249
+ADDED_VOLUME 273092.234074487
+RESULT_FACES 101 RESULT_EDGES 224
+FLAT_BOTTOM_FACE_COUNT 1
+Exported shape to: /home/adml/Research/Hackathon2026/IDETC26-Hackathon-Autodesk-neuralCAD-Edit/output/gpt-5.6-sol-full48/gpt-5.6-sol_cadquery-script_1787008040.9313867/brep_end/1787008040.9313867/tmp.step
+Exported STL to: /home/adml/Research/Hackathon2026/IDETC26-Hackathon-Autodesk-neuralCAD-Edit/output/gpt-5.6-sol-full48/gpt-5.6-sol_cadquery-script_1787008040.9313867/brep_end/1787008040.9313867/tmp.stl
+Exported PNG image to: /home/adml/Research/Hackathon2026/IDETC26-Hackathon-Autodesk-neuralCAD-Edit/output/gpt-5.6-sol-full48/gpt-5.6-sol_cadquery-script_1787008040.9313867/brep_end/1787008040.9313867/tmp.png
+Script completed.
+
+stderr: 
+
+Exported this iteration:
+tmp.step, tmp.stl, tmp.png, tmp_front.png, tmp_back.png, tmp_left.png, tmp_right.png, tmp_top.png, tmp_bottom.png, tmp_toprightiso.png

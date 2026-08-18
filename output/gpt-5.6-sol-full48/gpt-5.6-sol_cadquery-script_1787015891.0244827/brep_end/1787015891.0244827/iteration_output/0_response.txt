@@ -1,0 +1,99 @@
+Thinking text:
+
+
+Generated script:
+def my_cad_function(args):
+    import os
+
+    input_file = os.path.expanduser(args["input_file"])
+    imported = cq.importers.importStep(input_file)
+
+    solids = imported.solids().vals()
+    if not solids:
+        raise ValueError("The input STEP file contains no solid bodies")
+
+    original = solids[0]
+    for extra_solid in solids[1:]:
+        original = original.fuse(extra_solid)
+    original = original.clean()
+
+    bbox = original.BoundingBox()
+    print("Input bounding box: "
+          f"x=[{bbox.xmin:.6f}, {bbox.xmax:.6f}], "
+          f"y=[{bbox.ymin:.6f}, {bbox.ymax:.6f}], "
+          f"z=[{bbox.zmin:.6f}, {bbox.zmax:.6f}]")
+    print(f"Input volume: {original.Volume():.6f} mm^3")
+    print(f"Input face count: {len(original.Faces())}")
+
+    # Extract the planar end face at the non-rounded, maximum-X end.
+    end_faces = []
+    tolerance = max(1.0e-5, bbox.xlen * 1.0e-7)
+    for face in original.Faces():
+        face_bbox = face.BoundingBox()
+        if (face.geomType() == "PLANE" and
+                face_bbox.xlen <= tolerance and
+                abs(face_bbox.xmax - bbox.xmax) <= tolerance):
+            end_faces.append(face)
+
+    if not end_faces:
+        raise ValueError("Could not identify the planar non-rounded terminal face")
+
+    terminal_face = max(end_faces, key=lambda f: f.Area())
+    terminal_center = terminal_face.Center()
+    mirror_x = terminal_center.x
+    print(f"Resolved non-rounded terminal plane at x={mirror_x:.6f} mm")
+    print(f"Terminal face area: {terminal_face.Area():.6f} mm^2")
+    print(f"Terminal face center: ({terminal_center.x:.6f}, "
+          f"{terminal_center.y:.6f}, {terminal_center.z:.6f})")
+
+    # Reflect the complete original solid about the YZ-oriented datum plane
+    # coincident with the square terminal face.
+    mirrored = original.mirror(
+        mirrorPlane="YZ",
+        basePointVector=(mirror_x, 0.0, 0.0)
+    )
+
+    # Fuse the face-coincident bodies and remove the redundant seam/splitters.
+    result = original.fuse(mirrored).clean()
+
+    result_solids = result.Solids()
+    result_bbox = result.BoundingBox()
+    print(f"Result is valid: {result.isValid()}")
+    print(f"Result solid count: {len(result_solids)}")
+    print(f"Result volume: {result.Volume():.6f} mm^3")
+    print("Result bounding box: "
+          f"x=[{result_bbox.xmin:.6f}, {result_bbox.xmax:.6f}], "
+          f"y=[{result_bbox.ymin:.6f}, {result_bbox.ymax:.6f}], "
+          f"z=[{result_bbox.zmin:.6f}, {result_bbox.zmax:.6f}]")
+
+    if not result.isValid():
+        raise ValueError("The mirrored Boolean union produced an invalid shape")
+    if len(result_solids) != 1:
+        raise ValueError(
+            f"Expected one unified solid after mirroring, found {len(result_solids)}"
+        )
+
+    return cq.Workplane(obj=result)
+
+
+Program output:
+stdout: Loading function from: /home/adml/Research/Hackathon2026/IDETC26-Hackathon-Autodesk-neuralCAD-Edit/output/gpt-5.6-sol-full48/gpt-5.6-sol_cadquery-script_1787015891.0244827/brep_end/1787015891.0244827/temp_script.py
+Input bounding box: x=[-25.000000, 80.000000], y=[11.000000, 34.000000], z=[-3.000000, 11.000000]
+Input volume: 6052.471694 mm^3
+Input face count: 12
+Resolved non-rounded terminal plane at x=80.000000 mm
+Terminal face area: 48.000000 mm^2
+Terminal face center: (80.000000, 17.000000, 4.000000)
+Result is valid: True
+Result solid count: 1
+Result volume: 12104.858578 mm^3
+Result bounding box: x=[-25.000000, 185.000000], y=[11.000000, 34.000000], z=[-3.000000, 11.000000]
+Exported shape to: /home/adml/Research/Hackathon2026/IDETC26-Hackathon-Autodesk-neuralCAD-Edit/output/gpt-5.6-sol-full48/gpt-5.6-sol_cadquery-script_1787015891.0244827/brep_end/1787015891.0244827/tmp.step
+Exported STL to: /home/adml/Research/Hackathon2026/IDETC26-Hackathon-Autodesk-neuralCAD-Edit/output/gpt-5.6-sol-full48/gpt-5.6-sol_cadquery-script_1787015891.0244827/brep_end/1787015891.0244827/tmp.stl
+Exported PNG image to: /home/adml/Research/Hackathon2026/IDETC26-Hackathon-Autodesk-neuralCAD-Edit/output/gpt-5.6-sol-full48/gpt-5.6-sol_cadquery-script_1787015891.0244827/brep_end/1787015891.0244827/tmp.png
+Script completed.
+
+stderr: 
+
+Exported this iteration:
+tmp.step, tmp.stl, tmp.png, tmp_front.png, tmp_back.png, tmp_left.png, tmp_right.png, tmp_top.png, tmp_bottom.png, tmp_toprightiso.png

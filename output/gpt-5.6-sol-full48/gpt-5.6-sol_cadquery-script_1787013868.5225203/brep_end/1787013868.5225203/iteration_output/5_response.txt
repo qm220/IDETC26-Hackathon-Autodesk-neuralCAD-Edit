@@ -1,0 +1,326 @@
+Thinking text:
+**Exploring 3D edge improvements**
+
+I'm planning how to define horizontal and perpendicular edges in a 3D orthographic view, considering the socket axis and selecting straight transverse lines. I want to improve all the edges, maybe by reconstructing using a 2D profile extruded along the z-axis. I’m thinking about filleting edges, especially for the target radius. There seems to be complexity with the bottom segments, and I need to clearly identify shoulder edges to make modifications possible.
+**Analyzing edge configurations**
+
+I’m trying to understand why I changed my approach. First, I need to set the spine at z0=-450 and select the R20 radius for the top and bottom, aiming for likely four candidates. I’m considering filleting edges with R5 to avoid sharp edges and examining possible segments outside the spine. Constructing a pocket cutter with a rounded box could help guarantee those R5 edges. I’ll outline a pocket as a rounded rectangular prism, which would help create the desired concave features.
+**Refining pocket cutter design**
+
+I’m planning to use a box cutter to fillet all 12 edges with an R5 radius before making any cuts. However, I realize that the opening intersects the outer face, making the outside fillet irrelevant. I’ll extend the rounded box cutter outside the y-axis to create the pocket perimeter. Since the intersection might leave sharp edges, I need to apply fillets to the cavity opening after cutting. A rounded box cutter with R5 edges will help smooth transitions at the inner end.
+**Evaluating cutter geometry**
+
+I'm thinking about the opening edge of a cutter, focusing on the resulting cavity. The cutter's rounded exterior means that at y=230, the section near the end only extends 5 mm into the cutter. This section meets the y230 tangent plane where the cutter’s profile is fully formed. I wonder about the tangent transition of the cavity at this point. It might be reasonable to apply a fillet to the edges near y230 after the cut, resulting in rounded box dimensions being feasible.
+**Considering pocket applications**
+
+I'm thinking about how to apply pockets after the external elements. I want to group all sharp fillet edges together, considering that the cutter is rounded. The only sharp lines or arcs remain at the opening perimeter. Interestingly, the inner cutter isn't sharp anymore. I realize I need my code to be robust to handle this effectively. Right now, I can't assess new output, so it’s probably best to return false and focus on reconstruction.
+
+Generated script:
+def my_cad_function(args):
+    import cadquery as cq
+    import os
+    import math
+
+    source = cq.importers.importStep(os.path.expanduser(args['input_file']))
+    src = source.val()
+    bb = src.BoundingBox()
+    print('SOURCE_VALID', src.isValid())
+    print('SOURCE_BBOX', bb.xmin, bb.xmax, bb.ymin, bb.ymax, bb.zmin, bb.zmax)
+
+    x0, x1 = bb.xmin, bb.xmax
+    y0, y1 = bb.ymin, bb.ymax
+    z0, z1 = bb.zmin, bb.zmax
+
+    junction_x = 100.0
+    spine_y0 = 230.0
+    spine_y1 = 295.0
+    spine_mid_y = 0.5 * (spine_y0 + spine_y1)
+
+    # Reconstruct the unblended parent geometry. Both the housing and spine
+    # now share the same top and bottom levels. This removes the unintended
+    # one-sided external step as well as every legacy chamfer and radius.
+    housing = (
+        cq.Workplane('XY', origin=(x0, y0, z0))
+        .box(junction_x - x0, y1 - y0, z1 - z0,
+             centered=(False, False, False))
+    )
+    spine = (
+        cq.Workplane('XY', origin=(junction_x, spine_y0, z0))
+        .box(x1 - junction_x, spine_y1 - spine_y0, z1 - z0,
+             centered=(False, False, False))
+    )
+    solid = housing.union(spine).combine().clean().val()
+    print('SHARP_PARENT_VALID', solid.isValid(), 'FACES', len(solid.Faces()))
+
+    def is_line(edge):
+        try:
+            return edge.geomType() == 'LINE'
+        except Exception:
+            return False
+
+    def edge_axis(edge):
+        eb = edge.BoundingBox()
+        dims = (eb.xlen, eb.ylen, eb.zlen)
+        return max(range(3), key=lambda i: dims[i])
+
+    def adjacent_faces(shape, edge):
+        result = []
+        for face in shape.Faces():
+            for candidate in face.Edges():
+                try:
+                    same = edge.isSame(candidate)
+                except Exception:
+                    same = edge.hashCode() == candidate.hashCode()
+                if same:
+                    result.append(face)
+                    break
+        return result
+
+    def is_sharp(shape, edge):
+        faces = adjacent_faces(shape, edge)
+        if len(faces) != 2:
+            return False
+        c = edge.Center()
+        try:
+            n1 = faces[0].normalAt(c)
+            n2 = faces[1].normalAt(c)
+            l1 = math.sqrt(n1.x*n1.x + n1.y*n1.y + n1.z*n1.z)
+            l2 = math.sqrt(n2.x*n2.x + n2.y*n2.y + n2.z*n2.z)
+            if l1 < 1e-9 or l2 < 1e-9:
+                return True
+            dot = abs((n1.x*n2.x + n1.y*n2.y + n1.z*n2.z) / (l1*l2))
+            return dot < 0.985
+        except Exception:
+            return True
+
+    def sharp_edges(shape):
+        return [e for e in shape.Edges() if is_sharp(shape, e)]
+
+    def sharp_lines(shape):
+        return [e for e in shape.Edges() if is_line(e) and is_sharp(shape, e)]
+
+    # R20 applies to all four transverse horizontal shoulder edges: the two
+    # top segments and the corresponding two bottom segments at x=100.
+    r20_edges = []
+    for edge in solid.Edges():
+        if not is_line(edge) or edge_axis(edge) != 1:
+            continue
+        c = edge.Center()
+        eb = edge.BoundingBox()
+        at_junction = abs(c.x - junction_x) < 1e-4
+        at_horizontal_skin = min(abs(c.z - z0), abs(c.z - z1)) < 1e-4
+        outside_spine_width = (c.y < spine_y0 - 1e-4 or
+                               c.y > spine_y1 + 1e-4)
+        if (at_junction and at_horizontal_skin and outside_spine_width and
+                eb.ylen > 1.0 and eb.xlen < 1e-5 and eb.zlen < 1e-5):
+            r20_edges.append(edge)
+
+    print('R20_CANDIDATES', len(r20_edges))
+    if len(r20_edges) != 4:
+        print('R20_WARNING expected 4 shoulder edges')
+    if r20_edges:
+        trial = cq.Workplane(obj=solid).newObject(r20_edges).fillet(20.0).val()
+        if not trial.isValid():
+            raise RuntimeError('R20 shoulder fillets produced an invalid solid')
+        solid = trial.clean()
+        print('R20_SUCCEEDED', len(r20_edges))
+
+    def apply_r5_group(name, predicate):
+        nonlocal solid
+        targets = [e for e in sharp_lines(solid) if predicate(e)]
+        print('R5_GROUP_CANDIDATES', name, len(targets))
+        if not targets:
+            return
+
+        try:
+            trial = cq.Workplane(obj=solid).newObject(targets).fillet(5.0).val()
+            if trial.isValid():
+                solid = trial.clean()
+                print('R5_GROUP_SUCCEEDED', name, len(targets))
+                return
+        except Exception as exc:
+            print('R5_GROUP_RETRY', name, str(exc)[:140])
+
+        # Greedy fallback, re-identifying each edge after every topology change.
+        keys = []
+        for edge in targets:
+            c = edge.Center()
+            keys.append((c.x, c.y, c.z, edge.Length(), edge_axis(edge)))
+
+        succeeded = 0
+        conflicts = 0
+        for key in keys:
+            candidates = [e for e in sharp_lines(solid)
+                          if predicate(e) and edge_axis(e) == key[4]]
+            if not candidates:
+                continue
+            edge = min(candidates, key=lambda e:
+                (e.Center().x-key[0])**2 +
+                (e.Center().y-key[1])**2 +
+                (e.Center().z-key[2])**2 +
+                0.0025*(e.Length()-key[3])**2)
+            try:
+                trial = cq.Workplane(obj=solid).newObject([edge]).fillet(5.0).val()
+                if trial.isValid():
+                    solid = trial.clean()
+                    succeeded += 1
+                else:
+                    conflicts += 1
+            except Exception:
+                conflicts += 1
+        print('R5_GROUP_FALLBACK', name, 'SUCCEEDED', succeeded,
+              'CONFLICTS', conflicts)
+
+    # Add R5 to the complement of the R20 set. Coherent groups are processed
+    # first to obtain clean rolling-ball corner solutions.
+    apply_r5_group('longitudinal', lambda e: edge_axis(e) == 0)
+    apply_r5_group('front_end', lambda e: abs(e.Center().x - x1) < 0.2)
+    apply_r5_group('rear_end', lambda e: abs(e.Center().x - x0) < 0.2)
+    apply_r5_group(
+        'vertical_shoulder',
+        lambda e: edge_axis(e) == 2 and
+                  abs(e.Center().x-junction_x) < 0.2
+    )
+    apply_r5_group('remaining_external', lambda e: True)
+
+    # Restore the blind axial socket on the original longitudinal datum.
+    socket_z = -400.0
+    socket_radius = 20.0
+    socket_closed_x = junction_x
+    socket_tool = cq.Solid.makeCylinder(
+        socket_radius,
+        x1 - socket_closed_x,
+        cq.Vector(x1, spine_mid_y, socket_z),
+        cq.Vector(-1, 0, 0)
+    )
+    solid = solid.cut(socket_tool).clean()
+
+    socket_edges = []
+    for edge in solid.Edges():
+        try:
+            circular = edge.geomType() in ('CIRCLE', 'ELLIPSE')
+        except Exception:
+            circular = False
+        if not circular:
+            continue
+        c = edge.Center()
+        eb = edge.BoundingBox()
+        if (abs(c.y-spine_mid_y) < 0.15 and
+                abs(c.z-socket_z) < 0.15 and
+                eb.ylen > 39.0 and eb.zlen > 39.0 and
+                (abs(c.x-x1) < 0.15 or
+                 abs(c.x-socket_closed_x) < 0.15)):
+            socket_edges.append(edge)
+
+    print('SOCKET_R5_CANDIDATES', len(socket_edges))
+    if socket_edges:
+        trial = cq.Workplane(obj=solid).newObject(socket_edges).fillet(5.0).val()
+        if not trial.isValid():
+            raise RuntimeError('Socket R5 fillets produced an invalid solid')
+        solid = trial.clean()
+        print('SOCKET_R5_SUCCEEDED', len(socket_edges))
+
+    # Build the latch-pocket removal volume as an R5 rounded box. This directly
+    # generates R5 internal side, floor, roof, and blind-end transitions instead
+    # of relying on unstable sequential concave-edge fillets.
+    pocket_x0, pocket_x1 = 125.0, 170.0
+    pocket_y0, pocket_y1 = 225.0, 282.0
+    pocket_z0, pocket_z1 = -407.5, -372.5
+    pocket_raw = (
+        cq.Workplane('XY', origin=(pocket_x0, pocket_y0, pocket_z0))
+        .box(pocket_x1-pocket_x0,
+             pocket_y1-pocket_y0,
+             pocket_z1-pocket_z0,
+             centered=(False, False, False))
+    )
+    try:
+        pocket_tool = pocket_raw.edges().fillet(5.0).val()
+        print('ROUNDED_POCKET_TOOL_SUCCEEDED')
+    except Exception as exc:
+        print('ROUNDED_POCKET_TOOL_FAILED', str(exc)[:160])
+        pocket_tool = pocket_raw.val()
+
+    solid = solid.cut(pocket_tool).clean()
+
+    # Fillet the pocket mouth where the cavity intersects the near side skin.
+    mouth_edges = []
+    for edge in sharp_edges(solid):
+        c = edge.Center()
+        eb = edge.BoundingBox()
+        near_mouth = abs(c.y-spine_y0) < 0.25
+        within_x = pocket_x0-0.2 <= c.x <= pocket_x1+0.2
+        within_z = pocket_z0-0.2 <= c.z <= pocket_z1+0.2
+        local_size = max(eb.xlen, eb.ylen, eb.zlen) <= 50.0
+        if near_mouth and within_x and within_z and local_size:
+            mouth_edges.append(edge)
+
+    print('POCKET_MOUTH_R5_CANDIDATES', len(mouth_edges))
+    if mouth_edges:
+        try:
+            trial = cq.Workplane(obj=solid).newObject(mouth_edges).fillet(5.0).val()
+            if trial.isValid():
+                solid = trial.clean()
+                print('POCKET_MOUTH_R5_SUCCEEDED', len(mouth_edges))
+            else:
+                print('POCKET_MOUTH_R5_INVALID')
+        except Exception as exc:
+            print('POCKET_MOUTH_R5_FAILED', str(exc)[:180])
+
+    remaining = sharp_lines(solid)
+    print('FINAL_SHARP_LINE_COUNT', len(remaining))
+    for i, edge in enumerate(remaining[:30]):
+        c = edge.Center()
+        print('FINAL_SHARP_EDGE', i, round(c.x, 3), round(c.y, 3),
+              round(c.z, 3), round(edge.Length(), 3), edge_axis(edge))
+
+    out_bb = solid.BoundingBox()
+    print('RESULT_VALID', solid.isValid())
+    print('RESULT_VOLUME', round(solid.Volume(), 3))
+    print('RESULT_BBOX', round(out_bb.xmin, 3), round(out_bb.xmax, 3),
+          round(out_bb.ymin, 3), round(out_bb.ymax, 3),
+          round(out_bb.zmin, 3), round(out_bb.zmax, 3))
+    print('RESULT_COUNTS', len(solid.Faces()), len(solid.Edges()),
+          len(solid.Vertices()))
+
+    if not solid.isValid():
+        raise RuntimeError('Final edited body is invalid')
+    return cq.Workplane(obj=solid)
+
+
+Program output:
+stdout: Loading function from: /home/adml/Research/Hackathon2026/IDETC26-Hackathon-Autodesk-neuralCAD-Edit/output/gpt-5.6-sol-full48/gpt-5.6-sol_cadquery-script_1787013868.5225203/brep_end/1787013868.5225203/temp_script.py
+SOURCE_VALID True
+SOURCE_BBOX 0.0 300.0 199.9999999 320.0 -450.0000001 -339.9999999
+SHARP_PARENT_VALID True FACES 10
+R20_CANDIDATES 4
+R20_SUCCEEDED 4
+R5_GROUP_CANDIDATES longitudinal 8
+R5_GROUP_SUCCEEDED longitudinal 8
+R5_GROUP_CANDIDATES front_end 4
+R5_GROUP_SUCCEEDED front_end 4
+R5_GROUP_CANDIDATES rear_end 4
+R5_GROUP_SUCCEEDED rear_end 4
+R5_GROUP_CANDIDATES vertical_shoulder 2
+R5_GROUP_SUCCEEDED vertical_shoulder 2
+R5_GROUP_CANDIDATES remaining_external 0
+SOCKET_R5_CANDIDATES 2
+SOCKET_R5_SUCCEEDED 2
+ROUNDED_POCKET_TOOL_SUCCEEDED
+POCKET_MOUTH_R5_CANDIDATES 8
+POCKET_MOUTH_R5_SUCCEEDED 8
+FINAL_SHARP_LINE_COUNT 2
+FINAL_SHARP_EDGE 0 147.5 243.96 -407.5 35.0 0
+FINAL_SHARP_EDGE 1 147.5 282.0 -395.556 35.0 0
+RESULT_VALID True
+RESULT_VOLUME 2438178.271
+RESULT_BBOX -0.0 300.0 200.0 320.0 -450.0 -340.0
+RESULT_COUNTS 80 171 94
+Exported shape to: /home/adml/Research/Hackathon2026/IDETC26-Hackathon-Autodesk-neuralCAD-Edit/output/gpt-5.6-sol-full48/gpt-5.6-sol_cadquery-script_1787013868.5225203/brep_end/1787013868.5225203/tmp.step
+Exported STL to: /home/adml/Research/Hackathon2026/IDETC26-Hackathon-Autodesk-neuralCAD-Edit/output/gpt-5.6-sol-full48/gpt-5.6-sol_cadquery-script_1787013868.5225203/brep_end/1787013868.5225203/tmp.stl
+Exported PNG image to: /home/adml/Research/Hackathon2026/IDETC26-Hackathon-Autodesk-neuralCAD-Edit/output/gpt-5.6-sol-full48/gpt-5.6-sol_cadquery-script_1787013868.5225203/brep_end/1787013868.5225203/tmp.png
+Script completed.
+
+stderr: 
+
+Exported this iteration:
+tmp.step, tmp.stl, tmp.png, tmp_front.png, tmp_back.png, tmp_left.png, tmp_right.png, tmp_top.png, tmp_bottom.png, tmp_toprightiso.png

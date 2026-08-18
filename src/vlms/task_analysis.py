@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Pre-iteration CAD task analysis: three VLM turns → model.json + operation.json.
 
-Turn 1: multi-view images → model.json
+Turn 1: multi-view images + STEP face report → model.json
 Turn 2: natural-language request → operation.json
 Turn 3: model.json + operation.json + images → updated operation.json
 
@@ -22,6 +22,7 @@ import os
 import os.path as osp
 import re
 import shutil
+import subprocess
 import sys
 from pathlib import Path
 
@@ -29,24 +30,18 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
-PROMPT_DIR = REPO_ROOT / "src" / "prompts" / "cadquery"
+from src.utils.cadquery_rendering import STANDARD_VIEWS
+
+PROMPT_DIR = REPO_ROOT / "add-ons" / "prompts" / "cadquery"
 DEFAULT_PROMPT_FILES = {
     "model": str(PROMPT_DIR / "01_model_analysis.txt"),
     "operation": str(PROMPT_DIR / "02_request_parse.txt"),
     "localize": str(PROMPT_DIR / "03_localize_and_plan.txt"),
 }
+EXTRACT_INFO_SCRIPT = REPO_ROOT / "add-ons" / "code" / "extract_info.py"
 PLANNING_LOOP_PREFACE_FILE = PROMPT_DIR / "planning_loop_preface.txt"
 REQUEST_SENTINEL = "[insert prompt]"
-DEFAULT_VIEWS = (
-    "front",
-    "back",
-    "left",
-    "right",
-    "top",
-    "bottom",
-    "toprightiso",
-    "bottomleftiso",
-)
+DEFAULT_VIEWS = STANDARD_VIEWS
 IMAGE_EXTS = (".png", ".jpg", ".jpeg")
 REQUEST_KEYS = ("request_text", "text", "prompt", "instruction")
 STEP_KEYS = ("brep_start_path_step", "brep_start_path_stp")
@@ -91,6 +86,8 @@ def extract_step_path(task_info_dict: dict | None, fallback: str = "") -> str:
 
 def collect_start_view_paths(task_info_dict: dict | None, view_names=None) -> list[tuple[str, str]]:
     """Resolve labeled start-model views from parquet keys or STEP siblings."""
+    from src.utils.cadquery_rendering import canonical_view_name, view_name_aliases
+
     view_names = list(view_names or DEFAULT_VIEWS)
     found: list[tuple[str, str]] = []
     seen = set()
@@ -104,9 +101,11 @@ def collect_start_view_paths(task_info_dict: dict | None, view_names=None) -> li
 
     task_info_dict = task_info_dict or {}
     for name in view_names:
-        raw = task_info_dict.get(f"view_{name}")
-        if isinstance(raw, str):
-            _add(name, raw)
+        canon = canonical_view_name(name)
+        for alias in view_name_aliases(canon):
+            raw = task_info_dict.get(f"view_{alias}")
+            if isinstance(raw, str):
+                _add(canon, raw)
 
     step_path = extract_step_path(task_info_dict)
     if step_path:
@@ -114,9 +113,11 @@ def collect_start_view_paths(task_info_dict: dict | None, view_names=None) -> li
         parent = osp.dirname(step_path)
         base = osp.splitext(osp.basename(step_path))[0]
         for name in view_names:
-            for ext in IMAGE_EXTS:
-                _add(name, f"{stem}_{name}{ext}")
-                _add(name, osp.join(parent, f"{base}_{name}{ext}"))
+            canon = canonical_view_name(name)
+            for alias in view_name_aliases(canon):
+                for ext in IMAGE_EXTS:
+                    _add(canon, f"{stem}_{alias}{ext}")
+                    _add(canon, osp.join(parent, f"{base}_{alias}{ext}"))
 
     return found
 
@@ -159,8 +160,68 @@ def parse_json_object(payload) -> dict:
             return {}
 
 
-def build_model_analysis_parts(prompt_text: str, views: list[tuple[str, str]]) -> list[str]:
-    return [prompt_text, *labeled_view_parts(views)]
+def _load_extract_info():
+    import importlib.util
+
+    spec = importlib.util.spec_from_file_location("extract_info", EXTRACT_INFO_SCRIPT)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+def build_step_analysis_report(step_path: str) -> str:
+    """Dump CadQuery face information for the start STEP (text only, no PNGs)."""
+    import cadquery as cq
+
+    module = _load_extract_info()
+    model = cq.importers.importStep(step_path)
+    info = module.extract_shape_info(model, input_file=step_path)
+    return module.format_info_text(info)
+
+
+def run_extract_info(step_path: str, report_path: Path) -> str:
+    """Run extract_info.py and return the written STEP analysis .txt."""
+    report_path = Path(report_path)
+    report_path.parent.mkdir(parents=True, exist_ok=True)
+    cmd = [
+        sys.executable,
+        str(EXTRACT_INFO_SCRIPT),
+        "--input",
+        step_path,
+        "--output",
+        str(report_path),
+        "--no-views",
+    ]
+    print("Running extract_info:", " ".join(cmd))
+    completed = subprocess.run(
+        cmd,
+        cwd=str(REPO_ROOT),
+        capture_output=True,
+        text=True,
+        timeout=180,
+    )
+    if completed.stdout:
+        print(completed.stdout.rstrip())
+    if completed.returncode != 0:
+        err = (completed.stderr or completed.stdout or f"exit {completed.returncode}").strip()
+        raise RuntimeError(err)
+    if not report_path.is_file():
+        raise RuntimeError(f"extract_info did not write {report_path}")
+    return report_path.read_text(encoding="utf-8")
+
+
+def build_model_analysis_parts(
+    prompt_text: str,
+    views: list[tuple[str, str]],
+    step_report: str = "",
+) -> list[str]:
+    parts = [prompt_text, *labeled_view_parts(views)]
+    if step_report and step_report.strip():
+        parts.append("STEP analysis report (.txt) from extract_info:")
+        parts.append(step_report)
+    else:
+        parts.append("No STEP B-rep analysis report was available for this part.")
+    return parts
 
 
 def build_request_parse_parts(prompt_text: str, request_text: str) -> list[str]:
@@ -190,19 +251,12 @@ def planning_message_parts(planning: dict | None) -> list[str]:
         return []
     model_json = planning.get("model") or {}
     operation_json = planning.get("operation") or {}
-    preface_path = planning.get("preface_file") or str(PLANNING_LOOP_PREFACE_FILE)
-    parts = []
-    if os.path.isfile(preface_path):
-        parts.append(_read_text(preface_path).strip())
-    parts.extend(
-        [
-            "model.json from the planning stage:",
-            json.dumps(model_json, indent=2, ensure_ascii=False),
-            "operation.json from the planning stage:",
-            json.dumps(operation_json, indent=2, ensure_ascii=False),
-        ]
-    )
-    return parts
+    return [
+        "model.json from the planning stage:",
+        json.dumps(model_json, indent=2, ensure_ascii=False),
+        "operation.json from the planning stage:",
+        json.dumps(operation_json, indent=2, ensure_ascii=False),
+    ]
 
 
 def _prompt_files_from_config(config: dict | None) -> dict:
@@ -213,7 +267,13 @@ def _prompt_files_from_config(config: dict | None) -> dict:
     return {k: str((REPO_ROOT / p).resolve()) if not osp.isabs(os.path.expanduser(p)) else os.path.expanduser(p) for k, p in files.items()}
 
 
-def _write_turn_log(plan_dir: Path, turn_name: str, parts: list, parsed: dict, whole_response=None) -> None:
+def _sanitize_logged_messages(obj):
+    from .base_vlm import _sanitize_api_messages
+
+    return _sanitize_api_messages(obj)
+
+
+def _write_turn_log(plan_dir: Path, turn_name: str, parts: list, parsed: dict, whole_response=None, api_messages=None) -> None:
     plan_dir.mkdir(parents=True, exist_ok=True)
     records = []
     text_chunks = []
@@ -236,14 +296,29 @@ def _write_turn_log(plan_dir: Path, turn_name: str, parts: list, parsed: dict, w
     _write_json(plan_dir / f"{turn_name}_prompt.json", {"turn": turn_name, "parts": records})
     (plan_dir / f"{turn_name}_prompt.txt").write_text("\n\n".join(text_chunks), encoding="utf-8")
     _write_json(plan_dir / f"{turn_name}_parsed.json", parsed)
+    if api_messages is not None:
+        _write_json(plan_dir / f"{turn_name}_api_messages.json", _sanitize_logged_messages(api_messages))
     if whole_response is not None:
         payload = {
             "turn": turn_name,
             "response_text": getattr(whole_response, "response_text", None),
             "thinking_text": getattr(whole_response, "thinking_text", None),
+            "response_json": getattr(whole_response, "response_json", None),
+            "parsed_response": parsed,
             "token_counts": getattr(whole_response, "token_counts", None) or {},
         }
         _write_json(plan_dir / f"{turn_name}_vlm_response.json", payload)
+        raw = getattr(whole_response, "response_text", None)
+        if not isinstance(raw, str):
+            raw = json.dumps(raw, indent=2, ensure_ascii=False)
+        (plan_dir / f"{turn_name}_vlm_response.txt").write_text(
+            "=== thinking_text ===\n"
+            + (getattr(whole_response, "thinking_text", None) or "")
+            + "\n\n=== response_text ===\n"
+            + (raw or "")
+            + "\n",
+            encoding="utf-8",
+        )
 
 
 def _call_vlm(vlm, parts: list, system_prompt: str):
@@ -255,10 +330,38 @@ def _accumulate_tokens(dst: dict, token_counts: dict | None) -> None:
     if not token_counts:
         return
     for key, value in token_counts.items():
+        if key == "cost_estimate":
+            continue
         try:
             dst[key] = dst.get(key, 0) + (value or 0)
         except TypeError:
             dst[key] = value
+
+
+def _step_report_for_task(task_info_dict: dict | None, plan_dir: Path | None = None) -> str:
+    step_path = extract_step_path(task_info_dict)
+    if not step_path or not os.path.isfile(step_path):
+        print("Task analysis: no start STEP file; skipping extract_info")
+        return ""
+    report_path = None if plan_dir is None else plan_dir / "step_analysis.txt"
+    try:
+        if report_path is None:
+            report = build_step_analysis_report(step_path)
+        else:
+            report = run_extract_info(step_path, report_path)
+            print(f"Wrote {report_path}")
+        return report
+    except Exception as exc:
+        print(f"Task analysis: extract_info CLI failed ({exc}); falling back to in-process dump")
+        try:
+            report = build_step_analysis_report(step_path)
+            if report_path is not None:
+                report_path.write_text(report, encoding="utf-8")
+                print(f"Wrote {report_path}")
+            return report
+        except Exception as inner:
+            print(f"Task analysis: STEP face report failed: {inner}")
+            return f"STEP B-rep analysis report could not be generated: {inner}"
 
 
 def run_task_analysis(vlm, task_info_dict: dict, output_dir: str, request_text: str = "") -> dict:
@@ -282,14 +385,17 @@ def run_task_analysis(vlm, task_info_dict: dict, output_dir: str, request_text: 
     print(f"Task analysis: {len(views)} start views, request={request_text[:80]!r}")
 
     token_counts = {}
+    step_report = _step_report_for_task(task_info_dict, plan_dir)
 
-    model_parts = build_model_analysis_parts(_read_text(prompt_files["model"]), views)
+    model_parts = build_model_analysis_parts(
+        _read_text(prompt_files["model"]), views, step_report=step_report
+    )
     print("Task analysis turn 1/3: model.json")
-    model_response, _ = _call_vlm(vlm, model_parts, system_prompt)
+    model_response, model_api = _call_vlm(vlm, model_parts, system_prompt)
     model_json = parse_json_object(model_response.response_json)
     if not model_json:
         model_json = parse_json_object(model_response.response_text)
-    _write_turn_log(plan_dir, "1_model", model_parts, model_json, model_response)
+    _write_turn_log(plan_dir, "1_model", model_parts, model_json, model_response, model_api)
     _accumulate_tokens(token_counts, model_response.token_counts)
     if not model_json:
         raise RuntimeError("Task analysis turn 1 did not return a JSON object for model.json")
@@ -298,11 +404,11 @@ def run_task_analysis(vlm, task_info_dict: dict, output_dir: str, request_text: 
 
     op_parts = build_request_parse_parts(_read_text(prompt_files["operation"]), request_text)
     print("Task analysis turn 2/3: operation.json")
-    op_response, _ = _call_vlm(vlm, op_parts, system_prompt)
+    op_response, op_api = _call_vlm(vlm, op_parts, system_prompt)
     operation_json = parse_json_object(op_response.response_json)
     if not operation_json:
         operation_json = parse_json_object(op_response.response_text)
-    _write_turn_log(plan_dir, "2_operation", op_parts, operation_json, op_response)
+    _write_turn_log(plan_dir, "2_operation", op_parts, operation_json, op_response, op_api)
     _accumulate_tokens(token_counts, op_response.token_counts)
     if not operation_json:
         raise RuntimeError("Task analysis turn 2 did not return a JSON object for operation.json")
@@ -313,11 +419,11 @@ def run_task_analysis(vlm, task_info_dict: dict, output_dir: str, request_text: 
         _read_text(prompt_files["localize"]), model_json, operation_json, views
     )
     print("Task analysis turn 3/3: localize operation.json")
-    loc_response, _ = _call_vlm(vlm, loc_parts, system_prompt)
+    loc_response, loc_api = _call_vlm(vlm, loc_parts, system_prompt)
     localized = parse_json_object(loc_response.response_json)
     if not localized:
         localized = parse_json_object(loc_response.response_text)
-    _write_turn_log(plan_dir, "3_localize", loc_parts, localized, loc_response)
+    _write_turn_log(plan_dir, "3_localize", loc_parts, localized, loc_response, loc_api)
     _accumulate_tokens(token_counts, loc_response.token_counts)
     if localized:
         operation_json = localized
@@ -334,6 +440,7 @@ def run_task_analysis(vlm, task_info_dict: dict, output_dir: str, request_text: 
         "request_text": request_text,
         "token_counts": token_counts,
         "preface_file": str(PLANNING_LOOP_PREFACE_FILE),
+        "step_analysis_path": str(plan_dir / "step_analysis.txt"),
     }
     _write_json(plan_dir / "planning_summary.json", {k: v for k, v in result.items() if k not in ("model", "operation")})
     print(f"Wrote {model_path}")
@@ -348,8 +455,11 @@ def formulate_prompts(task_info_dict: dict, output_dir: str, request_text: str =
     views = collect_start_view_paths(task_info_dict)
     plan_dir = Path(output_dir)
     plan_dir.mkdir(parents=True, exist_ok=True)
+    step_report = _step_report_for_task(task_info_dict, plan_dir)
 
-    model_parts = build_model_analysis_parts(_read_text(prompt_files["model"]), views)
+    model_parts = build_model_analysis_parts(
+        _read_text(prompt_files["model"]), views, step_report=step_report
+    )
     op_parts = build_request_parse_parts(_read_text(prompt_files["operation"]), request_text)
     loc_parts = build_localize_parts(
         _read_text(prompt_files["localize"]),

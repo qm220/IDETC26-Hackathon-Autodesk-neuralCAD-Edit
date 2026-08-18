@@ -1,0 +1,121 @@
+{
+  "request": "Multiply amount of cylindrical feature to 4. Imagine this is a system of plant pots, so you need to add stability to that afterwards by adding another legs or ribs on the sides.",
+  "request_wording": {
+    "action_words": [
+      "Multiply",
+      "amount",
+      "4",
+      "add",
+      "afterwards",
+      "adding",
+      "another",
+      "legs",
+      "ribs",
+      "on"
+    ],
+    "referenced_feature_words": [
+      "cylindrical",
+      "feature",
+      "this",
+      "that",
+      "sides"
+    ],
+    "intention_words": [
+      "system",
+      "plant",
+      "pots",
+      "stability"
+    ],
+    "grammatical_words": [
+      "of",
+      "to",
+      "Imagine",
+      "is",
+      "a",
+      "of",
+      "so",
+      "you",
+      "need",
+      "to",
+      "to",
+      "by",
+      "or",
+      "the"
+    ]
+  },
+  "actions": [
+    {
+      "operation": "Increase the quantity of the existing cylindrical feature to a total of four instances.",
+      "parameters": {
+        "total_instance_count": "4"
+      },
+      "target": "Existing cylindrical feature",
+      "relational_constraint": "The resulting model must contain four instances of the referenced cylindrical feature.",
+      "unresolved_reference": "Identify the cylindrical feature in the original CAD model; the arrangement, spacing, and duplication method are not specified.",
+      "target section code": [
+        "SEC-03",
+        "SEC-02",
+        "SEC-01"
+      ],
+      "target face code": [
+        "0008",
+        "0009",
+        "0010",
+        "0011",
+        "0007",
+        "0000",
+        "0003",
+        "0006"
+      ],
+      "steps": [
+        "Localize the referenced cylindrical feature as SEC-03, Blind socket boss. The source feature consists of the outer boss cylinder face 0008 (FACE 10), annular socket rim 0009 (FACE 11), internal blind socket wall 0010 (FACE 3), and planar socket bottom 0011 (FACE 4). The multiview images confirm that this is the only complete cylindrical feature and that its axis is transverse to the lever beam, approximately parallel to the global y-axis.",
+        "Include SEC-02, Blended boss pedestal, in the repeated feature definition rather than patterning only the unsupported cylinder. Its compound transition face 0007 (FACE 9) spreads the boss load into SEC-01 and is functionally required for every new pot or socket instance.",
+        "Use the existing boss center at approximately x=0 mm, z=4 mm as the first instance. Preserve the existing y-axis orientation, outer radius of 7 mm, socket radius of 5 mm, opening plane at approximately y=34 mm, and blind floor at approximately y=25 mm.",
+        "Create a linear feature pattern along the global x-axis, which is the longitudinal direction of the lever beam. Use four total instances, including the original. Because the beam extends to approximately x=80 mm and each boss has a 14 mm outside diameter, use a nominal 20 mm center-to-center pitch as a practical resolved arrangement, giving centers near x=0, 20, 40, and 60 mm. This leaves approximately 6 mm clear between adjacent boss exteriors and approximately 13 mm radial edge clearance to the square terminal plane.",
+        "Pattern both the additive boss/pedestal geometry and the subtractive blind-socket geometry. If the CAD system cannot pattern the compound pedestal reliably, reconstruct each new instance parametrically instead of copying only faces.",
+        "For reconstructed instances, create a sketch on a plane normal to the y-axis through each new center. Draw a concentric outer circle of radius 7 mm and extrude the outer boss toward positive y so that its annular opening terminates at the same y=34 mm plane as the source boss.",
+        "Create each socket using a concentric radius-5 mm circular cut from the annular opening face toward negative y. Set the cut depth to 9 mm so that the blind bottom remains at y=25 mm, matching faces 0010 and 0011 of the original boss. Do not use a through-all cut because the blind floor controls insertion depth.",
+        "At every added boss root, create or pattern a smooth pedestal transition equivalent to face 0007. Blend the outer boss cylinder into the beam-side wall 0000 (FACE 8) and into the adjacent broad beam faces 0003 (FACE 1) and 0006 (FACE 6). Maintain tangent continuity where practical and avoid sharp re-entrant corners.",
+        "Boolean-union all three added boss and pedestal solids with SEC-01. Regenerate the beam-side wall where it is interrupted by the added transitions, while retaining the original beam thickness and the square terminal end.",
+        "Verify that the final model contains exactly four coaxially oriented blind cylindrical socket bosses, that all four sockets open toward positive y, and that each boss is structurally connected to the lever beam through its own blended pedestal.",
+        "Check minimum clearances between adjacent outer cylinders, between the final boss and face 0001 at x=80 mm, and between the first boss and the rounded nose. If manufacturing clearance or pot diameter requirements conflict with the nominal 20 mm pitch, retain four total instances and adjust the pitch uniformly within the available beam span."
+      ]
+    },
+    {
+      "operation": "Add additional leg or rib support features.",
+      "parameters": {
+        "support_feature_type": "legs or ribs",
+        "quantity": "Additional; exact count not specified"
+      },
+      "target": "The sides of the model resulting from the first action",
+      "relational_constraint": "Place the added support features on the sides, after increasing the cylindrical-feature count.",
+      "unresolved_reference": "Identify which faces constitute the sides, determine whether legs or ribs are intended, and resolve the number, dimensions, positions, and attachment geometry of the supports.",
+      "target section code": [
+        "SEC-01"
+      ],
+      "target face code": [
+        "0000",
+        "0002",
+        "0003"
+      ],
+      "steps": [
+        "Interpret the sides as the two longitudinal sides of SEC-01: boss-side longitudinal wall 0000 (FACE 8) at approximately y=23 mm and opposite longitudinal wall 0002 (FACE 5) at approximately y=11 mm. Use lower broad beam face 0003 (FACE 1) as the vertical and ground-clearance reference.",
+        "Select lateral outrigger legs with ribbed roots as the preferred support solution. Legs directly widen the footprint and therefore address the stated stability intention more effectively than reinforcement ribs alone, while gusset-like root geometry prevents the legs from behaving as weak cantilevers.",
+        "Create four added legs arranged as two opposed pairs. Place one pair near the rounded-end region, clear of the original boss and pedestal, and place the second pair near the square-end region, clear of the fourth patterned boss and terminal face. A practical initial layout is approximately x=-15 mm and x=70 mm, with one leg extending from each longitudinal side at each station.",
+        "Create a sketch on lower broad beam face 0003 or on a coincident XY datum plane at z=2 mm. Project the boundaries of side faces 0000 and 0002 into the sketch to establish associative attachment references.",
+        "At each selected x station, draw opposed rectangular or slightly tapered outrigger profiles that overlap the beam edge sufficiently for a valid union. Extend one profile outward from the y=23 mm side and the other outward from the y=11 mm side. Keep the profiles clear of the four socket openings and their pedestal transition envelopes.",
+        "Dimension the leg width along x to approximately 6 to 8 mm. Extend the legs laterally by a preliminary 12 to 18 mm beyond each beam side so the footprint becomes substantially wider than the original 12 mm beam width. Use equal lateral extension on both sides to avoid introducing a static tipping bias.",
+        "Extrude the four leg profiles downward from face 0003 by approximately 4 mm, producing coplanar bottom contact faces near z=-2 mm. Use a joined extrusion or boolean union so the legs form a single solid with SEC-01.",
+        "Add triangular gusset ribs at each leg root. On side face 0000 and side face 0002, sketch triangular profiles connecting the outer portion of each leg to the beam side wall. Extrude the ribs across the local leg width and merge them with both the beam and leg.",
+        "Apply root fillets to the internal leg-to-beam and rib-to-beam junctions. Use the largest radius permitted by the available geometry without intersecting a boss pedestal; a preliminary radius of 1 to 2 mm is appropriate for the 4 mm beam thickness. Add small external edge fillets or chamfers of approximately 0.5 mm to remove sharp foot edges.",
+        "Where a positive-y leg approaches a patterned boss pedestal, shorten or locally taper the leg and gusset rather than cutting into SEC-02 or SEC-03. The socket bosses, socket walls, blind bottoms, and pedestal blends must remain unchanged after the first action.",
+        "Confirm that all four leg bottom faces are coplanar and that the resulting support polygon spans both sides of the beam and brackets the four-boss array longitudinally. Check that the model rests on the new legs rather than on the rounded nose, boss cylinders, or pedestal blends.",
+        "Perform an interference and thickness check at every attachment. Verify that each leg and rib has a continuous merged volume with the beam, no zero-thickness contact exists, and no support obstructs access to any of the four annular socket rims."
+      ]
+    }
+  ],
+  "intention": [
+    "Make the model function as or represent a system of plant pots.",
+    "Improve the stability of the model after increasing the number of cylindrical features."
+  ]
+}

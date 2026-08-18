@@ -1,0 +1,717 @@
+Now use all the given information:
+1. model.json file
+2. operation.json file
+3. Multiview images
+
+Decide which sections of the original model should be modified, removed, interacted with or if new sections should be created. Use as much information from the Multiview images, model.json files and operation.json as possible.
+
+Make this decision from several perspectives. If target clearly identify geometry, locate the corresponding section(s) and face(s) in model.json. If there is no clear geometry identified, use the referenced features and relational_constraint to identify potential sections and features. Additionally, consider the intention of the edit. Based on the function and behavior associated with each section and features, decide which section require the action the most. Then, find the corresponding section and face code from model.json.
+
+Plan out the modeling procedure needed to perform each action. Describe them in professional CAD modelling languages from choosing the plane, draw sketches to extrusion, add chamfers. Be thorough and detailed.
+
+face_code values in model.json are visual labels from shaded renders. Brep_id is the CadQuery Faces() index from the STEP analysis report (for example FACE 0).
+
+Edit operation.json accordingly. Keep the previous request_wording and actions, and add localization plus steps.
+
+OUTPUT FORMAT (JSON, operation.json, no markdown fences, use this schema):
+{
+  "request": "",
+  "request_wording": {
+    "action_words": ["..."],
+    "referenced_feature_words": ["..."],
+    "intention_words": ["..."],
+    "grammatical_words": ["..."]
+  },
+  "actions": [
+    {
+      "operation": "...",
+      "parameters": {
+        "parameter_name": "..."
+      },
+      "target": "...",
+      "relational_constraint": "...",
+      "unresolved_reference": "...",
+      "target section code": ["..."],
+      "target face code": ["..."],
+      "steps": [
+        "...",
+        "..."
+      ]
+    }
+  ],
+  "intention": ["..."]
+}
+
+The model.json, operation.json, and labeled multi-view images follow.
+
+
+model.json:
+
+{
+  "part": {
+    "name": "Enclosed roller-dispenser housing with cradle, side straps, and power cord",
+    "description": "A rounded-rectangle enclosure with a top access opening and internal cylindrical roll interface, supported/retained by an external U-shaped cradle and two side mounting straps. Includes small bottom connector/feet features and an attached power cord with plug.",
+    "source_views": [
+      "front",
+      "back",
+      "left",
+      "right",
+      "top",
+      "bottom",
+      "toprightiso"
+    ],
+    "symmetry_note": "Largely symmetric about the mid-plane X=0 (left/right), with mirrored side straps and rounded end geometry; asymmetry introduced by cord exit and internal cutouts."
+  },
+  "Section": [
+    {
+      "id": "S1",
+      "name": "Main outer housing shell",
+      "features included": [
+        "Rounded rectangular outer shell",
+        "End caps (front/rear faces)",
+        "Side walls (left/right planar faces)",
+        "Top rounded edge bands (corner fillet cylinders)",
+        "Lower outer curvature (large BSPLINE underside surface)"
+      ],
+      "function intent": "Provide primary protective enclosure and structure for internal mechanism; offer external mounting datum surfaces and resist bending/torsion from mounted loads.",
+      "physical behavior": "Acts as a stiff shell beam: distributes strap/cradle reaction loads into the larger shell area; rounded corners reduce stress concentration; underside curvature improves stiffness and clearance.",
+      "geometry": "Long prismatic shell with large-radius corner rounds along the length (Y axis), planar side faces at X=±101.6, planar end faces at Y=0 and Y=355.6, and a broad BSPLINE curved underside from Z=-127 to Z=0.",
+      "location": "Largest gray body spanning the full part length; surrounds all other sections.",
+      "colour": {
+        "R": 210,
+        "G": 210,
+        "B": 210
+      },
+      "major_faces": [
+        {
+          "face_code": "0000",
+          "name": "Right outer side wall",
+          "Brep_id": "FACE 42",
+          "description": "Large planar side face on +X side (housing exterior)."
+        },
+        {
+          "face_code": "0001",
+          "name": "Right top corner radius band",
+          "Brep_id": "FACE 43",
+          "description": "Cylindrical patch (R=25.4) forming rounded top corner on +X side along length."
+        },
+        {
+          "face_code": "0002",
+          "name": "Top outer flat (main span)",
+          "Brep_id": "FACE 39",
+          "description": "Planar top face at Z=126.999 over most of length (split by internal opening features)."
+        },
+        {
+          "face_code": "0003",
+          "name": "Left top corner radius band",
+          "Brep_id": "FACE 44",
+          "description": "Cylindrical patch (R=25.4) forming rounded top corner on -X side along length."
+        },
+        {
+          "face_code": "0004",
+          "name": "Left outer side wall",
+          "Brep_id": "FACE 40",
+          "description": "Large planar side face on -X side (housing exterior)."
+        },
+        {
+          "face_code": "0005",
+          "name": "Front end face",
+          "Brep_id": "FACE 46",
+          "description": "Planar end face at Y=0 closing one end of the shell."
+        },
+        {
+          "face_code": "0006",
+          "name": "Rear end face / service end",
+          "Brep_id": "FACE 45",
+          "description": "Planar end face at Y=355.6 closing the opposite end of the shell."
+        },
+        {
+          "face_code": "0007",
+          "name": "Outer underside curvature",
+          "Brep_id": "FACE 41",
+          "description": "Large BSPLINE surface forming the curved lower exterior (underside)."
+        }
+      ],
+      "minor_faces_Brep_id": [
+        "FACE 38",
+        "FACE 5",
+        "FACE 20",
+        "FACE 29",
+        "FACE 33-37",
+        "FACE 47-54"
+      ],
+      "relationships": [
+        {
+          "source id": "S1",
+          "target id": "S2",
+          "function relationship": "provides_clearance",
+          "structural relationship": "contains"
+        },
+        {
+          "source id": "S1",
+          "target id": "S3",
+          "function relationship": "locates_mating_part",
+          "structural relationship": "adjacent_to"
+        },
+        {
+          "source id": "S1",
+          "target id": "S4",
+          "function relationship": "mounts_to",
+          "structural relationship": "attached_to"
+        },
+        {
+          "source id": "S1",
+          "target id": "S5",
+          "function relationship": "mounts_to",
+          "structural relationship": "attached_to"
+        },
+        {
+          "source id": "S1",
+          "target id": "S6",
+          "function relationship": "provides_clearance",
+          "structural relationship": "contained_in"
+        },
+        {
+          "source id": "S1",
+          "target id": "S7",
+          "function relationship": "provides_clearance",
+          "structural relationship": "attached_to"
+        }
+      ]
+    },
+    {
+      "id": "S2",
+      "name": "Top access opening & internal cavity walls",
+      "features included": [
+        "Top opening rim",
+        "Internal cavity side walls",
+        "Internal ledges/shelves for mechanism",
+        "Local cylindrical cutout/port in internal region"
+      ],
+      "function intent": "Provide access for loading/servicing internal roll/mechanism and define the internal envelope that guides/locates inserted components.",
+      "physical behavior": "Cavity walls act as locating datums and reaction surfaces; rim edges resist local deformation and provide stiffness around the large cutout.",
+      "geometry": "Rectangular cutout and stepped internal bay; multiple planar faces forming inner walls and ledges; local cylindrical surface used as a port/relief in the cavity region.",
+      "location": "Upper region of housing (visible from top and isometric), within the shell near the middle length.",
+      "colour": {
+        "R": 170,
+        "G": 200,
+        "B": 255
+      },
+      "major_faces": [
+        {
+          "face_code": "0008",
+          "name": "Cavity ledge plane (upper)",
+          "Brep_id": "FACE 5",
+          "description": "Planar internal shelf/ledge at Y=220.98 bounding cavity."
+        },
+        {
+          "face_code": "0009",
+          "name": "Cavity ledge plane (lower)",
+          "Brep_id": "FACE 25",
+          "description": "Planar internal shelf/ledge at Y=215.90 bounding cavity."
+        },
+        {
+          "face_code": "0010",
+          "name": "Cavity end wall (front of bay)",
+          "Brep_id": "FACE 32",
+          "description": "Planar internal wall at Y=203.20 defining bay boundary."
+        },
+        {
+          "face_code": "0011",
+          "name": "Cavity side wall plane (bay split)",
+          "Brep_id": "FACE 10",
+          "description": "Planar inner face at Y=342.264995 (one side of internal upper structure)."
+        },
+        {
+          "face_code": "0012",
+          "name": "Cavity side wall plane (bay split opposite)",
+          "Brep_id": "FACE 15",
+          "description": "Planar inner face at Y=342.899995 (opposing side of internal upper structure)."
+        },
+        {
+          "face_code": "0013",
+          "name": "Internal cylindrical relief/port",
+          "Brep_id": "FACE 4",
+          "description": "Short cylinder (R=12.7) used as internal relief/port feature."
+        }
+      ],
+      "minor_faces_Brep_id": [
+        "FACE 6-24",
+        "FACE 26-31",
+        "FACE 34",
+        "FACE 55-59",
+        "FACE 228-251",
+        "FACE 257-258"
+      ],
+      "relationships": [
+        {
+          "source id": "S2",
+          "target id": "S3",
+          "function relationship": "locates_mating_part",
+          "structural relationship": "adjacent_to"
+        },
+        {
+          "source id": "S2",
+          "target id": "S6",
+          "function relationship": "guides_motion",
+          "structural relationship": "provides_clearance"
+        },
+        {
+          "source id": "S2",
+          "target id": "S1",
+          "function relationship": "distributes_stress",
+          "structural relationship": "contained_in"
+        }
+      ]
+    },
+    {
+      "id": "S3",
+      "name": "Internal roll / drum interface",
+      "features included": [
+        "Large cylindrical roll surface",
+        "End planes of roll volume",
+        "Secondary inner cylinder surface",
+        "Top/bottom end faces of roll cavity"
+      ],
+      "function intent": "Provide the primary cylindrical interface that supports or represents a roll/drum (e.g., dispenser roll), allowing rotation and controlled unwinding/feeding.",
+      "physical behavior": "Cylindrical surface acts as a bearing/support envelope; end planes act as axial stops/positioners; large radius improves load distribution and reduces local contact stress.",
+      "geometry": "Dominant cylinder along Y with large radius (~69.85) plus associated end planes; additional nearby cylinder (R~68.58) and cap planes define a nested/stepped drum shape.",
+      "location": "Visible through the top opening, centered in the housing cavity.",
+      "colour": {
+        "R": 245,
+        "G": 245,
+        "B": 200
+      },
+      "major_faces": [
+        {
+          "face_code": "0014",
+          "name": "Roll outer cylindrical surface",
+          "Brep_id": "FACE 264",
+          "description": "Main outer cylinder (R=69.85) defining roll/drum envelope."
+        },
+        {
+          "face_code": "0015",
+          "name": "Roll top end plane",
+          "Brep_id": "FACE 273",
+          "description": "Planar end/cap at Y=328.441268 closing/locating roll assembly."
+        },
+        {
+          "face_code": "0016",
+          "name": "Roll lower end plane (front end)",
+          "Brep_id": "FACE 265",
+          "description": "Planar end/cap at Y=224.301268 (axial boundary near lower/front)."
+        },
+        {
+          "face_code": "0017",
+          "name": "Roll inner/secondary cylindrical surface",
+          "Brep_id": "FACE 260",
+          "description": "Large cylinder (R=68.58) coaxial with roll axis (secondary drum surface)."
+        },
+        {
+          "face_code": "0018",
+          "name": "Roll end plane (bay boundary)",
+          "Brep_id": "FACE 279",
+          "description": "Planar end at Y=310.661268 (upper axial boundary of internal roll region)."
+        },
+        {
+          "face_code": "0019",
+          "name": "Roll end plane (bay boundary opposite)",
+          "Brep_id": "FACE 280",
+          "description": "Planar end at Y=234.461268 (lower axial boundary of internal roll region)."
+        }
+      ],
+      "minor_faces_Brep_id": [
+        "FACE 261-263",
+        "FACE 266-272",
+        "FACE 274-278",
+        "FACE 275-276",
+        "FACE 277"
+      ],
+      "relationships": [
+        {
+          "source id": "S3",
+          "target id": "S2",
+          "function relationship": "constrains_dof",
+          "structural relationship": "contained_in"
+        },
+        {
+          "source id": "S3",
+          "target id": "S1",
+          "function relationship": "distributes_stress",
+          "structural relationship": "contained_in"
+        }
+      ]
+    },
+    {
+      "id": "S4",
+      "name": "External U-shaped cradle / lower support band",
+      "features included": [
+        "U-shaped support band",
+        "Side cheeks with through features",
+        "Axial mounting/locating faces",
+        "Large BSPLINE inner/outer band curvature"
+      ],
+      "function intent": "Provide an external structural cradle to support the housing, distribute load into mounting points, and protect/lift the underside; likely forms the primary mount/stand interface.",
+      "physical behavior": "Works as a curved beam (hoop-like) that spreads loads around the lower perimeter; resists bending by arch action; provides stable support contact and mounting reaction paths.",
+      "geometry": "Broad U-shaped curved surface set wrapping around the lower housing with planar side faces at X=±126.999 and a large BSPLINE surface spanning Z negative to near zero; includes local cylindrical boss/holes for fasteners or pins.",
+      "location": "Black U-shaped component seen in front/back views wrapping around bottom of housing.",
+      "colour": {
+        "R": 40,
+        "G": 40,
+        "B": 40
+      },
+      "major_faces": [
+        {
+          "face_code": "0020",
+          "name": "Cradle right outer cheek",
+          "Brep_id": "FACE 363",
+          "description": "Planar side face at X=126.999 (outer cheek of U-cradle)."
+        },
+        {
+          "face_code": "0021",
+          "name": "Cradle right inner cheek",
+          "Brep_id": "FACE 364",
+          "description": "Planar side face at X=101.6 (inner cheek boundary near housing)."
+        },
+        {
+          "face_code": "0022",
+          "name": "Cradle upper mounting/stop plane",
+          "Brep_id": "FACE 368",
+          "description": "Planar face at Y=304.800010 (upper boundary/stop of cradle region)."
+        },
+        {
+          "face_code": "0023",
+          "name": "Cradle lower mounting/stop plane",
+          "Brep_id": "FACE 370",
+          "description": "Planar face at Y=279.400009 (lower boundary/stop of cradle region)."
+        },
+        {
+          "face_code": "0024",
+          "name": "Cradle main curved band (outer)",
+          "Brep_id": "FACE 365",
+          "description": "Large BSPLINE surface forming outer curved span of U-cradle."
+        },
+        {
+          "face_code": "0025",
+          "name": "Cradle main curved band (inner)",
+          "Brep_id": "FACE 366",
+          "description": "BSPLINE surface forming inner curved span adjacent to housing underside."
+        },
+        {
+          "face_code": "0026",
+          "name": "Cradle left outer cheek",
+          "Brep_id": "FACE 371",
+          "description": "Planar side face at X=-126.999 (outer cheek of U-cradle)."
+        },
+        {
+          "face_code": "0027",
+          "name": "Cradle left inner cheek",
+          "Brep_id": "FACE 372",
+          "description": "Planar side face at X=-101.6 (inner cheek boundary near housing)."
+        }
+      ],
+      "minor_faces_Brep_id": [
+        "FACE 361-362",
+        "FACE 367",
+        "FACE 369",
+        "FACE 314-322",
+        "FACE 315-320",
+        "FACE 316-318"
+      ],
+      "relationships": [
+        {
+          "source id": "S4",
+          "target id": "S1",
+          "function relationship": "supports",
+          "structural relationship": "adjacent_to"
+        },
+        {
+          "source id": "S4",
+          "target id": "S5",
+          "function relationship": "distributes_stress",
+          "structural relationship": "attached_to"
+        },
+        {
+          "source id": "S4",
+          "target id": "S6",
+          "function relationship": "provides_clearance",
+          "structural relationship": "offset_from"
+        }
+      ]
+    },
+    {
+      "id": "S5",
+      "name": "Side mounting straps (left & right)",
+      "features included": [
+        "Two vertical strap/bracket arms",
+        "Fastener holes with counterbore/countersink",
+        "Strap-to-cradle/housing interfaces"
+      ],
+      "function intent": "Provide mounting/attachment points to external structure (wall/stand), allowing the unit to be hung or bolted; strap holes constrain translation and rotation.",
+      "physical behavior": "Acts as tension/bending members: straps carry load from housing/cradle into screw/bolt; holes concentrate stress—local cone/cylinder geometry indicates countersink/counterbore to seat fasteners.",
+      "geometry": "Thin bracket arms (not fully enumerated here due to many small faces) with cylindrical through-holes and conical countersinks; mirrored on left/right about X=0.",
+      "location": "Black vertical straps visible on left and right side views, with round hole near upper end.",
+      "colour": {
+        "R": 20,
+        "G": 20,
+        "B": 20
+      },
+      "major_faces": [
+        {
+          "face_code": "0028",
+          "name": "Right strap countersink (cone)",
+          "Brep_id": "FACE 0",
+          "description": "Conical countersink surface for right strap fastener hole."
+        },
+        {
+          "face_code": "0029",
+          "name": "Right strap hole cylinder",
+          "Brep_id": "FACE 1",
+          "description": "Cylindrical surface of right strap fastener hole (R=7.62)."
+        },
+        {
+          "face_code": "0030",
+          "name": "Left strap countersink (cone)",
+          "Brep_id": "FACE 2",
+          "description": "Conical countersink surface for left strap fastener hole."
+        },
+        {
+          "face_code": "0031",
+          "name": "Left strap hole cylinder",
+          "Brep_id": "FACE 3",
+          "description": "Cylindrical surface of left strap fastener hole (R=7.62)."
+        }
+      ],
+      "minor_faces_Brep_id": [
+        "FACE 361-362",
+        "FACE 60-77",
+        "FACE 78-227"
+      ],
+      "relationships": [
+        {
+          "source id": "S5",
+          "target id": "S1",
+          "function relationship": "mounts_to",
+          "structural relationship": "attached_to"
+        },
+        {
+          "source id": "S5",
+          "target id": "S4",
+          "function relationship": "transmits_load",
+          "structural relationship": "attached_to"
+        }
+      ]
+    },
+    {
+      "id": "S6",
+      "name": "Bottom connectors / feet blocks (pair)",
+      "features included": [
+        "Two small bottom blocks/feet",
+        "Flat seating faces",
+        "Small cylindrical/through features",
+        "Edge fillets/chamfers (implicit in many small faces)"
+      ],
+      "function intent": "Provide small support standoffs and/or connector housings at the bottom region; likely serves as feet or interface pads and may locate cable/strain relief features.",
+      "physical behavior": "Transfers local compressive loads to a support surface; protects housing from direct ground contact; small blocks can also constrain cable path and reduce bending at exit.",
+      "geometry": "Two small prismatic blocks with multiple planar faces and several small cylindrical holes/features; located near lower end region.",
+      "location": "Bottom of assembly near the cord exit side; seen as two small rectangular pads/blocks in bottom view/front view.",
+      "colour": {
+        "R": 180,
+        "G": 180,
+        "B": 180
+      },
+      "major_faces": [
+        {
+          "face_code": "0032",
+          "name": "Left block outer plate face",
+          "Brep_id": "FACE 325",
+          "description": "Planar face of left bottom block (main outer plate at Z=-140.321)."
+        },
+        {
+          "face_code": "0033",
+          "name": "Left block base face",
+          "Brep_id": "FACE 332",
+          "description": "Planar base face of left bottom block (at Z=-142.861)."
+        },
+        {
+          "face_code": "0034",
+          "name": "Right block outer plate face",
+          "Brep_id": "FACE 343",
+          "description": "Planar face of right bottom block (main outer plate at Z=-140.321)."
+        },
+        {
+          "face_code": "0035",
+          "name": "Right block base face",
+          "Brep_id": "FACE 351",
+          "description": "Planar base face of right bottom block (at Z=-142.861)."
+        }
+      ],
+      "minor_faces_Brep_id": [
+        "FACE 323-341",
+        "FACE 342-360"
+      ],
+      "relationships": [
+        {
+          "source id": "S6",
+          "target id": "S1",
+          "function relationship": "supports",
+          "structural relationship": "attached_to"
+        },
+        {
+          "source id": "S6",
+          "target id": "S7",
+          "function relationship": "guides_motion",
+          "structural relationship": "adjacent_to"
+        }
+      ]
+    },
+    {
+      "id": "S7",
+      "name": "Power cord and plug",
+      "features included": [
+        "Cord jacket (swept/BSPLINE surfaces)",
+        "Strain-relief transition near exit",
+        "Plug body (multi-planar and BSPLINE surfaces)"
+      ],
+      "function intent": "Provide electrical power connection to the unit; cord routing allows flexible positioning; plug provides standardized interface to mains supply.",
+      "physical behavior": "Cord acts as flexible member resisting bending with jacket compliance; strain-relief reduces curvature/peak stress at exit; plug body is rigid and protects terminations.",
+      "geometry": "Long slender cable represented by multiple BSPLINE surfaces and planar end features; plug body has small planar facets and chamfer-like planes.",
+      "location": "Exits from bottom/side region and extends outward; visible in front/back/left/right/bottom views.",
+      "colour": {
+        "R": 15,
+        "G": 15,
+        "B": 15
+      },
+      "major_faces": [
+        {
+          "face_code": "0036",
+          "name": "Cord/plug primary outer skin (segment A)",
+          "Brep_id": "FACE 376",
+          "description": "Large BSPLINE surface forming a major portion of the cable/transition skin."
+        },
+        {
+          "face_code": "0037",
+          "name": "Cord/plug primary outer skin (segment B)",
+          "Brep_id": "FACE 378",
+          "description": "Large BSPLINE surface forming the opposing portion of the cable/transition skin."
+        },
+        {
+          "face_code": "0038",
+          "name": "Plug side plane (body)",
+          "Brep_id": "FACE 404",
+          "description": "Planar face on plug body region (one of the main bounding planes)."
+        },
+        {
+          "face_code": "0039",
+          "name": "Plug opposite side plane (body)",
+          "Brep_id": "FACE 413",
+          "description": "Planar face on plug body region opposite FACE 404."
+        }
+      ],
+      "minor_faces_Brep_id": [
+        "FACE 373-403",
+        "FACE 405-412",
+        "FACE 384-393"
+      ],
+      "relationships": [
+        {
+          "source id": "S7",
+          "target id": "S6",
+          "function relationship": "provides_clearance",
+          "structural relationship": "attached_to"
+        },
+        {
+          "source id": "S7",
+          "target id": "S1",
+          "function relationship": "provides_clearance",
+          "structural relationship": "adjacent_to"
+        }
+      ]
+    }
+  ]
+}
+
+operation.json:
+
+{
+  "request": "Change the current plug for Europlug with two round pins and try to copy the real shape.",
+  "request_wording": {
+    "action_words": [
+      "Change",
+      "two",
+      "round",
+      "try",
+      "copy"
+    ],
+    "referenced_feature_words": [
+      "current",
+      "plug",
+      "Europlug",
+      "pins",
+      "shape"
+    ],
+    "intention_words": [
+      "real"
+    ],
+    "grammatical_words": [
+      "the",
+      "for",
+      "with",
+      "and",
+      "to",
+      "the"
+    ]
+  },
+  "actions": [
+    {
+      "operation": "Replace/modify existing plug geometry to a Europlug style plug with two round pins",
+      "parameters": {
+        "plug_type": "Europlug",
+        "pin_count": "2",
+        "pin_profile": "round"
+      },
+      "target": "current plug",
+      "relational_constraint": "Pins belong to/are part of the Europlug; pin quantity is two; pin cross-section/profile is round",
+      "unresolved_reference": "Identify which body/feature(s) constitute the 'current plug' in the CAD model; determine Europlug standard dimensions, pin spacing, pin diameter/length, body outline, and required orientation/placement relative to the rest of the assembly"
+    },
+    {
+      "operation": "Adjust/refine the Europlug external geometry to better match the real-world shape (more realistic form)",
+      "parameters": {},
+      "target": "Europlug geometry (plug body and pins) created/modified in previous action",
+      "relational_constraint": "Overall form should resemble a real Europlug shape",
+      "unresolved_reference": "What 'real shape' reference should be followed (standard/spec, photo, manufacturer model); which details are expected (chamfers/fillets, taper, reliefs, strain relief, edge radii) and acceptable level of detail"
+    }
+  ],
+  "intention": [
+    "Convert the design from the current plug type to a Europlug interface",
+    "Make the plug geometry resemble the real/actual Europlug shape (more realistic appearance)"
+  ]
+}
+
+View: front
+
+[IMAGE 0: /home/adml/Research/Hackathon2026/IDETC26-Hackathon-Autodesk-neuralCAD-Edit/data/edit_192_external/breps/3YH2WFSRM22W7DKT_1769782430.5654984_front.jpg]
+
+View: back
+
+[IMAGE 1: /home/adml/Research/Hackathon2026/IDETC26-Hackathon-Autodesk-neuralCAD-Edit/data/edit_192_external/breps/3YH2WFSRM22W7DKT_1769782430.5654984_back.jpg]
+
+View: left
+
+[IMAGE 2: /home/adml/Research/Hackathon2026/IDETC26-Hackathon-Autodesk-neuralCAD-Edit/data/edit_192_external/breps/3YH2WFSRM22W7DKT_1769782430.5654984_left.jpg]
+
+View: right
+
+[IMAGE 3: /home/adml/Research/Hackathon2026/IDETC26-Hackathon-Autodesk-neuralCAD-Edit/data/edit_192_external/breps/3YH2WFSRM22W7DKT_1769782430.5654984_right.jpg]
+
+View: top
+
+[IMAGE 4: /home/adml/Research/Hackathon2026/IDETC26-Hackathon-Autodesk-neuralCAD-Edit/data/edit_192_external/breps/3YH2WFSRM22W7DKT_1769782430.5654984_top.jpg]
+
+View: bottom
+
+[IMAGE 5: /home/adml/Research/Hackathon2026/IDETC26-Hackathon-Autodesk-neuralCAD-Edit/data/edit_192_external/breps/3YH2WFSRM22W7DKT_1769782430.5654984_bottom.jpg]
+
+View: toprightiso
+
+[IMAGE 6: /home/adml/Research/Hackathon2026/IDETC26-Hackathon-Autodesk-neuralCAD-Edit/data/edit_192_external/breps/3YH2WFSRM22W7DKT_1769782430.5654984_toprightiso.jpg]

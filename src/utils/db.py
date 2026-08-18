@@ -140,7 +140,7 @@ class DatabaseManager:
             
         return brep_id
     
-    def get_brep_images(self, brep_id, views=["toprightiso"], format=["jpg", "png"]):
+    def get_brep_images(self, brep_id, views=["iso1"], format=["jpg", "png"]):
         """
         Get the path to the frame image for a given brep_id.
         Assumes the frame image is stored as a PNG file in the breps directory.
@@ -161,11 +161,21 @@ class DatabaseManager:
             print(f"No images found for format {format} in brep {brep_id}.")
             return []
         
+        from src.utils.cadquery_rendering import view_name_aliases
+
+        match_views = []
+        seen = set()
+        for view in views:
+            for alias in view_name_aliases(view):
+                if alias not in seen:
+                    match_views.append(alias)
+                    seen.add(alias)
+
         all_format_image_list = []
 
         for format in all_formats:
             image_list = brep[format]
-            image_list = [img for img in image_list if any(img.endswith(f"{v}.{format}" ) for v in views)]
+            image_list = [img for img in image_list if any(img.endswith(f"{v}.{format}" ) for v in match_views)]
 
             if image_list:
                 all_format_image_list.extend(image_list) 

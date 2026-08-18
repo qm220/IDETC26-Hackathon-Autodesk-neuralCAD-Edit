@@ -1,0 +1,110 @@
+Thinking text:
+**Considering assembly design**
+
+I'm thinking about creating compound or assembly copies with bearing overlaps. For the visible model, I have eight arms around the x-axis. I need to load and inspect the print. The bearing sleeve should fit onto an outer R7 bore5, with an ideal length between 14 units from x=80 to 94. Joining each rotated part could work too. If the entire pattern is modified, each occurrence would share the same bearing, but overlapping might be a bit tricky. I might want to consider fusing the original with the bearing first.
+**Planning cylinder bore and fusion**
+
+I'm considering boring through the cylinder from x=79.9 to 94.1, but this could accidentally cut a tiny existing arm, which I'd prefer to avoid. Ideally, I should bore through the whole bearing, ending at x=80, without cutting the plate. I want to build the annulus for the outer cut while fusing it with the base to preserve the design. Then, I need to rotate the seed around an axis, ensuring the shape object is defined correctly and properly fused. If all copies are the same, then the exporter should be fine.
+
+Generated script:
+def my_cad_function(args):
+    input_file = os.path.expanduser(args["input_file"])
+    imported = cq.importers.importStep(input_file)
+    base_shape = imported.val() if hasattr(imported, "val") else imported
+
+    bbox = base_shape.BoundingBox()
+    print("Input valid:", base_shape.isValid())
+    print("Input bounding box: x=[%.3f, %.3f], y=[%.3f, %.3f], z=[%.3f, %.3f]" % (
+        bbox.xmin, bbox.xmax, bbox.ymin, bbox.ymax, bbox.zmin, bbox.zmax
+    ))
+
+    # Locate the largest planar face at the maximum-X, non-rounded end.
+    tolerance = 1.0e-3
+    terminal_faces = []
+    for face in base_shape.Faces():
+        center = face.Center()
+        try:
+            geom_type = face.geomType()
+        except Exception:
+            geom_type = ""
+        if geom_type == "PLANE" and abs(center.x - bbox.xmax) < tolerance:
+            terminal_faces.append(face)
+
+    if terminal_faces:
+        terminal_face = max(terminal_faces, key=lambda f: f.Area())
+        terminal_center = terminal_face.Center()
+        end_x = bbox.xmax
+        center_y = terminal_center.y
+        center_z = terminal_center.z
+        print("Terminal face found at x=%.3f, center=(%.3f, %.3f, %.3f), area=%.3f" % (
+            end_x, terminal_center.x, center_y, center_z, terminal_face.Area()
+        ))
+    else:
+        # Dimensional fallback from the supplied model description.
+        end_x = bbox.xmax
+        center_y = 0.5 * (bbox.ymin + bbox.ymax)
+        center_z = 0.5 * (bbox.zmin + bbox.zmax)
+        print("Terminal face selection fallback used; center=(%.3f, %.3f, %.3f)" % (
+            end_x, center_y, center_z
+        ))
+
+    # Match the existing boss precedent: OD 14 mm, bore diameter 10 mm.
+    # Use a 14 mm outward axial length because no separate length was supplied.
+    bearing_outer_radius = 7.0
+    bearing_bore_radius = 5.0
+    bearing_length = 14.0
+    origin = cq.Vector(end_x, center_y, center_z)
+    axis = cq.Vector(1, 0, 0)
+
+    outer = cq.Solid.makeCylinder(
+        bearing_outer_radius, bearing_length, origin, axis
+    )
+    bore = cq.Solid.makeCylinder(
+        bearing_bore_radius, bearing_length, origin, axis
+    )
+    bearing = outer.cut(bore)
+
+    # Join the annular bearing housing to the square terminal face.
+    try:
+        seed = base_shape.fuse(bearing).clean()
+        if not seed.isValid():
+            raise ValueError("Fused seed is invalid")
+        print("Bearing successfully joined to terminal face.")
+    except Exception as exc:
+        print("Bearing fusion fallback used:", exc)
+        seed = cq.Compound.makeCompound([base_shape, bearing])
+
+    # Eight total linked geometric occurrences: seed plus seven additional
+    # instances at 45-degree intervals about the terminal bearing axis.
+    axis_start = cq.Vector(end_x, center_y, center_z)
+    axis_end = cq.Vector(end_x + 1.0, center_y, center_z)
+    instances = []
+    for index in range(8):
+        angle = 45.0 * index
+        occurrence = seed if index == 0 else seed.rotate(axis_start, axis_end, angle)
+        instances.append(occurrence)
+
+    result = cq.Compound.makeCompound(instances)
+    print("Created cylindrical terminal bearing and 8 total occurrences.")
+    print("Pattern angles:", [45 * i for i in range(8)])
+    print("Result valid:", result.isValid())
+    return result
+
+Program output:
+stdout: Loading function from: /home/adml/Research/Hackathon2026/IDETC26-Hackathon-Autodesk-neuralCAD-Edit/output/gpt-5.6-sol-full48/gpt-5.6-sol_cadquery-script_1787016349.1313672/brep_end/1787016349.1313672/temp_script.py
+Input valid: True
+Input bounding box: x=[-25.000, 80.000], y=[11.000, 34.000], z=[-3.000, 11.000]
+Terminal face found at x=80.000, center=(80.000, 17.000, 4.000), area=48.000
+Bearing successfully joined to terminal face.
+Created cylindrical terminal bearing and 8 total occurrences.
+Pattern angles: [0, 45, 90, 135, 180, 225, 270, 315]
+Result valid: True
+Exported shape to: /home/adml/Research/Hackathon2026/IDETC26-Hackathon-Autodesk-neuralCAD-Edit/output/gpt-5.6-sol-full48/gpt-5.6-sol_cadquery-script_1787016349.1313672/brep_end/1787016349.1313672/tmp.step
+Exported STL to: /home/adml/Research/Hackathon2026/IDETC26-Hackathon-Autodesk-neuralCAD-Edit/output/gpt-5.6-sol-full48/gpt-5.6-sol_cadquery-script_1787016349.1313672/brep_end/1787016349.1313672/tmp.stl
+Exported PNG image to: /home/adml/Research/Hackathon2026/IDETC26-Hackathon-Autodesk-neuralCAD-Edit/output/gpt-5.6-sol-full48/gpt-5.6-sol_cadquery-script_1787016349.1313672/brep_end/1787016349.1313672/tmp.png
+Script completed.
+
+stderr: 
+
+Exported this iteration:
+tmp.step, tmp.stl, tmp.png, tmp_front.png, tmp_back.png, tmp_left.png, tmp_right.png, tmp_top.png, tmp_bottom.png, tmp_toprightiso.png

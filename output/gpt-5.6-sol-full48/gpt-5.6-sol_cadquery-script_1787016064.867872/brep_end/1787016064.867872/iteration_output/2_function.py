@@ -1,0 +1,35 @@
+def my_cad_function(args):
+    import os
+    import cadquery as cq
+
+    input_file = os.path.expanduser(args["input_file"])
+    imported = cq.importers.importStep(input_file)
+    base_shape = imported.val()
+    result = cq.Workplane(obj=base_shape)
+
+    axis_y = cq.Vector(0, 1, 0)
+    new_centers = [20.0, 40.0, 60.0]
+
+    for x_center in new_centers:
+        pedestal = cq.Solid.makeCone(8.0, 7.0, 5.0, cq.Vector(x_center, 21.5, 4.0), axis_y)
+        boss = cq.Solid.makeCylinder(7.0, 11.0, cq.Vector(x_center, 23.0, 4.0), axis_y)
+        result = result.union(cq.Workplane(obj=pedestal))
+        result = result.union(cq.Workplane(obj=boss))
+
+    for x_center in new_centers:
+        socket_cutter = cq.Solid.makeCylinder(5.0, 9.1, cq.Vector(x_center, 25.0, 4.0), axis_y)
+        result = result.cut(cq.Workplane(obj=socket_cutter))
+
+    leg_stations = [-15.0, 74.0]
+    for x_center in leg_stations:
+        positive_leg = cq.Workplane("XY").box(8.0, 20.0, 9.0, centered=(True, True, True)).translate((x_center, 31.0, -1.5))
+        negative_leg = cq.Workplane("XY").box(8.0, 20.0, 9.0, centered=(True, True, True)).translate((x_center, 3.0, -1.5))
+        result = result.union(positive_leg)
+        result = result.union(negative_leg)
+
+        positive_rib = cq.Workplane("XZ", origin=(x_center, 21.0, 0.0)).polyline([(-4.0, 2.0), (4.0, 2.0), (0.0, 6.0)]).close().extrude(-5.0)
+        negative_rib = cq.Workplane("XZ", origin=(x_center, 13.0, 0.0)).polyline([(-4.0, 2.0), (4.0, 2.0), (0.0, 6.0)]).close().extrude(5.0)
+        result = result.union(positive_rib)
+        result = result.union(negative_rib)
+
+    return result

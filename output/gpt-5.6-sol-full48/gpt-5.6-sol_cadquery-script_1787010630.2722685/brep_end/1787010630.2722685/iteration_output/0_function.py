@@ -1,0 +1,86 @@
+def my_cad_function(args):
+    input_file = os.path.expanduser(args["input_file"])
+    model = cq.importers.importStep(input_file)
+    base_shape = model.val()
+
+    # Extract the opposed outer seating planes and their rounded-square envelope.
+    model_bb = base_shape.BoundingBox()
+    front_y = model_bb.ymax
+    rear_y = model_bb.ymin
+    tol = 0.05
+
+    def seating_face_at(y_value):
+        candidates = []
+        for face in base_shape.Faces():
+            bb = face.BoundingBox()
+            lies_at_y = abs(bb.ymin - y_value) < tol and abs(bb.ymax - y_value) < tol
+            if lies_at_y and bb.xlen > 20.0 and bb.zlen > 20.0:
+                candidates.append((bb.xlen * bb.zlen, face, bb))
+        if not candidates:
+            return None, None
+        candidates.sort(key=lambda item: item[0], reverse=True)
+        return candidates[0][1], candidates[0][2]
+
+    front_face, front_bb = seating_face_at(front_y)
+    rear_face, rear_bb = seating_face_at(rear_y)
+
+    # Prefer the extracted hub-rim dimensions. Fall back to the nominal dimensions
+    # from the source geometry if topology import obscures the planar rim faces.
+    if front_bb is not None:
+        width = front_bb.xlen
+        height = front_bb.zlen
+        center_x = (front_bb.xmin + front_bb.xmax) / 2.0
+        center_z = (front_bb.zmin + front_bb.zmax) / 2.0
+    elif rear_bb is not None:
+        width = rear_bb.xlen
+        height = rear_bb.zlen
+        center_x = (rear_bb.xmin + rear_bb.xmax) / 2.0
+        center_z = (rear_bb.zmin + rear_bb.zmax) / 2.0
+    else:
+        width = 50.8
+        height = 50.8
+        center_x = 0.0
+        center_z = 0.0
+        front_y = 27.94
+        rear_y = -15.24
+
+    # The imported outer contour has nominal 7.62 mm corner transitions.
+    corner_radius = min(7.62, width / 2.0 - 0.01, height / 2.0 - 0.01)
+    thickness = 2.54
+
+    front_plane = cq.Plane(
+        origin=(center_x, front_y, center_z),
+        xDir=(1, 0, 0),
+        normal=(0, 1, 0)
+    )
+    front_cover = (
+        cq.Workplane(front_plane)
+        .rect(width, height)
+        .vertices()
+        .fillet(corner_radius)
+        .extrude(thickness)
+    )
+
+    rear_plane = cq.Plane(
+        origin=(center_x, rear_y, center_z),
+        xDir=(1, 0, 0),
+        normal=(0, -1, 0)
+    )
+    rear_cover = (
+        cq.Workplane(rear_plane)
+        .rect(width, height)
+        .vertices()
+        .fillet(corner_radius)
+        .extrude(thickness)
+    )
+
+    print("Imported model valid:", base_shape.isValid())
+    print("Extracted hub seating planes: rear=%.3f mm, front=%.3f mm" % (rear_y, front_y))
+    print("Cover profile: %.3f x %.3f mm, corner radius %.3f mm" % (width, height, corner_radius))
+    print("Created two independent cover solids, each %.3f mm thick" % thickness)
+
+    result = cq.Assembly(name="crossed_arm_with_covers")
+    result.add(base_shape, name="existing_model", color=cq.Color(0.72, 0.72, 0.76))
+    result.add(front_cover.val(), name="front_cover", color=cq.Color(0.20, 0.65, 0.85))
+    result.add(rear_cover.val(), name="rear_cover", color=cq.Color(0.20, 0.65, 0.85))
+    return result

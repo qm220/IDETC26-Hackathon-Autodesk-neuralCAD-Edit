@@ -1,0 +1,41 @@
+def my_cad_function(args):
+    import os
+    import cadquery as cq
+
+    input_file = os.path.expanduser(args['input_file'])
+    model = cq.importers.importStep(input_file)
+    shape = model.val()
+    solids = list(shape.Solids())
+
+    expected_center = cq.Vector(-237.0, 340.0, 318.5)
+    expected_dims = (42.9583, 10.0, 4.7917)
+    expected_volume = 1623.5385
+
+    candidates = []
+    for index, solid in enumerate(solids):
+        bb = solid.BoundingBox()
+        c = bb.center
+        dim_error = (
+            abs(bb.xlen - expected_dims[0]) / expected_dims[0] +
+            abs(bb.ylen - expected_dims[1]) / expected_dims[1] +
+            abs(bb.zlen - expected_dims[2]) / expected_dims[2]
+        )
+        center_error = (
+            abs(c.x - expected_center.x) / 50.0 +
+            abs(c.y - expected_center.y) / 50.0 +
+            abs(c.z - expected_center.z) / 50.0
+        )
+        volume_error = abs(solid.Volume() - expected_volume) / expected_volume
+        score = 5.0 * dim_error + center_error + volume_error
+        candidates.append((score, index, solid))
+
+    score, source_index, source_button = min(candidates, key=lambda item: item[0])
+    if score > 0.25:
+        raise ValueError('Unable to identify the existing horizontal button reliably')
+
+    pitch = 20.0
+    upper_button = source_button.translate(cq.Vector(0.0, pitch, 0.0))
+    lower_button = source_button.translate(cq.Vector(0.0, -pitch, 0.0))
+
+    result = cq.Compound.makeCompound([shape, upper_button, lower_button])
+    return cq.Workplane('XY').newObject([result])

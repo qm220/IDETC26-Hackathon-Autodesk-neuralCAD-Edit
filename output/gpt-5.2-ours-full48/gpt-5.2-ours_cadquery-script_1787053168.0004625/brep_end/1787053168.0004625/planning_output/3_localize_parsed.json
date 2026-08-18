@@ -1,0 +1,221 @@
+{
+  "request": "Let's make this part symmetric. There is a step on one of the sides of the whistle. Move the protruding surface so that it is level with the surface next to it. Delete all chamfers and radii and new ones following rules: Horizontal edges in the area where the narrow and bigger part of the whistle meet have a radius R=20mm. Other edges have R=5mm applied to them",
+  "request_wording": {
+    "action_words": [
+      "make",
+      "Move",
+      "level",
+      "Delete",
+      "chamfers",
+      "radii",
+      "new",
+      "following",
+      "rules",
+      "Horizontal",
+      "edges",
+      "meet",
+      "have",
+      "radius",
+      "R=20mm",
+      "Other",
+      "edges",
+      "have",
+      "R=5mm",
+      "applied"
+    ],
+    "referenced_feature_words": [
+      "part",
+      "step",
+      "sides",
+      "whistle",
+      "protruding",
+      "surface",
+      "surface",
+      "it",
+      "chamfers",
+      "radii",
+      "edges",
+      "area",
+      "narrow",
+      "bigger",
+      "part",
+      "whistle",
+      "them"
+    ],
+    "intention_words": [
+      "symmetric"
+    ],
+    "grammatical_words": [
+      "Let's",
+      "this",
+      "There",
+      "is",
+      "a",
+      "on",
+      "one",
+      "of",
+      "the",
+      "of",
+      "the",
+      "so",
+      "that",
+      "it",
+      "is",
+      "with",
+      "the",
+      "next",
+      "to",
+      "it",
+      "all",
+      "and",
+      "and",
+      "ones",
+      "in",
+      "the",
+      "where",
+      "the",
+      "and",
+      "of",
+      "the",
+      "to",
+      "them"
+    ]
+  },
+  "actions": [
+    {
+      "operation": "Move/offset the protruding side surface to eliminate the step by making it flush (coplanar) with the adjacent side surface",
+      "parameters": {
+        "symmetry_reference_plane": "Mid-width datum plane at y=260 (per model symmetry note)",
+        "reference_face_y_value": "y=230 (FACE 5)",
+        "target_face_new_y_value": "y=290.000 (symmetric counterpart of y=230 about y=260)",
+        "offset_distance": "-4.336333mm (move FACE 11 from y=294.336 to y=290.000, direction -Y)"
+      },
+      "target": "The protruding surface on one side of the whistle (the surface forming the step)",
+      "relational_constraint": "Resulting surface must be level/flush with the neighboring surface next to it; remove the step; achieve side symmetry about the mid-width plane (y=260)",
+      "unresolved_reference": "The request says 'step on one of the sides'; based on model symmetry, the only clear non-symmetric side is the arm/tip side plane at y=294.336 (FACE 11). If a different local step is intended (e.g., underside relief step), confirm the specific location/side from the multiview images.",
+      "target section code": [
+        "S2_ARM_TIP"
+      ],
+      "target face code": [
+        "0016",
+        "0014"
+      ],
+      "steps": [
+        "Establish symmetry reference: create/verify a datum midplane parallel to the XZ plane located at y=260 (mid-width plane noted in model.json symmetry_note).",
+        "Identify the two main arm side planes: front/left side face at y=230 (face_code 0014, Brep FACE 5) and rear/right side face at y=294.336 (face_code 0016, Brep FACE 11).",
+        "Compute symmetric target for the rear/right face: y_target = 2*260 - 230 = 290.000. This indicates the rear/right face currently protrudes by 294.336 - 290.000 = 4.336333mm.",
+        "Direct-edit (Move Face / Offset Face): select face_code 0016 (Brep FACE 11) and offset it by -4.336333mm in the -Y direction to relocate it to y=290.000.",
+        "Heal/propagate adjacent faces: allow the CAD system to extend/trim the top face (0015), bottom face (0017), and end faces (0013 shoulder and 0027 right end) to maintain a watertight solid after the move.",
+        "Validation: measure overall arm width about y=260 to confirm symmetry (distance from y=260 to each side equals 30mm). Confirm bore opening on end face remains valid; if bore becomes off-center relative to new outer width, leave as-is unless a separate centering requirement is provided."
+      ]
+    },
+    {
+      "operation": "Delete/remove all existing chamfer and fillet (radius) features",
+      "parameters": {
+        "method_preference": "If parametric history exists: suppress/delete fillet and chamfer features. If direct BREP only: Delete Face with Heal/Patch for blend faces listed.",
+        "delete_mode": "Delete blend faces and heal to sharp edges prior to re-filleting"
+      },
+      "target": "All chamfers and all radii/fillets on the part",
+      "relational_constraint": "All existing edge breaks are removed prior to reapplying new radii per rules",
+      "unresolved_reference": "Some blends are represented by BSPLINE transition faces and minor faces without explicit face_code (e.g., S1_HEAD minor_faces_Brep_id FACE 30, FACE 35). These must also be removed/healed to fully reset edge conditions.",
+      "target section code": [
+        "S1_HEAD",
+        "S2_ARM_TIP"
+      ],
+      "target face code": [
+        "0001",
+        "0002",
+        "0004",
+        "0006",
+        "0007",
+        "0008",
+        "0010",
+        "0011",
+        "0012",
+        "0019",
+        "0020",
+        "0021",
+        "0022",
+        "0023",
+        "0024",
+        "0025",
+        "0026"
+      ],
+      "steps": [
+        "Head blends removal (S1_HEAD): select and delete/heal all rounded/blended faces on the head, including large R≈30 cylindrical/spherical blends and transition patches: face_codes 0001, 0002, 0006, 0007, 0008, 0010, 0011, 0012, plus small fillet 0004. Also include the un-coded minor blend faces (Brep FACE 30 and FACE 35) as needed for complete sharp restoration.",
+        "Arm/tip blends removal (S2_ARM_TIP): select and delete/heal all chamfer/fillet/relief blend faces including underside relief cylinder 0019, lower/upper chamfer planes 0020 and 0022, conical transitions 0021 and 0023, tip chamfer 0024, and tip fillets 0025 (R2.5) and 0026 (R10).",
+        "After each delete-heal group, run geometry repair (stitch/heal) to ensure adjacent planar faces are extended/trimmed back to clean intersections (sharp edges) without gaps.",
+        "Checkpoint: visually verify that all exterior edges are sharp (no remaining rolling highlight bands), and that the shoulder at x=100 (face_code 0013) is now a crisp intersection with top/bottom/side planes prior to applying new fillets."
+      ]
+    },
+    {
+      "operation": "Apply fillet with radius 20 mm to the specified horizontal edges at the transition between narrow and larger whistle sections",
+      "parameters": {
+        "radius": "20mm",
+        "edge_selection_rule": "Edges at the head-to-arm transition (x=100, face_code 0013) that are horizontal (parallel to global Y) — i.e., intersections of the shoulder plane with the top and bottom planes."
+      },
+      "target": "Horizontal edges in the area where the narrow and bigger part of the whistle meet",
+      "relational_constraint": "Edges must be horizontal and located in the meeting/transition area between the narrow section and the larger section",
+      "unresolved_reference": "If the user intended 'horizontal edges' to mean edges parallel to global X (instead of Y), confirm. Current best match is the shoulder-plane intersections at x=100 with top/bottom faces, which are the primary stress-relief edges between the larger head and narrower arm.",
+      "target section code": [
+        "S2_ARM_TIP",
+        "S1_HEAD"
+      ],
+      "target face code": [
+        "0013",
+        "0015",
+        "0017",
+        "0009"
+      ],
+      "steps": [
+        "Identify the narrow-to-large transition: the shoulder/transition plane at x=100 (face_code 0013, Brep FACE 13) where the head (S1_HEAD) blends/steps into the arm (S2_ARM_TIP).",
+        "Select the two horizontal shoulder edges created after blend deletion: (a) edge = intersection of FACE 13 (0013) with top plane FACE 10 (0015, z=-340); (b) edge(s) = intersection of FACE 13 (0013) with bottom planes in the transition region (arm bottom FACE 12 (0017, z=-445) and/or head bottom FACE 34 (0009, z=-450) depending on resulting sharp topology).",
+        "Apply constant edge fillet: radius = 20mm. Use tangent propagation OFF initially to avoid unintentionally filleting vertical side edges; then add any additional horizontal shoulder segments explicitly if the shoulder edge is segmented.",
+        "Verify fillet continuity around the transition: confirm the R20 fillet sits only on the horizontal shoulder edges (top and bottom) at x=100 and does not roll onto functional faces (e.g., bore end face 0033 at x=100 inside the part)."
+      ]
+    },
+    {
+      "operation": "Apply fillet with radius 5 mm to all remaining edges not covered by the R20 rule",
+      "parameters": {
+        "radius": "5mm",
+        "scope": "All remaining external sharp edges after R20 application; optionally include pocket mouth edges if desired for deburring",
+        "exclusions": "Do not override R20 edges; do not fillet internal bore cylindrical wall; avoid altering functional datum planes if required for mating (not specified)."
+      },
+      "target": "Other edges (all edges excluding the horizontal transition edges receiving R=20mm)",
+      "relational_constraint": "Apply to remaining edges after R20 edges are selected; do not override the R20 fillets",
+      "unresolved_reference": "Unclear whether 'other edges' includes internal pocket edges (S3_BOTTOM_POCKET) and the bore mouth edge on the right end face (0027). If the intent is global deburr, include pocket perimeter and bore mouth. If the pocket/bore are functional datums, leave sharp unless specified.",
+      "target section code": [
+        "S1_HEAD",
+        "S2_ARM_TIP",
+        "S3_BOTTOM_POCKET"
+      ],
+      "target face code": [
+        "0000",
+        "0003",
+        "0005",
+        "0009",
+        "0014",
+        "0015",
+        "0016",
+        "0017",
+        "0027",
+        "0028",
+        "0029",
+        "0030",
+        "0031",
+        "0032"
+      ],
+      "steps": [
+        "After completing R20 fillets, set up an edge fillet feature with radius = 5mm.",
+        "Select remaining external sharp edges on the head and arm/tip outer body: edges formed by intersections of planar faces such as top (0015) with side faces (0014/0016), side faces with bottom (0017/0009), and end faces (0000 left end, 0027 right end) with adjacent faces. Use tangent propagation ON for smooth chains on the same logical edge run, but validate it does not consume the R20 shoulder fillets.",
+        "Tip/end detailing: include the right-end outer perimeter edges on face_code 0027 (Brep FACE 7) for a uniform R5 unless the tip requires a sharp seating edge (not indicated in request).",
+        "Pocket edge treatment (conditional per intent): if applying R5 to internal recess edges, fillet the pocket mouth perimeter and internal vertical edges defined by pocket faces 0028–0032 to reduce stress risers and sharpness. Keep the pocket floor/ceiling planar.",
+        "Regenerate and perform interference/self-intersection check: confirm R5 fillets do not collide with the underside relief region (which was deleted and redefined) or with the bore opening boundary on the end face."
+      ]
+    }
+  ],
+  "intention": [
+    "Make the whistle part symmetric by removing an unintended side step (best match: arm side plane y=294.336 adjusted to y=290 to be symmetric about y=260 relative to y=230 side).",
+    "Standardize edge treatment by removing existing chamfers/fillets and reapplying consistent fillet radii based on location: R20 on horizontal shoulder edges at the narrow-to-large transition (x=100), and R5 on all remaining edges."
+  ]
+}

@@ -1,0 +1,748 @@
+Now use all the given information:
+1. model.json file
+2. operation.json file
+3. Multiview images
+
+Decide which sections of the original model should be modified, removed, interacted with or if new sections should be created. Use as much information from the Multiview images, model.json files and operation.json as possible.
+
+Make this decision from several perspectives. If target clearly identify geometry, locate the corresponding section(s) and face(s) in model.json. If there is no clear geometry identified, use the referenced features and relational_constraint to identify potential sections and features. Additionally, consider the intention of the edit. Based on the function and behavior associated with each section and features, decide which section require the action the most. Then, find the corresponding section and face code from model.json.
+
+Plan out the modeling procedure needed to perform each action. Describe them in professional CAD modelling languages from choosing the plane, draw sketches to extrusion, add chamfers. Be thorough and detailed.
+
+face_code values in model.json are visual labels from shaded renders. Brep_id is the CadQuery Faces() index from the STEP analysis report (for example FACE 0).
+
+Edit operation.json accordingly. Keep the previous request_wording and actions, and add localization plus steps.
+
+OUTPUT FORMAT (JSON, operation.json, no markdown fences, use this schema):
+{
+  "request": "",
+  "request_wording": {
+    "action_words": ["..."],
+    "referenced_feature_words": ["..."],
+    "intention_words": ["..."],
+    "grammatical_words": ["..."]
+  },
+  "actions": [
+    {
+      "operation": "...",
+      "parameters": {
+        "parameter_name": "..."
+      },
+      "target": "...",
+      "relational_constraint": "...",
+      "unresolved_reference": "...",
+      "target section code": ["..."],
+      "target face code": ["..."],
+      "steps": [
+        "...",
+        "..."
+      ]
+    }
+  ],
+  "intention": ["..."]
+}
+
+The model.json, operation.json, and labeled multi-view images follow.
+
+
+model.json:
+
+{
+  "part": {
+    "name": "Countertop beverage machine outer assembly (espresso-style)",
+    "description": "Multi-solid CAD assembly representing an appliance enclosure with a front removable faceplate, rear vent/control cover, internal cavity/drip-area, a central brew-head interface with actuating lever/rod, and a right-side steam-wand interface. Geometry dominated by large blended shells plus repeated small cylindrical/planar faces for vents, pads, and fastener/feature details.",
+    "source_views": [
+      "front",
+      "back",
+      "left",
+      "right",
+      "top",
+      "bottom",
+      "toprightiso"
+    ],
+    "symmetry_note": "Overall housing is approximately left-right symmetric about a vertical mid-plane, but symmetry is broken by the right-side steam wand and local control/feature cutouts."
+  },
+  "Section": [
+    {
+      "id": "S1",
+      "name": "Main housing shell (cream enclosure + internal cavity frame)",
+      "features included": [
+        "Primary structural enclosure shell with large corner blends",
+        "Front mating interface for detachable front faceplate",
+        "Rear mating interface for rear cover/vent panel",
+        "Internal open cavity (cup/drip space) with inner wall surfaces",
+        "Base footprint and underside datum surfaces",
+        "Top blended roof surface transitioning to rear cover"
+      ],
+      "function intent": "Provide the primary structure, protect internal components, define the user-facing cavity volume, and provide locating/mounting interfaces for front and rear panels and functional subassemblies.",
+      "physical behavior": "Acts as a stiff shell/monocoque: large blended walls distribute handling and operational loads; front/rear flange-like interfaces constrain attached covers; base plane transfers weight to feet/pads; inner cavity walls resist local bending from drip tray and cup contact.",
+      "geometry": "Large U/C-shaped enclosure volume with broad BSPLINE outer surfaces, planar datum faces, and multiple blended transitions. Includes a recessed/open front cavity and planar interface bands for cover attachment.",
+      "location": "Central and majority of the part volume; spans from front interface behind faceplate to rear interface ahead of rear cover.",
+      "colour": {
+        "R": 214,
+        "G": 209,
+        "B": 195
+      },
+      "major_faces": [
+        {
+          "face_code": "0010",
+          "name": "Base/underside datum",
+          "Brep_id": "FACE 68",
+          "description": "Large underside face of the main shell (broad near-planar/BSPLINE base region) establishing the machine’s support footprint."
+        },
+        {
+          "face_code": "0011",
+          "name": "Front interface band",
+          "Brep_id": "FACE 67",
+          "description": "Front-facing interface surface at the start of the main shell (mating/locating surface behind the detachable front faceplate)."
+        },
+        {
+          "face_code": "0012",
+          "name": "Right exterior wall",
+          "Brep_id": "FACE 54",
+          "description": "Outer right side wall patch (dominantly vertical BSPLINE) forming the housing’s right silhouette."
+        },
+        {
+          "face_code": "0013",
+          "name": "Right exterior secondary wall",
+          "Brep_id": "FACE 55",
+          "description": "Adjacent right-side wall patch near the front cavity transition (BSPLINE)."
+        },
+        {
+          "face_code": "0014",
+          "name": "Left exterior wall",
+          "Brep_id": "FACE 60",
+          "description": "Outer left side wall patch (dominantly vertical BSPLINE) forming the housing’s left silhouette."
+        },
+        {
+          "face_code": "0015",
+          "name": "Left exterior secondary wall",
+          "Brep_id": "FACE 64",
+          "description": "Adjacent left-side wall patch near the front cavity transition (BSPLINE)."
+        },
+        {
+          "face_code": "0016",
+          "name": "Inner cavity rear wall",
+          "Brep_id": "FACE 58",
+          "description": "Large inner cavity wall/partition surface (near-planar BSPLINE/plane) at the back of the cup/drip space."
+        },
+        {
+          "face_code": "0017",
+          "name": "Inner cavity floor",
+          "Brep_id": "FACE 61",
+          "description": "Large inner cavity lower surface supporting/draining toward drip area (BSPLINE)."
+        },
+        {
+          "face_code": "0018",
+          "name": "Inner cavity front opening wall",
+          "Brep_id": "FACE 6",
+          "description": "Interior-facing surface around the front opening, defining the cavity aperture (BSPLINE)."
+        },
+        {
+          "face_code": "0019",
+          "name": "Top roof surface",
+          "Brep_id": "FACE 5",
+          "description": "Upper blended roof/cover surface (BSPLINE) transitioning toward rear cover region."
+        }
+      ],
+      "minor_faces_Brep_id": [
+        "FACE 0..11 (main shell blends and side/top patches not promoted to major)",
+        "FACE 46..66 except FACE 54,55,58,60,61,64,67 (additional cavity/exterior patches and transitions)",
+        "FACE 79..90 except FACE 86,87,89 (rear transition/interface patches shared with rear cover region)",
+        "FACE 394..401 (front cavity frame/edge band patches near y≈54..59 that stiffen the opening)",
+        "FACE 508..513 (internal shelf/tray support patches blended into housing volume)"
+      ],
+      "relationships": [
+        {
+          "source id": "S1",
+          "target id": "S2",
+          "function relationship": "locates_mating_part",
+          "structural relationship": "attached_to"
+        },
+        {
+          "source id": "S1",
+          "target id": "S4",
+          "function relationship": "locates_mating_part",
+          "structural relationship": "attached_to"
+        },
+        {
+          "source id": "S1",
+          "target id": "S6",
+          "function relationship": "supports",
+          "structural relationship": "supports"
+        },
+        {
+          "source id": "S1",
+          "target id": "S7",
+          "function relationship": "mounts_to",
+          "structural relationship": "attached_to"
+        },
+        {
+          "source id": "S1",
+          "target id": "S8",
+          "function relationship": "supports",
+          "structural relationship": "supports"
+        }
+      ]
+    },
+    {
+      "id": "S2",
+      "name": "Front detachable faceplate (black square panel)",
+      "features included": [
+        "Large planar exterior front face",
+        "Perimeter rounded-corner blend geometry",
+        "Panel thickness defining an inner back face",
+        "Side/top/bottom perimeter faces for fit into housing opening"
+      ],
+      "function intent": "Provide a user-facing front cover/door/trim that closes the front of the appliance and protects/finishes the opening while locating to the main housing.",
+      "physical behavior": "Acts as a stiff plate; transfers push/pull and handling loads into the housing through perimeter contact; rounded corners reduce stress concentration and improve impact resistance.",
+      "geometry": "Rectangular plate with large corner radii (cylindrical corner blends), two main parallel planar faces (outer and inner), and planar perimeter sides.",
+      "location": "Front-most element; spans nearly full width/height of the front silhouette.",
+      "colour": {
+        "R": 30,
+        "G": 30,
+        "B": 34
+      },
+      "major_faces": [
+        {
+          "face_code": "0000",
+          "name": "Front exterior plane",
+          "Brep_id": "FACE 14",
+          "description": "Main outer front planar face of the faceplate (user-facing)."
+        },
+        {
+          "face_code": "0001",
+          "name": "Rear interior plane",
+          "Brep_id": "FACE 17",
+          "description": "Main inner planar face of the faceplate (mates toward housing)."
+        },
+        {
+          "face_code": "0002",
+          "name": "Left perimeter side",
+          "Brep_id": "FACE 16",
+          "description": "Left vertical planar edge face of the plate thickness."
+        },
+        {
+          "face_code": "0003",
+          "name": "Bottom perimeter side",
+          "Brep_id": "FACE 19",
+          "description": "Bottom horizontal planar edge face of the plate thickness."
+        },
+        {
+          "face_code": "0004",
+          "name": "Bottom-right corner blend",
+          "Brep_id": "FACE 20",
+          "description": "Cylindrical blend at the bottom-right rounded corner (corner radius surface)."
+        },
+        {
+          "face_code": "0005",
+          "name": "Right perimeter side",
+          "Brep_id": "FACE 13",
+          "description": "Right vertical planar edge face of the plate thickness."
+        },
+        {
+          "face_code": "0006",
+          "name": "Top-right corner blend",
+          "Brep_id": "FACE 12",
+          "description": "Cylindrical blend at the top-right rounded corner (corner radius surface)."
+        },
+        {
+          "face_code": "0007",
+          "name": "Top perimeter side",
+          "Brep_id": "FACE 21",
+          "description": "Top horizontal planar edge face of the plate thickness."
+        },
+        {
+          "face_code": "0008",
+          "name": "Top-left corner blend",
+          "Brep_id": "FACE 15",
+          "description": "Cylindrical blend at the top-left rounded corner (corner radius surface)."
+        },
+        {
+          "face_code": "0009",
+          "name": "Bottom-left corner blend",
+          "Brep_id": "FACE 18",
+          "description": "Cylindrical blend at the bottom-left rounded corner (corner radius surface)."
+        }
+      ],
+      "minor_faces_Brep_id": [
+        "FACE 69..78 (duplicate/second instance of the faceplate face set in the STEP export)",
+        "FACE 10,11 (adjacent base/trim surfaces near the faceplate boundary depending on assembly overlap)"
+      ],
+      "relationships": [
+        {
+          "source id": "S2",
+          "target id": "S1",
+          "function relationship": "mounts_to",
+          "structural relationship": "attached_to"
+        },
+        {
+          "source id": "S2",
+          "target id": "S3",
+          "function relationship": "provides_clearance",
+          "structural relationship": "adjacent_to"
+        }
+      ]
+    },
+    {
+      "id": "S3",
+      "name": "Front corner bumper pads / feet (4x small pads on faceplate corners)",
+      "features included": [
+        "Four small protruding pads at faceplate corners",
+        "Flat pad contact faces",
+        "Side walls and small blends"
+      ],
+      "function intent": "Provide stand-off and impact protection when the faceplate contacts other surfaces; also protect finish and stabilize against rocking/abrasion.",
+      "physical behavior": "Pads act in compression at contact; distribute local contact stress; add friction and protect the faceplate from direct edge/corner impacts.",
+      "geometry": "Four small block-like solids with planar/BSPLINE faces; each has an outward-facing pad surface, side walls, and top/bottom faces.",
+      "location": "At the four corners of the front faceplate.",
+      "colour": {
+        "R": 70,
+        "G": 70,
+        "B": 74
+      },
+      "major_faces": [
+        {
+          "face_code": "0020",
+          "name": "Pad outward contact face (representative)",
+          "Brep_id": "FACE 24",
+          "description": "Representative outward-facing pad face (contact surface); other pads are similar instances."
+        },
+        {
+          "face_code": "0021",
+          "name": "Pad top face (representative)",
+          "Brep_id": "FACE 23",
+          "description": "Representative top face of a corner pad."
+        },
+        {
+          "face_code": "0022",
+          "name": "Pad bottom face (representative)",
+          "Brep_id": "FACE 26",
+          "description": "Representative bottom face of a corner pad."
+        },
+        {
+          "face_code": "0023",
+          "name": "Pad side face (representative)",
+          "Brep_id": "FACE 22",
+          "description": "Representative side wall face of a corner pad."
+        }
+      ],
+      "minor_faces_Brep_id": [
+        "FACE 22..27 (pad at one corner: remaining minor faces)",
+        "FACE 28..33 (pad at second corner)",
+        "FACE 34..39 (pad at third corner)",
+        "FACE 40..45 (pad at fourth corner)"
+      ],
+      "relationships": [
+        {
+          "source id": "S3",
+          "target id": "S2",
+          "function relationship": "distributes_stress",
+          "structural relationship": "attached_to"
+        }
+      ]
+    },
+    {
+      "id": "S4",
+      "name": "Rear cover / vented back panel module",
+      "features included": [
+        "Rear outer cover surface",
+        "Rear inner interface surface to main housing",
+        "Top rear blended cap",
+        "Rear vent/grill feature set (repeated slats/slots)",
+        "Side walls of rear cover"
+      ],
+      "function intent": "Close the rear of the enclosure, provide ventilation openings, and support/guard rear-side interfaces while cosmetically finishing the appliance.",
+      "physical behavior": "Acts as a secondary shell; transfers handling loads into the main housing through the rear interface; vent slats behave as thin ribs that resist local bending while maintaining open area for airflow.",
+      "geometry": "Rear cover with large planar/BSPLINE faces and a dense array of repeated small cylindrical/planar faces forming the vent slats.",
+      "location": "Rear-most portion of the assembly (back view).",
+      "colour": {
+        "R": 25,
+        "G": 25,
+        "B": 28
+      },
+      "major_faces": [
+        {
+          "face_code": "0024",
+          "name": "Rear outer back face",
+          "Brep_id": "FACE 86",
+          "description": "Back-most exterior face of the rear cover module (dominant rear plane/BSPLINE patch)."
+        },
+        {
+          "face_code": "0025",
+          "name": "Rear inner interface face",
+          "Brep_id": "FACE 87",
+          "description": "Forward-facing inner interface surface of the rear cover that mates to the main housing rear opening."
+        },
+        {
+          "face_code": "0026",
+          "name": "Rear top cap face",
+          "Brep_id": "FACE 89",
+          "description": "Top region face of rear cover (upper band near the top edge)."
+        },
+        {
+          "face_code": "0027",
+          "name": "Rear upper blend strip",
+          "Brep_id": "FACE 81",
+          "description": "Upper blended transition surface on the rear cover (sloped/rounded strip near top)."
+        },
+        {
+          "face_code": "0028",
+          "name": "Rear lower face/bottom band",
+          "Brep_id": "FACE 84",
+          "description": "Lower rear cover underside/band surface (near bottom of rear module)."
+        },
+        {
+          "face_code": "0029",
+          "name": "Representative vent slat cylinder",
+          "Brep_id": "FACE 91",
+          "description": "One of many repeated small cylindrical slat faces forming the rear vent grill; representative of the repeated pattern."
+        },
+        {
+          "face_code": "0030",
+          "name": "Representative slat endcap plane",
+          "Brep_id": "FACE 92",
+          "description": "One of many repeated planar end faces terminating vent slat elements; representative."
+        }
+      ],
+      "minor_faces_Brep_id": [
+        "FACE 79..90 except FACE 81,84,86,87,89 (rear module surrounding patches)",
+        "FACE 93..150 (remaining repeated slat cylinders/endcaps and closely related small faces)",
+        "FACE 151..177 (rear handle/edge details and small blends around rear cover)",
+        "FACE 178..393 (dense repeated vent/slot/feature faces; majority of rear grill/trim detailing)"
+      ],
+      "relationships": [
+        {
+          "source id": "S4",
+          "target id": "S1",
+          "function relationship": "mounts_to",
+          "structural relationship": "attached_to"
+        },
+        {
+          "source id": "S4",
+          "target id": "S5",
+          "function relationship": "provides_clearance",
+          "structural relationship": "adjacent_to"
+        }
+      ]
+    },
+    {
+      "id": "S5",
+      "name": "Base support & lower trim (incl. bottom contact features)",
+      "features included": [
+        "Lower base band/trim geometry",
+        "Underside contact regions and small foot features",
+        "Lower front/rear rounded transitions"
+      ],
+      "function intent": "Provide stable support on a countertop, protect lower edges, and distribute load into the support points.",
+      "physical behavior": "Transfers static weight into the contact points; bottom trim resists scuffing and local impacts; small feet/pads carry compressive load and add friction.",
+      "geometry": "Broad lower band with large blends; includes small protruding pad/foot solids and underside planar faces.",
+      "location": "Bottom perimeter of the assembly; includes underside and near-floor features.",
+      "colour": {
+        "R": 45,
+        "G": 45,
+        "B": 48
+      },
+      "major_faces": [
+        {
+          "face_code": "0031",
+          "name": "Representative underside contact plane",
+          "Brep_id": "FACE 10",
+          "description": "Primary underside face patch (near-planar) contributing to the bottom datum/stand region."
+        },
+        {
+          "face_code": "0032",
+          "name": "Front-bottom underside plane (panel underside region)",
+          "Brep_id": "FACE 11",
+          "description": "Underside planar face near the front-bottom region spanning much of the width."
+        }
+      ],
+      "minor_faces_Brep_id": [
+        "FACE 2,8 (bottom/front blended underside transitions)",
+        "FACE 22..45 (if treated as feet/pads in some assembly interpretations; otherwise S3)",
+        "FACE 84 (rear lower band interface shared with rear module)",
+        "SOLID-level small underside details not promoted: FACE 24,27,30,33,36,39,42,45 (local underside patches near pads)"
+      ],
+      "relationships": [
+        {
+          "source id": "S5",
+          "target id": "S1",
+          "function relationship": "transmits_load",
+          "structural relationship": "attached_to"
+        }
+      ]
+    },
+    {
+      "id": "S6",
+      "name": "Brew head / central dispensing interface block",
+      "features included": [
+        "Central brew head mounting block geometry",
+        "Cylindrical interface surfaces for mating tool/portafilter-like component",
+        "Front-facing dispensing region geometry",
+        "Local blends and transitions into housing cavity"
+      ],
+      "function intent": "Provide the primary mechanical interface that mates with a brewing tool/adapter and routes fluid into the dispensing region; locates the functional centerline relative to the housing/cavity.",
+      "physical behavior": "Receives operational loads from locking/mating and from actuation; local thick geometry resists torsion and bending; interfaces must maintain alignment to avoid leakage/misalignment.",
+      "geometry": "Compact multi-surface block dominated by BSPLINE faces; includes several quasi-planar faces and blended transitions; neighboring faces form a robust mount/neck region.",
+      "location": "Upper-front region, centered above the cavity opening (seen in top and iso views).",
+      "colour": {
+        "R": 160,
+        "G": 160,
+        "B": 165
+      },
+      "major_faces": [
+        {
+          "face_code": "0033",
+          "name": "Brew block front face",
+          "Brep_id": "FACE 469",
+          "description": "Front-facing face of the brew interface block (near-planar/BSPLINE) at the dispensing region."
+        },
+        {
+          "face_code": "0034",
+          "name": "Brew block left side face",
+          "Brep_id": "FACE 464",
+          "description": "Side face patch of the brew block (BSPLINE), forming one lateral boundary of the interface block."
+        },
+        {
+          "face_code": "0035",
+          "name": "Brew block right side face",
+          "Brep_id": "FACE 467",
+          "description": "Opposing side face patch of the brew block (BSPLINE), paired with the left side."
+        },
+        {
+          "face_code": "0036",
+          "name": "Brew block top/upper face",
+          "Brep_id": "FACE 468",
+          "description": "Upper face patch (BSPLINE) around the brew interface region."
+        }
+      ],
+      "minor_faces_Brep_id": [
+        "FACE 464..469 (all remaining brew-block faces not listed as major)",
+        "FACE 478..507 (associated brew head fairings, transitions, and mating surfaces surrounding the brew interface)"
+      ],
+      "relationships": [
+        {
+          "source id": "S6",
+          "target id": "S1",
+          "function relationship": "mounts_to",
+          "structural relationship": "attached_to"
+        },
+        {
+          "source id": "S6",
+          "target id": "S8",
+          "function relationship": "provides_clearance",
+          "structural relationship": "adjacent_to"
+        },
+        {
+          "source id": "S6",
+          "target id": "S7",
+          "function relationship": "guides_motion",
+          "structural relationship": "adjacent_to"
+        }
+      ]
+    },
+    {
+      "id": "S7",
+      "name": "Actuation lever/rod (vertical handle column + piston/shaft features)",
+      "features included": [
+        "Vertical cylindrical rod/column",
+        "Conical transition at lever base",
+        "Upper end cap plane",
+        "Lower interface cylinder"
+      ],
+      "function intent": "Transmit user-applied lever force into the brew head mechanism and constrain motion along a principal axis.",
+      "physical behavior": "Primarily loaded in bending and axial compression/tension during operation; conical transition reduces stress concentration into the larger mating cylinder; cylindrical shaft maintains alignment/coaxiality.",
+      "geometry": "Coaxial cone + cylinder stack with planar end caps; major surfaces are revolution features (cone and cylinder).",
+      "location": "Top-front center, rising vertically above the brew head (visible in front/back/iso).",
+      "colour": {
+        "R": 20,
+        "G": 20,
+        "B": 22
+      },
+      "major_faces": [
+        {
+          "face_code": "0037",
+          "name": "Lever base cone",
+          "Brep_id": "FACE 526",
+          "description": "Conical transition surface at the lever base (cone frustum-like)."
+        },
+        {
+          "face_code": "0038",
+          "name": "Main vertical rod cylinder",
+          "Brep_id": "FACE 528",
+          "description": "Main cylindrical surface of the vertical lever/rod column."
+        },
+        {
+          "face_code": "0039",
+          "name": "Top end cap",
+          "Brep_id": "FACE 529",
+          "description": "Top planar end face of the lever/rod column."
+        },
+        {
+          "face_code": "0040",
+          "name": "Lower interface cylinder",
+          "Brep_id": "FACE 530",
+          "description": "Smaller cylindrical surface at the lower portion, forming an interface/guide region."
+        },
+        {
+          "face_code": "0041",
+          "name": "Lower end cap",
+          "Brep_id": "FACE 531",
+          "description": "Bottom planar end face of the lower interface cylinder."
+        }
+      ],
+      "minor_faces_Brep_id": [
+        "FACE 527 (intermediate planar face at the base of the cone)",
+        "FACE 408..418 (small bracket/guide block faces near the lever/rod linkage region)"
+      ],
+      "relationships": [
+        {
+          "source id": "S7",
+          "target id": "S6",
+          "function relationship": "transmits_load",
+          "structural relationship": "attached_to"
+        },
+        {
+          "source id": "S7",
+          "target id": "S1",
+          "function relationship": "constrains_dof",
+          "structural relationship": "supports"
+        }
+      ]
+    },
+    {
+      "id": "S8",
+      "name": "Steam wand / side nozzle interface",
+      "features included": [
+        "Cylindrical wand body segments",
+        "Elbow/torus-like transition",
+        "Nozzle end cap and local chamfer/fillet bands",
+        "Mount/interface toward housing side"
+      ],
+      "function intent": "Provide a controllable fluid/steam outlet positioned into the front cavity volume while allowing clearance and ergonomic access from the side.",
+      "physical behavior": "Experiences bending from user contact and hose/connection loads; cylindrical geometry provides stiffness; elbow transitions reduce stress concentration and maintain flow path continuity.",
+      "geometry": "Small-diameter cylinder(s) with torus elbow and planar end faces; includes short blended transitions and a mounting interface face.",
+      "location": "Right side of the front cavity region (seen in right/top/iso).",
+      "colour": {
+        "R": 120,
+        "G": 125,
+        "B": 132
+      },
+      "major_faces": [
+        {
+          "face_code": "0042",
+          "name": "Wand main cylinder",
+          "Brep_id": "FACE 472",
+          "description": "Primary cylindrical surface of the wand/nozzle body."
+        },
+        {
+          "face_code": "0043",
+          "name": "Elbow torus transition",
+          "Brep_id": "FACE 476",
+          "description": "Torus elbow surface forming the bend transition near the mount."
+        },
+        {
+          "face_code": "0044",
+          "name": "Nozzle/interface plane",
+          "Brep_id": "FACE 477",
+          "description": "Planar interface face associated with the wand end/mount region (flat trimming face)."
+        },
+        {
+          "face_code": "0045",
+          "name": "Small elbow/knuckle torus",
+          "Brep_id": "FACE 470",
+          "description": "Secondary torus feature (small-radius elbow/knuckle) in the wand assembly."
+        }
+      ],
+      "minor_faces_Brep_id": [
+        "FACE 471,473,474,475 (small planes/BSPLINE patches and end-cap features around the wand)",
+        "FACE 478..480 (nearby small fairing/transition faces that visually belong to the wand-side of the front cavity)"
+      ],
+      "relationships": [
+        {
+          "source id": "S8",
+          "target id": "S1",
+          "function relationship": "mounts_to",
+          "structural relationship": "attached_to"
+        },
+        {
+          "source id": "S8",
+          "target id": "S6",
+          "function relationship": "provides_clearance",
+          "structural relationship": "offset_from"
+        }
+      ]
+    }
+  ]
+}
+
+operation.json:
+
+{
+  "request": "Prolong black lever sticking out to the front by 5cm for better manipulation.",
+  "request_wording": {
+    "action_words": [
+      "Prolong",
+      "5cm"
+    ],
+    "referenced_feature_words": [
+      "black",
+      "lever"
+    ],
+    "intention_words": [
+      "better",
+      "manipulation"
+    ],
+    "grammatical_words": [
+      "sticking",
+      "out",
+      "to",
+      "the",
+      "front",
+      "by",
+      "for"
+    ]
+  },
+  "actions": [
+    {
+      "operation": "Extend/prolong an existing protruding lever",
+      "parameters": {
+        "extension_length": "5cm"
+      },
+      "target": "black lever",
+      "relational_constraint": "Increase the lever length in the forward ('to the front') direction, i.e., further out from the main body in the same direction it is currently sticking out",
+      "unresolved_reference": "Identify which component/feature is the 'black lever' in the CAD model; identify the lever's protrusion direction corresponding to 'front' (coordinate system / assembly orientation); identify which end face/terminal geometry of the lever is to be moved/extended to achieve the +5cm length increase"
+    }
+  ],
+  "intention": [
+    "Improve manipulation/handling by making the lever longer"
+  ]
+}
+
+View: front
+
+[IMAGE 0: /home/adml/Research/Hackathon2026/IDETC26-Hackathon-Autodesk-neuralCAD-Edit/data/edit_192_external/breps/B7A2N74ZJBF9MZHU_1770174182.8249135_front.jpg]
+
+View: back
+
+[IMAGE 1: /home/adml/Research/Hackathon2026/IDETC26-Hackathon-Autodesk-neuralCAD-Edit/data/edit_192_external/breps/B7A2N74ZJBF9MZHU_1770174182.8249135_back.jpg]
+
+View: left
+
+[IMAGE 2: /home/adml/Research/Hackathon2026/IDETC26-Hackathon-Autodesk-neuralCAD-Edit/data/edit_192_external/breps/B7A2N74ZJBF9MZHU_1770174182.8249135_left.jpg]
+
+View: right
+
+[IMAGE 3: /home/adml/Research/Hackathon2026/IDETC26-Hackathon-Autodesk-neuralCAD-Edit/data/edit_192_external/breps/B7A2N74ZJBF9MZHU_1770174182.8249135_right.jpg]
+
+View: top
+
+[IMAGE 4: /home/adml/Research/Hackathon2026/IDETC26-Hackathon-Autodesk-neuralCAD-Edit/data/edit_192_external/breps/B7A2N74ZJBF9MZHU_1770174182.8249135_top.jpg]
+
+View: bottom
+
+[IMAGE 5: /home/adml/Research/Hackathon2026/IDETC26-Hackathon-Autodesk-neuralCAD-Edit/data/edit_192_external/breps/B7A2N74ZJBF9MZHU_1770174182.8249135_bottom.jpg]
+
+View: toprightiso
+
+[IMAGE 6: /home/adml/Research/Hackathon2026/IDETC26-Hackathon-Autodesk-neuralCAD-Edit/data/edit_192_external/breps/B7A2N74ZJBF9MZHU_1770174182.8249135_toprightiso.jpg]

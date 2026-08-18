@@ -149,16 +149,21 @@ class VLM(BaseVLM):
 
         if return_token_counts:
             if full_response is not None:
+                usage = full_response.usage
                 token_count_dict = {
-                    "input_tokens": full_response.usage.input_tokens,
-                    "output_tokens": full_response.usage.output_tokens,
-                    "total_tokens": full_response.usage.input_tokens + full_response.usage.output_tokens,
+                    "input_tokens": usage.input_tokens,
+                    "output_tokens": usage.output_tokens,
+                    "total_tokens": usage.input_tokens + usage.output_tokens,
+                    "cached_tokens": int(getattr(usage, "cache_read_input_tokens", 0) or 0),
+                    "cache_creation_tokens": int(getattr(usage, "cache_creation_input_tokens", 0) or 0),
                 }
             else:
                 token_count_dict = {
                     "input_tokens": 0,
                     "output_tokens": 0,
                     "total_tokens": 0,
+                    "cached_tokens": 0,
+                    "cache_creation_tokens": 0,
                 }
             response_object.token_counts = token_count_dict
 

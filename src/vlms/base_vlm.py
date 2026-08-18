@@ -7,6 +7,8 @@ import json
 import shutil
 import sys
 
+from src.utils.cadquery_rendering import ITERATION_VIEWS
+
 IMAGE_EXTS = (".png", ".jpg", ".jpeg")
 CAD_ARTIFACTS = (
     ("tmp.step", "{i}_output.step"),
@@ -14,6 +16,37 @@ CAD_ARTIFACTS = (
     ("tmp.png", "{i}_output.png"),
     ("tmp.svg", "{i}_output.svg"),
 )
+
+
+def estimate_token_cost(config: dict, token_counts: dict) -> float:
+    """USD estimate. Cached input uses 1m_token_cost_input_cached, else half of input rate."""
+    input_tokens = float(token_counts.get("input_tokens", 0) or 0)
+    cached_tokens = float(token_counts.get("cached_tokens", 0) or 0)
+    uncached = max(input_tokens - cached_tokens, 0.0)
+    output_tokens = float(token_counts.get("output_tokens", 0) or 0) + float(
+        token_counts.get("thinking_tokens", 0) or 0
+    )
+    input_rate = float(config.get("1m_token_cost_input", 0) or 0)
+    output_rate = float(config.get("1m_token_cost_output", 0) or 0)
+    cached_rate = config.get("1m_token_cost_input_cached")
+    cached_rate = float(cached_rate) if cached_rate is not None else 0.5 * input_rate
+    return (
+        uncached * input_rate / 1e6
+        + cached_tokens * cached_rate / 1e6
+        + output_tokens * output_rate / 1e6
+    )
+
+
+def format_token_report(token_counts: dict | None) -> str:
+    counts = token_counts or {}
+    return (
+        f"Tokens: input={counts.get('input_tokens', 0)} "
+        f"(cached={counts.get('cached_tokens', 0)}) "
+        f"output={counts.get('output_tokens', 0)} "
+        f"thinking={counts.get('thinking_tokens', 0)} "
+        f"total={counts.get('total_tokens', counts.get('input_tokens', 0) + counts.get('output_tokens', 0))}  "
+        f"cost_estimate=${float(counts.get('cost_estimate', 0) or 0):.6f}"
+    )
 
 
 def _is_image_path(part):
@@ -478,26 +511,167 @@ class BaseVLM(ABC):
         print(f"CadQuery artifacts this iteration: exported={copied or ['none']} missing={missing}")
         return copied
 
-    def visual_update_loop(self, instruction_text, task_info_dict, harness_script_file, output_dir, max_iters=10, run_function=None, conversation_instruction="", output_script_key=None, input_file=None, planning=None):
-        if run_function is None:
-            raise ValueError("run_function must be provided to visual_update_loop")
-        
-        messages = []
+    def _restore_last_good_cad_artifacts(self, output_dir, iteration_dir):
+        """If the final tmp.step/stl is missing, copy the last successful iteration export."""
+        if not os.path.isdir(iteration_dir):
+            return
+        tmp_step = os.path.join(output_dir, "tmp.step")
+        tmp_stl = os.path.join(output_dir, "tmp.stl")
+        if os.path.isfile(tmp_step) and os.path.isfile(tmp_stl):
+            return
+        best_i = -1
+        for name in os.listdir(iteration_dir):
+            if not name.endswith("_output.step") and not name.endswith("_output.stl"):
+                continue
+            prefix = name.split("_", 1)[0]
+            if prefix.isdigit():
+                best_i = max(best_i, int(prefix))
+        if best_i < 0:
+            return
+        restored = []
+        for src_name, dest_template in CAD_ARTIFACTS:
+            dest = os.path.join(output_dir, src_name)
+            src = os.path.join(iteration_dir, dest_template.format(i=best_i))
+            if os.path.isfile(src) and not os.path.isfile(dest):
+                shutil.copy(src, dest)
+                restored.append(src_name)
+        if restored:
+            print(f"Restored last good CadQuery export from iteration {best_i}: {restored}")
 
-        messages.append(conversation_instruction)
+    def _iteration_view_names(self):
+        views = self.config.get("iteration_views")
+        if views:
+            return list(views)
+        return list(ITERATION_VIEWS)
+
+    def _render_iteration_views(self, output_dir):
+        """Render 8 camera views of tmp.step into tmp_{view}.png. Returns [(name, path), ...]."""
+        from src.utils.cadquery_rendering import (
+            canonical_view_name,
+            projection_for_view,
+            render_to_png,
+            view_name_aliases,
+        )
+
+        views = self._iteration_view_names()
+        for name in views:
+            for alias in view_name_aliases(name):
+                stale = os.path.join(output_dir, f"tmp_{alias}.png")
+                if os.path.exists(stale):
+                    os.remove(stale)
+
+        step_path = os.path.join(output_dir, "tmp.step")
+        if not os.path.isfile(step_path):
+            return []
+
+        try:
+            import cadquery as cq
+
+            shape = cq.importers.importStep(step_path)
+            if hasattr(shape, "val"):
+                shape = shape.val()
+        except Exception as e:
+            print(f"Failed to load tmp.step for multi-view render: {e}")
+            return []
+
+        exported = []
+        for name in views:
+            canon = canonical_view_name(name)
+            proj = projection_for_view(canon)
+            if proj is None:
+                print(f"Warning: Unknown iteration view '{name}', skipping.")
+                continue
+            png_path = os.path.join(output_dir, f"tmp_{canon}.png")
+            try:
+                render_to_png(shape, png_path, proj=proj)
+            except Exception as e:
+                print(f"Failed to render view '{canon}': {e}")
+                continue
+            if os.path.isfile(png_path):
+                exported.append((canon, png_path))
+        print(f"Rendered iteration views: {[name for name, _ in exported] or ['none']}")
+        return exported
+
+    def _copy_iteration_views(self, view_paths, iteration_dir, iter_count):
+        copied = []
+        for name, src in view_paths:
+            dest = os.path.join(iteration_dir, f"{iter_count}_{name}.png")
+            shutil.copy(src, dest)
+            copied.append(os.path.basename(src))
+        return copied
+
+    def _cadquery_prefix_parts(
+        self,
+        loop_instruction,
+        instruction_text,
+        task_info_dict,
+        planning=None,
+        harness_script=None,
+    ):
+        parts = []
         if planning:
             from .task_analysis import planning_message_parts
-            messages.extend(planning_message_parts(planning))
+            parts.extend(planning_message_parts(planning))
+        parts.append(loop_instruction)
+        if harness_script is not None:
+            parts.append(harness_script)
+        parts.append("Instruction:")
+        parts.append(instruction_text)
+        parts.append("Task information:")
+        parts.extend(self.load_task_info_dict(task_info_dict))
+        return parts
+
+    def _last_iteration_feedback_parts(self, program_output, view_paths, script):
+        parts = [
+            "Program output from last iteration:",
+            program_output or "None",
+            "Visual output from last iteration:",
+        ]
+        if view_paths:
+            for name, path in view_paths:
+                parts.append(f"View: {name}")
+                parts.append(path)
+        else:
+            parts.append("None")
+        parts.append("CadQuery text output from last iteration:")
+        parts.append(script or "None")
+        return parts
+
+    def _required_actions_block(self, planning=None) -> str:
+        """List operation.json action operation + target fields for follow-up prompts."""
+        operation_json = (planning or {}).get("operation") or {}
+        actions = operation_json.get("actions") or []
+        lines = ["The required actions are:"]
+        n = 0
+        for action in actions:
+            if not isinstance(action, dict):
+                continue
+            operation = str(action.get("operation") or "").strip() or "(unspecified operation)"
+            target = str(action.get("target") or "").strip() or "(unspecified target)"
+            n += 1
+            lines.append(f"{n}. Operation: {operation}")
+            lines.append(f"   Target: {target}")
+        if n == 0:
+            lines.append("(none listed in operation.json)")
+        return "\n".join(lines)
+
+    def _fill_followup_instruction(self, template: str, planning=None) -> str:
+        block = self._required_actions_block(planning)
+        placeholder = "[The required actions are:...]"
+        if placeholder in template:
+            return template.replace(placeholder, block)
+        return template.rstrip() + "\n\n" + block + "\n"
+
+    def visual_update_loop(self, instruction_text, task_info_dict, harness_script_file, output_dir, max_iters=10, run_function=None, conversation_instruction="", followup_instruction="", output_script_key=None, input_file=None, planning=None):
+        if run_function is None:
+            raise ValueError("run_function must be provided to visual_update_loop")
 
         harness_script = self.read_text_file(harness_script_file)
-
-        messages.append(harness_script)
-
-        messages.append("Instruction:")
-        messages.append(instruction_text)
-        messages.append("Task information:")
-        messages.extend(self.load_task_info_dict(task_info_dict))
-        messages.append("Last output rendering: None (this is the first iteration)")
+        last_feedback = []
+        later_instruction = self._fill_followup_instruction(
+            followup_instruction or conversation_instruction,
+            planning=planning,
+        )
 
         iters_remaining = max_iters
 
@@ -508,6 +682,24 @@ class BaseVLM(ABC):
         script = ""
         while iters_remaining > 0:
             print(f"\n========== Iteration {iter_count + 1}/{max_iters} ==========")
+            if iter_count == 0:
+                messages = self._cadquery_prefix_parts(
+                    conversation_instruction,
+                    instruction_text,
+                    task_info_dict,
+                    planning=planning,
+                    harness_script=harness_script,
+                )
+                messages.append("Last output rendering: None (this is the first iteration)")
+            else:
+                messages = self._cadquery_prefix_parts(
+                    later_instruction,
+                    instruction_text,
+                    task_info_dict,
+                    planning=planning,
+                    harness_script=None,
+                )
+                messages.extend(last_feedback)
             messages.append(f"Iterations remaining: {iters_remaining}")
             iteration_dir = os.path.join(output_dir, "iteration_output")
             os.makedirs(iteration_dir, exist_ok=True)
@@ -523,6 +715,8 @@ class BaseVLM(ABC):
             token_counts = whole_response.token_counts or {}
 
             for k in token_counts.keys():
+                if k == "cost_estimate":
+                    continue
                 token_count_accumulator[k] = token_count_accumulator.get(k, 0) + token_counts[k]
 
             if isinstance(response, str):
@@ -562,7 +756,9 @@ class BaseVLM(ABC):
             program_output = run_function(script, harness_script_file, output_dir, input_file=input_file)
             print(program_output)
 
+            view_paths = self._render_iteration_views(output_dir)
             copied = self._copy_iteration_cad_artifacts(output_dir, iteration_dir, iter_count)
+            copied.extend(self._copy_iteration_views(view_paths, iteration_dir, iter_count))
             cadquery_ok = bool(copied)
 
             iteration_text_file = os.path.join(iteration_dir, f"{iter_count}_response.txt")
@@ -580,25 +776,26 @@ class BaseVLM(ABC):
             with open(os.path.join(iteration_dir, f"{iter_count}_cadquery.txt"), "w", encoding="utf-8") as f:
                 f.write(program_output)
 
-            messages.append("Program output from last iteration:")
-            messages.append(program_output)
-            messages.append("Visual output from last iteration:")
-
-            image_fn = osp.join(output_dir, "tmp.png")
-            if os.path.exists(image_fn):
-                messages.append(image_fn)
-            else:
-                messages.append("None")
-            messages.append("The function that you produced from the last iteration:")
-            messages.append(script)
+            last_feedback = self._last_iteration_feedback_parts(
+                program_output, view_paths, script
+            )
 
             print(f"Iteration {iter_count + 1} CadQuery export {'succeeded' if cadquery_ok else 'failed'}.")
             iters_remaining -= 1
             iter_count += 1
 
+        self._restore_last_good_cad_artifacts(output_dir, iteration_dir)
+
         input_tokens = float(token_count_accumulator.get("input_tokens", 0) or 0)
-        output_tokens = float(token_count_accumulator.get("output_tokens", 0) or 0) + float(token_count_accumulator.get("thinking_tokens", 0) or 0)
-        token_count_accumulator["cost_estimate"] = self.config["1m_token_cost_input"] * input_tokens / 1e6 + self.config["1m_token_cost_output"] * output_tokens / 1e6
+        output_tokens = float(token_count_accumulator.get("output_tokens", 0) or 0)
+        token_count_accumulator.setdefault("cached_tokens", 0)
+        token_count_accumulator.setdefault("thinking_tokens", 0)
+        token_count_accumulator.setdefault(
+            "total_tokens",
+            int(input_tokens + output_tokens + float(token_count_accumulator.get("thinking_tokens", 0) or 0)),
+        )
+        token_count_accumulator["cost_estimate"] = estimate_token_cost(self.config, token_count_accumulator)
+        print("CadQuery loop " + format_token_report(token_count_accumulator))
 
         return_dict = {
             "token_counts": token_count_accumulator,
@@ -630,8 +827,17 @@ class BaseVLM(ABC):
             cmd.extend(["--input_file", input_file])
 
         print(f"Running CadQuery script with command: {' '.join(cmd)}")
-        # run command and capture output
-        result = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, timeout=60)
+        try:
+            result = subprocess.run(
+                cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, timeout=180
+            )
+        except subprocess.TimeoutExpired as e:
+            stdout = e.stdout if isinstance(e.stdout, str) else (e.stdout or b"").decode("utf-8", "replace")
+            stderr = e.stderr if isinstance(e.stderr, str) else (e.stderr or b"").decode("utf-8", "replace")
+            return (
+                f"stdout: {stdout}\nstderr: {stderr}\n"
+                "CadQuery timed out; keeping the last successfully exported STEP/STL if any.\n"
+            )
 
         # remove all stdout lines before the one that starts with "Loading function from"
         for line in result.stdout.splitlines():
@@ -644,19 +850,38 @@ class BaseVLM(ABC):
     
     def cadquery_script(self, instruction_text, task_info_dict, harness_script_file, output_dir, max_iters=10):
         conversation_instruction = """
-        Given the following instruction and task information, generate a CadQuery Python function that accomplishes the task.
-        The script that runs the your function is provided for reference, as well as an example function, but you should only create your version of the function my_cad_function. Do not include any of the rest of the script.
-        Once you have generated the function, it will be executed in CadQuery. You will then be provided with a rendering of the CAD model created by your function, and any prints, debug or error messages.
-        You will then have the opportunity to refine your function based on this feedback, and it will be re-executed.
-        Continue this process until the task is complete, or you reach the maximum number of iterations.
+        Given the instructions and task information in operation.json, generate a CadQuery Python function that execute the modeling tasks you designed. First use CadQuery to extract information you need regarding the model, such as surfaces you want to use as reference faces. Then write CadQuery code with correct dimensions and coordinates to perform the edit.
+
+        The script that runs the function is provided for reference, as well as an example function, but you should only create your version of the function my_cad_function. Do not include any of the rest of the script.
+
+        Once you have generated the function, it will be executed in CadQuery. You will then be provided with a rendering of the CAD model created by your function, and any prints, debug or error messages. You will then have the opportunity to refine your function based on this feedback, and it will be re-executed. Continue this process until the task is complete, or you reach the maximum number of iterations.
 
         If the task involves editing an existing model, the path to that model's .step file is passed to your function as args["input_file"], and is also listed as brep_start_path_step in the task information. Load it from args["input_file"] rather than hard-coding a path. For these cases, you might need to print out debug information once the model is loaded in your first iteration.
 
         Return a json object with two fields. Do not include any other text outside of the json object in your response:
         'complete': true if the task has been completed. IMPORTANT: This should only be judged by looking at the output from the last iteration, not whether a function has been returned this iteration. If there is no valid output that corresponds to the instruction, the task is not complete. The first iteration can never be complete. If this is true, then the current function will NOT be executed, and the function from the last iteration will be used.
         'my_cad_function': CadQuery python function as a string. Use the same definition and arguments as the example.
-        Script:
+        Script example:
 
+        """
+
+        followup_instruction = """
+The multiview images generated from the code sent in your last response are attached. The text output from the cadquery are also provided. First, judge whether the required actions identified has been done correctly and the effect is satisfactory.
+
+[The required actions are:...]
+
+If yes, report the operation is finished in your response.
+
+If not, analyse errors and update the code accordingly.
+
+Once you have generated the new function, it will be executed in CadQuery on the original CAD model. You will then be provided with the latest rendering of the CAD model created by your function, and any prints, debug or error messages. You will then have the opportunity to refine your function based on this feedback, and it will be re-executed.
+
+Continue this process until the task is complete, or you reach the maximum number of iterations. If the task involves editing an existing model, the path to that model's .step file is passed to your function as args["input_file"], and is also listed as brep_start_path_step in the task information. Load it from args["input_file"] rather than hard-coding a path. For these cases, you might need to print out debug information once the model is loaded in your first iteration.
+
+Return a json object with three fields. Do not include any other text outside of the json object in your response:
+'complete': true if the task has been completed. IMPORTANT: This should only be judged by looking at the output from the last iteration, not whether a function has been returned this iteration. If there is no valid output that corresponds to the instruction, the task is not complete. The first iteration can never be complete. If this is true, then the current function will NOT be executed, and the function from the last iteration will be used.
+'my_cad_function': CadQuery python function as a string. Use the same definition and arguments as the example.
+'error': a description of errors and misalignments within the current model compared to the desired target.
         """
 
         input_file = None
@@ -678,19 +903,20 @@ class BaseVLM(ABC):
             max_iters=max_iters,
             run_function=self.run_cadquery_script,
             conversation_instruction=conversation_instruction,
+            followup_instruction=followup_instruction,
             input_file=input_file,
             planning=planning,
         )
         if planning and planning.get("token_counts"):
             acc = result.setdefault("token_counts", {})
             for key, value in planning["token_counts"].items():
+                if key == "cost_estimate":
+                    continue
                 try:
                     acc[key] = acc.get(key, 0) + (value or 0)
                 except TypeError:
                     acc[key] = value
-            if "cost_estimate" in acc:
-                input_tokens = float(acc.get("input_tokens", 0) or 0)
-                output_tokens = float(acc.get("output_tokens", 0) or 0) + float(acc.get("thinking_tokens", 0) or 0)
-                acc["cost_estimate"] = self.config["1m_token_cost_input"] * input_tokens / 1e6 + self.config["1m_token_cost_output"] * output_tokens / 1e6
+            acc["cost_estimate"] = estimate_token_cost(self.config, acc)
+            print("Run total (with planning) " + format_token_report(acc))
         return result
     

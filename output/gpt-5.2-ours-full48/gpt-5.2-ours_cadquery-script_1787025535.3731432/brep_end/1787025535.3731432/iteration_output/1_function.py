@@ -1,0 +1,268 @@
+def my_cad_function(args):
+    import cadquery as cq
+    import os
+    from math import sqrt
+
+    # ---------------- Helpers ----------------
+    def _unit(v: cq.Vector) -> cq.Vector:
+        L = v.Length
+        if L == 0:
+            return cq.Vector(0, 0, 0)
+        return cq.Vector(v.x / L, v.y / L, v.z / L)
+
+    def _dot(a: cq.Vector, b: cq.Vector) -> float:
+        return a.x * b.x + a.y * b.y + a.z * b.z
+
+    def _coord(p: cq.Vector, idx: int) -> float:
+        return [p.x, p.y, p.z][idx]
+
+    def _dist(a: cq.Vector, b: cq.Vector) -> float:
+        dx, dy, dz = a.x - b.x, a.y - b.y, a.z - b.z
+        return sqrt(dx * dx + dy * dy + dz * dz)
+
+    def _face_plane(face: cq.Face):
+        """Return (point_on_plane, unit_normal) for planar faces else (None, None)."""
+        try:
+            from OCP.BRepAdaptor import BRepAdaptor_Surface
+            from OCP.GeomAbs import GeomAbs_Plane
+
+            ad = BRepAdaptor_Surface(face.wrapped)
+            if ad.GetType() != GeomAbs_Plane:
+                return None, None
+            pln = ad.Plane()
+            loc = pln.Location()
+            n_dir = pln.Axis().Direction()
+            p = cq.Vector(loc.X(), loc.Y(), loc.Z())
+            n = _unit(cq.Vector(n_dir.X(), n_dir.Y(), n_dir.Z()))
+            return p, n
+        except Exception:
+            return None, None
+
+    def _cyl_data(face: cq.Face):
+        """Return (radius, axis_point, axis_dir_unit) for cylindrical faces else None."""
+        try:
+            from OCP.BRepAdaptor import BRepAdaptor_Surface
+            from OCP.GeomAbs import GeomAbs_Cylinder
+
+            ad = BRepAdaptor_Surface(face.wrapped)
+            if ad.GetType() != GeomAbs_Cylinder:
+                return None
+            cyl = ad.Cylinder()
+            r = float(cyl.Radius())
+            ax = cyl.Axis()
+            loc = ax.Location()
+            d = ax.Direction()
+            p = cq.Vector(loc.X(), loc.Y(), loc.Z())
+            v = _unit(cq.Vector(d.X(), d.Y(), d.Z()))
+            return r, p, v
+        except Exception:
+            return None
+
+    def _project_to_plane(pt: cq.Vector, plane_p: cq.Vector, plane_n_unit: cq.Vector) -> cq.Vector:
+        v = pt - plane_p
+        d = _dot(v, plane_n_unit)
+        return pt - plane_n_unit * d
+
+    # ---------------- Load STEP ----------------
+    if "input_file" not in args:
+        raise ValueError("Expected args['input_file'] for edit operation")
+    input_file = os.path.expanduser(args["input_file"])
+    wp = cq.importers.importStep(input_file)
+    shape = wp.val() if hasattr(wp, "val") else wp
+
+    bbox = shape.BoundingBox()
+    xlen, ylen, zlen = bbox.xlen, bbox.ylen, bbox.zlen
+    diag = sqrt(xlen * xlen + ylen * ylen + zlen * zlen)
+    print(f"BBOX lens: x={xlen:.3f} y={ylen:.3f} z={zlen:.3f} diag={diag:.3f}")
+
+    # Thickness axis = smallest bbox dimension
+    lens = [(xlen, 0), (ylen, 1), (zlen, 2)]
+    t_idx = sorted(lens, key=lambda a: a[0])[0][1]
+    thickness_axis = [cq.Vector(1, 0, 0), cq.Vector(0, 1, 0), cq.Vector(0, 0, 1)][t_idx]
+    thickness_axis = _unit(thickness_axis)
+    print(f"Thickness axis index={t_idx} vec=({thickness_axis.x:.1f},{thickness_axis.y:.1f},{thickness_axis.z:.1f})")
+
+    faces = list(shape.Faces())
+
+    # ---------------- Bottom face (contact plane) ----------------
+    planar = []
+    for f in faces:
+        p0, n = _face_plane(f)
+        if p0 is None:
+            continue
+        if abs(_dot(n, thickness_axis)) < 0.95:
+            continue
+        c = f.Center()
+        ctr = cq.Vector(c.x, c.y, c.z)
+        planar.append((f, f.Area(), ctr, n))
+
+    if not planar:
+        raise RuntimeError("No planar faces aligned with thickness axis found.")
+
+    minc = min(_coord(ctr, t_idx) for _, _, ctr, _ in planar)
+    tol = 0.02 * max(xlen, ylen, zlen)  # robust tolerance
+    bottom_cands = [(f, a, ctr, n) for (f, a, ctr, n) in planar if (_coord(ctr, t_idx) - minc) <= tol]
+    bottom_face, bottom_area, bottom_center, bottom_n = sorted(bottom_cands, key=lambda t: -t[1])[0]
+    bp_p, bp_n = _face_plane(bottom_face)
+    if bp_p is None:
+        bp_p, bp_n = bottom_center, bottom_n
+    bp_n = _unit(bp_n)
+    into_part = _unit(bp_n * -1.0)
+    print(f"Bottom face area={bottom_area:.2f} center=({bottom_center.x:.2f},{bottom_center.y:.2f},{bottom_center.z:.2f}) normal=({bp_n.x:.3f},{bp_n.y:.3f},{bp_n.z:.3f})")
+
+    # ---------------- Mounting hole centers + small-bore radius inference ----------------
+    cyls = []
+    for f in faces:
+        cd = _cyl_data(f)
+        if cd is None:
+            continue
+        r, ap, av = cd
+        if abs(_dot(av, thickness_axis)) < 0.98:
+            continue
+        if r < 0.05 or r > 50:
+            continue
+        cyls.append((r, ap, av))
+
+    print(f"Cyl faces aligned to thickness axis: {len(cyls)}")
+
+    cyls.sort(key=lambda t: t[0])
+    radius_groups = []  # (r_nom, items)
+    rtol = 0.15
+    for item in cyls:
+        r = item[0]
+        placed = False
+        for i, (rn, items) in enumerate(radius_groups):
+            if abs(r - rn) <= rtol:
+                items.append(item)
+                rn2 = (rn * (len(items) - 1) + r) / len(items)
+                radius_groups[i] = (rn2, items)
+                placed = True
+                break
+        if not placed:
+            radius_groups.append((r, [item]))
+
+    mounting_centers = []
+    chosen_r = None
+    center_cluster_tol = 0.8  # model units (works for cm-exported Fusion STEP)
+
+    for rn, items in radius_groups:
+        centers = []
+        for r, ap, av in items:
+            pp = _project_to_plane(ap, bp_p, bp_n)
+            if all(_dist(pp, c) > center_cluster_tol for c in centers):
+                centers.append(pp)
+        if len(centers) >= 4:
+            chosen_r = float(rn)
+            centers_sorted = sorted(centers, key=lambda v: (v.x, v.y, v.z))
+            for c in centers_sorted:
+                if all(_dist(c, e) > center_cluster_tol for e in mounting_centers):
+                    mounting_centers.append(c)
+                if len(mounting_centers) == 4:
+                    break
+            break
+
+    if len(mounting_centers) == 4:
+        print(f"Chosen mounting-hole small-bore radius (model units) ~ {chosen_r:.4f}")
+        for i, c in enumerate(mounting_centers):
+            print(f"  mount_center[{i}] = ({c.x:.3f},{c.y:.3f},{c.z:.3f})")
+    else:
+        print(f"WARNING: mounting centers found={len(mounting_centers)}; groove placement may be skipped.")
+
+    # ---------------- Unit scaling (Fusion STEP often comes in cm) ----------------
+    # Heuristic: if overall size is ~10-30 units and mounting small-bore radius is < ~1.5,
+    # treat model units as cm; else treat as mm.
+    maxdim = max(xlen, ylen, zlen)
+    if chosen_r is not None and maxdim < 80 and chosen_r < 1.5:
+        mm_to_model = 0.1  # cm
+        unit_note = "Assuming model units are cm (Fusion STEP); 1 mm = 0.1 model units"
+    else:
+        mm_to_model = 1.0  # mm
+        unit_note = "Assuming model units are mm; 1 mm = 1.0 model units"
+    print(unit_note)
+
+    # ---------------- Operation 1: connecting hole Ø1.7mm ----------------
+    # Robustly locate underside pocket opening by using the largest inner wire on the bottom face.
+    pocket_center = None
+    try:
+        outer_w = bottom_face.outerWire()
+        inner_ws = [w for w in bottom_face.Wires() if not w.isSame(outer_w)]
+
+        wire_areas = []
+        for w in inner_ws:
+            try:
+                ftmp = cq.Face.makeFromWires(w)
+                wire_areas.append((ftmp.Area(), w, ftmp.Center()))
+            except Exception:
+                bb = w.BoundingBox()
+                approx = bb.xlen * bb.zlen
+                # centroid fallback (bbox center projected)
+                cen = cq.Vector((bb.xmin + bb.xmax) / 2.0, (bb.ymin + bb.ymax) / 2.0, (bb.zmin + bb.zmax) / 2.0)
+                wire_areas.append((approx, w, cen))
+
+        if wire_areas:
+            wire_areas.sort(key=lambda t: -t[0])
+            pocket_area, pocket_wire, pocket_cen = wire_areas[0]
+            pocket_center = cq.Vector(pocket_cen.x, pocket_cen.y, pocket_cen.z)
+            pocket_center = _project_to_plane(pocket_center, bp_p, bp_n)
+            print(f"Pocket opening inferred from bottom-face inner wire: area~{pocket_area:.3f} center=({pocket_center.x:.2f},{pocket_center.y:.2f},{pocket_center.z:.2f})")
+        else:
+            print("WARNING: No inner wires found on bottom face; pocket opening not detected.")
+    except Exception as e:
+        print("WARNING: Failed to infer pocket opening from bottom face wires:", str(e))
+
+    if pocket_center is None:
+        # Fallback: use average of mounting centers if present, otherwise bbox center projected
+        if mounting_centers:
+            sx = sum(c.x for c in mounting_centers) / len(mounting_centers)
+            sy = sum(c.y for c in mounting_centers) / len(mounting_centers)
+            sz = sum(c.z for c in mounting_centers) / len(mounting_centers)
+            pocket_center = cq.Vector(sx, sy, sz)
+            pocket_center = _project_to_plane(pocket_center, bp_p, bp_n)
+            print(f"Pocket center fallback: avg(mount centers)=({pocket_center.x:.2f},{pocket_center.y:.2f},{pocket_center.z:.2f})")
+        else:
+            bc = cq.Vector((bbox.xmin + bbox.xmax) / 2.0, (bbox.ymin + bbox.ymax) / 2.0, (bbox.zmin + bbox.zmax) / 2.0)
+            pocket_center = _project_to_plane(bc, bp_p, bp_n)
+            print(f"Pocket center fallback: bbox center projected=({pocket_center.x:.2f},{pocket_center.y:.2f},{pocket_center.z:.2f})")
+
+    hole_d = 1.7 * mm_to_model
+    hole_r = hole_d / 2.0
+    hole_len = max(8 * diag, 200.0 * mm_to_model)
+    drill_dir = thickness_axis
+    base_p = pocket_center - drill_dir * hole_len
+    hole_cyl = cq.Solid.makeCylinder(hole_r, 2 * hole_len, base_p, drill_dir)
+
+    result = shape.cut(hole_cyl)
+    print(f"Connecting hole cut: diameter={hole_d:.4f} (model units) at ({pocket_center.x:.2f},{pocket_center.y:.2f},{pocket_center.z:.2f})")
+
+    # ---------------- Operation 2: grooves Ø around 4 mounting holes ----------------
+    groove_depth = 0.1 * mm_to_model
+    groove_w = 0.1 * mm_to_model
+    rings_per_hole = 3
+    start_offset = 0.3 * mm_to_model
+    pitch = 0.2 * mm_to_model
+
+    if chosen_r is None:
+        # conservative fallback: infer from bbox if we couldn't find it
+        chosen_r = 2.0 * mm_to_model
+
+    groove_solids = []
+    for c in mounting_centers:
+        c0 = _project_to_plane(c, bp_p, bp_n)
+        for i in range(rings_per_hole):
+            inner_r = chosen_r + start_offset + i * pitch
+            outer_r = inner_r + groove_w
+            outer = cq.Solid.makeCylinder(outer_r, groove_depth, c0, into_part)
+            inner = cq.Solid.makeCylinder(inner_r, groove_depth, c0, into_part)
+            groove_solids.append(outer.cut(inner))
+
+    if groove_solids:
+        g = groove_solids[0]
+        for s in groove_solids[1:]:
+            g = g.fuse(s)
+        result = result.cut(g)
+        print(f"Grooves cut: depth={groove_depth:.4f} width={groove_w:.4f} rings={len(groove_solids)}")
+    else:
+        print("WARNING: No grooves created (mounting centers not available).")
+
+    print("Edit complete (connecting hole + grooves).")
+    return cq.Workplane("XY").newObject([result])

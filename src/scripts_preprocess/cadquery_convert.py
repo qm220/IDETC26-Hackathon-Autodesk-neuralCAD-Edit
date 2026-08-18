@@ -15,11 +15,10 @@ import argparse
 import cadquery as cq
 from cadquery import exporters
 
-from src.utils.cadquery_rendering import render_to_png, VIEW_PROJECTIONS
+from src.utils.cadquery_rendering import ITERATION_VIEWS, projection_for_view, render_to_png, view_name_aliases
 
-# Keep the original seven eval views. VIEW_PROJECTIONS also includes
-# experiment-only angles such as bottomleftiso.
-EXPORT_VIEWS = ["toprightiso", "front", "back", "left", "right", "top", "bottom"]
+# Eight eval views under the axis/iso names. Legacy front/toprightiso files still count as present.
+EXPORT_VIEWS = list(ITERATION_VIEWS)
 
 
 def load_step_file(step_path):
@@ -91,12 +90,12 @@ def export_png_view(png_path, workplane, view_name, image_size=1024):
         True if successful, False otherwise
     """
     try:
-        if view_name not in VIEW_PROJECTIONS:
+        if projection_for_view(view_name) is None:
             print(f"Unknown view: {view_name}")
             return False
 
         shape = workplane.val() if hasattr(workplane, 'val') else workplane
-        render_to_png(shape, png_path, proj=VIEW_PROJECTIONS[view_name],
+        render_to_png(shape, png_path, proj=projection_for_view(view_name),
                       width=image_size, height=image_size)
         return True
 
@@ -183,12 +182,13 @@ def process_file(cad_file, skip_existing=True, image_size=1024):
     step_output_path = base_name.with_suffix('.step')
     
     # Check for all view PNG files
-    png_files = [Path(f"{base_name}_{view}.png") for view in EXPORT_VIEWS]
-    
-    # Check if all outputs already exist
+    # Check if all outputs already exist (canonical or legacy view names)
     stl_exists = stl_path.exists()
     step_exists = step_output_path.exists() if str(step_output_path) != str(cad_path) else True
-    png_exists = all(png.exists() for png in png_files)
+    png_exists = all(
+        any(Path(f"{base_name}_{alias}.png").exists() for alias in view_name_aliases(view))
+        for view in EXPORT_VIEWS
+    )
     
     if skip_existing and stl_exists and step_exists and png_exists:
         return False, True, None  # Not processed, skipped, no error
