@@ -1,0 +1,66 @@
+def my_cad_function(args):
+    import os
+    import cadquery as cq
+
+    input_file = os.path.expanduser(args["input_file"])
+    imported = cq.importers.importStep(input_file)
+    root = imported.val() if hasattr(imported, "val") else imported
+
+    solids = list(root.Solids())
+    faces = list(root.Faces())
+    print(f"Imported {len(solids)} solids and {len(faces)} faces")
+
+    if len(solids) <= 55:
+        raise ValueError(f"Expected lever solid 55, but only {len(solids)} solids were found")
+    if len(faces) <= 529:
+        raise ValueError(f"Expected lever faces 528/529, but only {len(faces)} faces were found")
+
+    grip_face = faces[528]
+    distal_face = faces[529]
+    grip_bb = grip_face.BoundingBox()
+    distal_center = distal_face.Center()
+
+    spans = [grip_bb.xlen, grip_bb.ylen, grip_bb.zlen]
+    axis_index = max(range(3), key=lambda i: spans[i])
+    axis_names = ["X", "Y", "Z"]
+
+    grip_center = grip_bb.center
+    distal_values = [distal_center.x, distal_center.y, distal_center.z]
+    grip_values = [grip_center.x, grip_center.y, grip_center.z]
+    axis_sign = 1.0 if distal_values[axis_index] >= grip_values[axis_index] else -1.0
+
+    direction_components = [0.0, 0.0, 0.0]
+    direction_components[axis_index] = axis_sign
+    direction = cq.Vector(*direction_components)
+
+    transverse_spans = [spans[i] for i in range(3) if i != axis_index]
+    radius = 0.25 * (transverse_spans[0] + transverse_spans[1])
+
+    print(
+        f"Grip face type={grip_face.geomType()}, distal face type={distal_face.geomType()}, "
+        f"axis={axis_sign:+.0f}{axis_names[axis_index]}, radius={radius:.4f} mm"
+    )
+    print(
+        f"Original distal center=({distal_center.x:.4f}, "
+        f"{distal_center.y:.4f}, {distal_center.z:.4f})"
+    )
+
+    overlap = 0.05
+    start = distal_center - direction.multiply(overlap)
+    extension = cq.Solid.makeCylinder(radius, 50.0 + overlap, start, direction)
+
+    lever = solids[55]
+    extended_lever = lever.fuse(extension)
+    if not extended_lever.isValid():
+        raise ValueError("Extended lever solid is invalid")
+
+    output_solids = [extended_lever if i == 55 else solid for i, solid in enumerate(solids)]
+    result = cq.Compound.makeCompound(output_solids)
+
+    new_endpoint = distal_center + direction.multiply(50.0)
+    print(
+        f"Lever grip extended by 50.0000 mm to "
+        f"({new_endpoint.x:.4f}, {new_endpoint.y:.4f}, {new_endpoint.z:.4f})"
+    )
+    print(f"Result valid: {result.isValid()}; solids: {len(result.Solids())}")
+    return result

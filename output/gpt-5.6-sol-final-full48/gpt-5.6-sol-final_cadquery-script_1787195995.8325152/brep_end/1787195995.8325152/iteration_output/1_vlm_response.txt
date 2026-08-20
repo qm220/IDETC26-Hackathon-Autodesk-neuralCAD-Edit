@@ -1,0 +1,8 @@
+=== thinking_text ===
+
+
+=== response_text ===
+{
+  "complete": true,
+  "my_cad_function": "def my_cad_function(args):\n    import os\n    import cadquery as cq\n\n    input_file = os.path.expanduser(args[\"input_file\"])\n    imported = cq.importers.importStep(input_file)\n    source_shape = imported.val()\n\n    candidates = []\n    for face in source_shape.Faces():\n        try:\n            vertices = face.Vertices()\n            if not vertices or face.geomType() != \"PLANE\":\n                continue\n\n            z_values = [v.Center().z for v in vertices]\n            center = face.Center()\n            area = face.Area()\n            edge_count = len(face.outerWire().Edges())\n\n            if max(z_values) - min(z_values) < 1.0e-5 and abs(center.z + 10.0) < 0.1:\n                candidates.append((face, area, edge_count))\n        except Exception:\n            continue\n\n    if not candidates:\n        raise ValueError(\"Could not locate the existing vertical slot pocket floor\")\n\n    capsule_candidates = [item for item in candidates if item[2] == 4]\n    pocket_face = min(\n        capsule_candidates if capsule_candidates else candidates,\n        key=lambda item: item[1]\n    )[0]\n\n    slot_wire = pocket_face.outerWire()\n    cutter_front = cq.Solid.extrudeLinear(\n        slot_wire, [], cq.Vector(0.0, 0.0, 100.0)\n    )\n    cutter_rear = cq.Solid.extrudeLinear(\n        slot_wire, [], cq.Vector(0.0, 0.0, -100.0)\n    )\n    result_shape = source_shape.cut(cutter_front.fuse(cutter_rear))\n\n    if not result_shape.isValid():\n        raise ValueError(\"The through-slot operation produced an invalid shape\")\n\n    return cq.Workplane(\"XY\").newObject([result_shape])"
+}

@@ -3,7 +3,7 @@
 
 For each sample, copies settings.json, STEP, STL, and multi-view images into:
 
-    add-ons/submission outputs/<edit_id>/brep_end/<timestamp>/
+    submission_folder/submission outputs/<edit_id>/brep_end/<timestamp>/
 
 Does not copy planning/iteration logs or temp_script.py.
 """
@@ -70,8 +70,8 @@ def main() -> None:
     parser.add_argument("output_dir", help="Harness output directory")
     parser.add_argument(
         "--dest",
-        default="add-ons/submission outputs",
-        help="Submission destination (default: add-ons/submission outputs)",
+        default="submission_folder/submission outputs",
+        help="Submission destination (default: submission_folder/submission outputs)",
     )
     args = parser.parse_args()
 

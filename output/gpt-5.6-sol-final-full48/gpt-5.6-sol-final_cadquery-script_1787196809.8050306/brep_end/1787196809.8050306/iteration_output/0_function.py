@@ -1,0 +1,153 @@
+def my_cad_function(args):
+    input_file = os.path.expanduser(args["input_file"])
+    imported = cq.importers.importStep(input_file)
+    source_shape = imported.val()
+    solids = list(source_shape.Solids())
+    if not solids:
+        raise ValueError("The input STEP file contains no solids")
+
+    # The radiator/frame/shroud is the largest solid. The fan blades, cap,
+    # mounts, and original hose fittings are separate solids.
+    primary_index = max(range(len(solids)), key=lambda i: solids[i].Volume())
+    primary = solids[primary_index]
+    frame_bb = primary.BoundingBox()
+
+    print("Imported solid count:", len(solids))
+    print(
+        "Primary bbox:",
+        frame_bb.xmin, frame_bb.xmax,
+        frame_bb.ymin, frame_bb.ymax,
+        frame_bb.zmin, frame_bb.zmax,
+    )
+
+    # Find the original pair of hose fittings at the visual bottom-left in the
+    # fan-facing +X view. They project in -Z and are compact in X and Y.
+    fitting_candidates = []
+    for i, solid in enumerate(solids):
+        if i == primary_index:
+            continue
+        bb = solid.BoundingBox()
+        cx = 0.5 * (bb.xmin + bb.xmax)
+        cy = 0.5 * (bb.ymin + bb.ymax)
+        cz = 0.5 * (bb.zmin + bb.zmax)
+        dx = bb.xmax - bb.xmin
+        dy = bb.ymax - bb.ymin
+        dz = bb.zmax - bb.zmin
+        if (
+            cy < 0.0
+            and cz < frame_bb.zmin + 8.0
+            and dx < 32.0
+            and dy < 32.0
+            and dz > 0.85 * max(dx, dy)
+        ):
+            fitting_candidates.append((i, solid, bb, cx, cy, cz, dx, dy, dz))
+
+    fitting_candidates.sort(key=lambda item: item[4])
+    print("Detected lower-left fitting candidates:",
+          [(c[0], round(c[3], 2), round(c[4], 2), round(c[5], 2)) for c in fitting_candidates])
+
+    # Use the lower member of the original pair as the dimensional/location
+    # reference. Replace the pair with one explicitly hollow inlet.
+    if fitting_candidates:
+        ref = fitting_candidates[0]
+        port_x = ref[3]
+        inlet_y = ref[4]
+        measured_od = max(ref[6], ref[7])
+        neck_od = max(10.0, min(18.0, measured_od * 0.72))
+        barb_od = max(neck_od + 2.0, min(22.0, measured_od))
+        remove_indices = {c[0] for c in fitting_candidates[:2]}
+    else:
+        port_x = 0.5 * (frame_bb.xmin + frame_bb.xmax)
+        inlet_y = frame_bb.ymin + 25.0
+        neck_od = 13.0
+        barb_od = 17.0
+        remove_indices = set()
+
+    bore_d = max(6.0, neck_od - 5.0)
+    root_od = barb_od + 3.0
+    projection = 30.0
+    root_length = 5.0
+    lip_length = 5.0
+    inlet_y = max(frame_bb.ymin + root_od * 0.7,
+                  min(-root_od, inlet_y))
+    outlet_y = -inlet_y
+    outlet_y = min(frame_bb.ymax - root_od * 0.7,
+                   max(root_od, outlet_y))
+
+    def make_port(center_x, center_y, root_z, direction):
+        axis = cq.Vector(0, 0, direction)
+        start = cq.Vector(center_x, center_y, root_z)
+
+        # Overlapping root collar, hose neck, and tapered retention barb.
+        collar = cq.Solid.makeCylinder(root_od / 2.0, root_length, start, axis)
+        neck_start = cq.Vector(center_x, center_y,
+                               root_z + direction * (root_length - 1.0))
+        neck = cq.Solid.makeCylinder(
+            neck_od / 2.0,
+            projection - root_length - lip_length + 2.0,
+            neck_start,
+            axis,
+        )
+        lip_start = cq.Vector(center_x, center_y,
+                              root_z + direction * (projection - lip_length))
+        lip = cq.Solid.makeCone(
+            barb_od / 2.0,
+            neck_od / 2.0,
+            lip_length,
+            lip_start,
+            axis,
+        )
+        outer = collar.fuse(neck).fuse(lip)
+
+        # The cutter starts inside the side tank and passes through the entire
+        # fitting, producing a continuous coolant passage.
+        bore_start = cq.Vector(center_x, center_y, root_z - direction * 10.0)
+        bore = cq.Solid.makeCylinder(
+            bore_d / 2.0,
+            projection + 16.0,
+            bore_start,
+            axis,
+        )
+        return outer, bore
+
+    # Visual bottom-left in +X is -Y/-Z; visual top-right is +Y/+Z.
+    inlet_root_z = frame_bb.zmin + 3.0
+    outlet_root_z = frame_bb.zmax - 3.0
+    inlet_outer, inlet_bore = make_port(port_x, inlet_y, inlet_root_z, -1.0)
+    outlet_outer, outlet_bore = make_port(port_x, outlet_y, outlet_root_z, 1.0)
+
+    # Integrate both fittings with the main tank/frame solid, then open their
+    # bores through the local side walls.
+    try:
+        edited_primary = primary.fuse(inlet_outer).fuse(outlet_outer)
+        edited_primary = edited_primary.cut(inlet_bore).cut(outlet_bore)
+        if not edited_primary.isValid():
+            raise ValueError("Port boolean result is invalid")
+        added_as_separate = False
+        print("Both hollow ports were boolean-integrated into the main radiator solid")
+    except Exception as exc:
+        # Robust fallback: preserve the imported radiator and return the hollow
+        # fittings as touching solids if a complex imported B-rep rejects fuse.
+        print("Primary boolean fallback:", exc)
+        edited_primary = primary
+        inlet_outer = inlet_outer.cut(inlet_bore)
+        outlet_outer = outlet_outer.cut(outlet_bore)
+        added_as_separate = True
+
+    output_solids = []
+    for i, solid in enumerate(solids):
+        if i == primary_index:
+            output_solids.append(edited_primary)
+        elif i not in remove_indices:
+            output_solids.append(solid)
+
+    if added_as_separate:
+        output_solids.extend([inlet_outer, outlet_outer])
+
+    result = cq.Compound.makeCompound(output_solids)
+    print("Removed original redundant fitting solids:", sorted(remove_indices))
+    print("Bottom-left inlet center (X,Y):", round(port_x, 3), round(inlet_y, 3))
+    print("Top-right outlet center (X,Y):", round(port_x, 3), round(outlet_y, 3))
+    print("Port OD/bore/projection:", neck_od, bore_d, projection)
+    print("Result valid:", result.isValid(), "solid count:", len(result.Solids()))
+    return result

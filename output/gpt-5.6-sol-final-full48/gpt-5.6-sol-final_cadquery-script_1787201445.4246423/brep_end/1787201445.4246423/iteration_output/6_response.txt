@@ -1,0 +1,219 @@
+Thinking text:
+
+
+Generated script:
+def my_cad_function(args):
+    import os
+    import math
+    import statistics
+    import cadquery as cq
+
+    input_file = os.path.expanduser(args["input_file"])
+    imported = cq.importers.importStep(input_file)
+
+    solids = imported.solids().vals()
+    if not solids:
+        raise ValueError("The input STEP file contains no solid")
+    source = max(solids, key=lambda s: abs(s.Volume()))
+    source_bb = source.BoundingBox()
+
+    # Locate a Z level passing through the unchanged inner and outer walls,
+    # away from the existing axial edge fillets.
+    wall_intervals = []
+    for face in source.Faces():
+        try:
+            if face.geomType() != "PLANE":
+                continue
+            bb = face.BoundingBox()
+            if bb.zlen > 1.0e-5:
+                wall_intervals.append((bb.zmin, bb.zmax))
+        except Exception:
+            continue
+
+    if wall_intervals:
+        section_min = max(interval[0] for interval in wall_intervals)
+        section_max = min(interval[1] for interval in wall_intervals)
+    else:
+        section_min = source_bb.zmin
+        section_max = source_bb.zmax
+
+    if section_max > section_min + 1.0e-4:
+        section_z = 0.5 * (section_min + section_max)
+    else:
+        section_z = source_bb.zmin + 0.5 * source_bb.zlen
+
+    section = cq.Workplane("XY").newObject([source]).section(height=section_z)
+    wires = []
+    for wire in section.wires().vals():
+        try:
+            if wire.IsClosed():
+                wires.append(wire)
+        except Exception:
+            continue
+
+    if len(wires) < 2:
+        raise ValueError("Could not recover the frame's inner and outer footprints")
+
+    wires.sort(
+        key=lambda wire: wire.BoundingBox().xlen * wire.BoundingBox().ylen,
+        reverse=True,
+    )
+    outer_wire = wires[0]
+    inner_wire = wires[1]
+    obb = outer_wire.BoundingBox()
+    ibb = inner_wire.BoundingBox()
+
+    outer_w = obb.xlen
+    outer_h = obb.ylen
+    inner_w = ibb.xlen
+    inner_h = ibb.ylen
+    cx = 0.5 * (obb.xmin + obb.xmax)
+    cy = 0.5 * (obb.ymin + obb.ymax)
+    zmin = source_bb.zmin
+    depth = source_bb.zlen
+
+    def recover_plan_radius(wire, fallback):
+        radii = []
+        for edge in wire.Edges():
+            try:
+                if not edge.isNull() and edge.geomType() == "CIRCLE":
+                    radius = float(edge.radius())
+                    if radius > 1.0e-4:
+                        radii.append(radius)
+            except Exception:
+                continue
+        return float(statistics.median(radii)) if radii else float(fallback)
+
+    # These are the plan-view path corner radii, not the cross-sectional
+    # fillets, and therefore remain unchanged.
+    outer_r = min(
+        recover_plan_radius(outer_wire, 63.0),
+        0.499 * outer_w,
+        0.499 * outer_h,
+    )
+    inner_r = min(
+        recover_plan_radius(inner_wire, 50.0),
+        0.499 * inner_w,
+        0.499 * inner_h,
+    )
+
+    def rounded_rectangle(width, height, radius, z):
+        hw = 0.5 * width
+        hh = 0.5 * height
+        diagonal = radius / math.sqrt(2.0)
+        return (
+            cq.Workplane("XY", origin=(cx, cy, z))
+            .moveTo(-hw + radius, -hh)
+            .lineTo(hw - radius, -hh)
+            .threePointArc(
+                (hw - radius + diagonal, -hh + radius - diagonal),
+                (hw, -hh + radius),
+            )
+            .lineTo(hw, hh - radius)
+            .threePointArc(
+                (hw - radius + diagonal, hh - radius + diagonal),
+                (hw - radius, hh),
+            )
+            .lineTo(-hw + radius, hh)
+            .threePointArc(
+                (-hw + radius - diagonal, hh - radius + diagonal),
+                (-hw, hh - radius),
+            )
+            .lineTo(-hw, -hh + radius)
+            .threePointArc(
+                (-hw + radius - diagonal, -hh + radius - diagonal),
+                (-hw + radius, -hh),
+            )
+            .close()
+        )
+
+    outer = rounded_rectangle(outer_w, outer_h, outer_r, zmin).extrude(depth).val()
+    margin = max(1.0, 0.1 * depth)
+    inner_cutter = (
+        rounded_rectangle(inner_w, inner_h, inner_r, zmin - margin)
+        .extrude(depth + 2.0 * margin)
+        .val()
+    )
+    sharp_frame = outer.cut(inner_cutter).clean()
+    if sharp_frame.isNull() or not sharp_frame.isValid():
+        raise ValueError("The reconstructed sharp frame is invalid")
+
+    target_radius = 2.0
+    end_tol = max(1.0e-5, max(outer_w, outer_h, depth) * 1.0e-7)
+
+    # Select axial-end boundary edges without calling BoundingBox on edges.
+    # The previous attempt encountered a void OCC edge whose bounding box
+    # could not be constructed. Null/degenerate edges are now safely skipped.
+    def edge_end_level(edge):
+        try:
+            if edge is None or edge.isNull():
+                return None
+            vertices = edge.Vertices()
+            if vertices:
+                zs = [vertex.Center().z for vertex in vertices]
+            else:
+                zs = [edge.positionAt(t).z for t in (0.0, 0.5, 1.0)]
+            if max(zs) - min(zs) > end_tol:
+                return None
+            z = sum(zs) / len(zs)
+            if abs(z - zmin) <= end_tol:
+                return "bottom"
+            if abs(z - (zmin + depth)) <= end_tol:
+                return "top"
+        except Exception:
+            return None
+        return None
+
+    end_edges = []
+    top_count = 0
+    bottom_count = 0
+    for edge in sharp_frame.Edges():
+        level = edge_end_level(edge)
+        if level is None:
+            continue
+        end_edges.append(edge)
+        if level == "top":
+            top_count += 1
+        else:
+            bottom_count += 1
+
+    if not end_edges or top_count == 0 or bottom_count == 0:
+        raise ValueError(
+            "Failed to identify both sets of axial profile edges: top=%d, bottom=%d"
+            % (top_count, bottom_count)
+        )
+
+    # Apply the same R2 value to all four cross-sectional corners: outer and
+    # inner boundaries at both axial ends. This replaces the original rear
+    # outer R10 while preserving the existing R2 transitions.
+    result = sharp_frame.fillet(target_radius, end_edges).clean()
+    if result.isNull() or not result.isValid():
+        raise ValueError("The uniform R2 frame result is invalid")
+
+    result_bb = result.BoundingBox()
+    print("Source envelope:", source_bb.xlen, source_bb.ylen, source_bb.zlen)
+    print("Recovered outer footprint:", outer_w, outer_h, "R", outer_r)
+    print("Recovered inner footprint:", inner_w, inner_h, "R", inner_r)
+    print("Axial boundary edges: top=%d bottom=%d" % (top_count, bottom_count))
+    print("All cross-sectional profile radii set to R2")
+    print("Result envelope:", result_bb.xlen, result_bb.ylen, result_bb.zlen)
+    print("Result valid:", result.isValid())
+
+    return cq.Workplane("XY").newObject([result])
+
+Program output:
+stdout: Loading function from: /home/adml/Research/Hackathon2026/IDETC26-Hackathon-Autodesk-neuralCAD-Edit/output/gpt-5.6-sol-final-full48/gpt-5.6-sol-final_cadquery-script_1787201445.4246423/brep_end/1787201445.4246423/temp_script.py
+Error executing LLM-provided function: Failed to identify both sets of axial profile edges: top=0, bottom=0
+No CadQuery result returned; skipped STEP/STL/image export.
+Script completed.
+
+stderr: Traceback (most recent call last):
+  File "/home/adml/Research/Hackathon2026/IDETC26-Hackathon-Autodesk-neuralCAD-Edit/src/harnesses/cadquery_script.py", line 158, in load_and_execute_function
+    return my_cad_function(args)
+           ^^^^^^^^^^^^^^^^^^^^^
+  File "<string>", line 177, in my_cad_function
+ValueError: Failed to identify both sets of axial profile edges: top=0, bottom=0
+
+
+Exported this iteration:
+none (CadQuery failed or returned no shape)

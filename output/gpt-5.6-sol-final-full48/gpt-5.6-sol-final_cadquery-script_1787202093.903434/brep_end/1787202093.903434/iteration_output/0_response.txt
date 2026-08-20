@@ -1,0 +1,105 @@
+Thinking text:
+**Identifying cylindrical features**
+
+I’m looking at the clevis's far end projection, which shows a central grey rectangle and side lobes split along the Y-axis, while the bore axis aligns with Y as well. The view along +X reveals the hook, but +Z looks odd, possibly due to an orientation flip. I need to dynamically identify cylindrical faces, aiming for a radius between 2.5 and 3.5. I’ll explore methods in Cadquery for obtaining the radius and identifying the center accurately.
+**Evaluating cylindrical dimensions**
+
+I'm working out some dimensions here: the external lug cylinder has a radius of 7.5, while the hook throat's radius is 3. It seems like I'm considering candidates with an xspan or zspan of about 6, with the axis along the Y. I'm realizing that a cylindrical face could be a partial arc with a bounding box that's less than its diameter. Also, it looks like I might need an 8 short transition. The bore appears to be full cylinders with an exact x/z span of 6.
+**Calculating cylinder parameters**
+
+I need to determine the maximum component for absolute value and set the positive axis accordingly. I’ll use the bounding box's minimum and maximum values along that dimension. For the cylinder, I'll position the base point using the minimum axis coordinate and take the other coordinates from the location. The cylinder's length will be calculated as max minus min, and I’ll set the radius to 2.95. This is straightforward, but I want to ensure precision!
+
+Generated script:
+def my_cad_function(args):
+    import os
+    from OCP.BRepAdaptor import BRepAdaptor_Surface
+
+    input_file = os.path.expanduser(args["input_file"])
+    imported = cq.importers.importStep(input_file)
+    base_shape = imported.val() if hasattr(imported, "val") else imported
+    bbox = base_shape.BoundingBox()
+
+    # Locate the radius-3 cylindrical surfaces and select the one nearest
+    # the negative-X end, corresponding to the clevis pivot bore.
+    bore_candidates = []
+    for face in base_shape.Faces():
+        if face.geomType() != "CYLINDER":
+            continue
+        try:
+            adaptor = BRepAdaptor_Surface(face.wrapped)
+            cylinder = adaptor.Cylinder()
+            radius = cylinder.Radius()
+            if abs(radius - 3.0) > 0.20:
+                continue
+
+            location = cylinder.Location()
+            direction = cylinder.Axis().Direction()
+            bore_candidates.append({
+                "radius": radius,
+                "location": (location.X(), location.Y(), location.Z()),
+                "direction": (direction.X(), direction.Y(), direction.Z()),
+                "face_center_x": face.Center().x
+            })
+        except Exception:
+            continue
+
+    if not bore_candidates:
+        raise ValueError("Could not locate the cylindrical clevis bearing bore")
+
+    pivot = min(bore_candidates, key=lambda item: item["face_center_x"])
+    px, py, pz = pivot["location"]
+    dx, dy, dz = pivot["direction"]
+
+    # Snap the detected cylindrical axis to its dominant model axis. The
+    # supplied part has a Y-directed clevis pin axis.
+    components = [abs(dx), abs(dy), abs(dz)]
+    axis_index = components.index(max(components))
+
+    if axis_index == 0:
+        start = cq.Vector(bbox.xmin, py, pz)
+        pin_direction = cq.Vector(1, 0, 0)
+        pin_length = bbox.xmax - bbox.xmin
+        axis_name = "X"
+    elif axis_index == 1:
+        start = cq.Vector(px, bbox.ymin, pz)
+        pin_direction = cq.Vector(0, 1, 0)
+        pin_length = bbox.ymax - bbox.ymin
+        axis_name = "Y"
+    else:
+        start = cq.Vector(px, py, bbox.zmin)
+        pin_direction = cq.Vector(0, 0, 1)
+        pin_length = bbox.zmax - bbox.zmin
+        axis_name = "Z"
+
+    # Use a small running clearance relative to the nominal 6 mm bore.
+    # The pin remains an independent solid so the lever can rotate about it.
+    pin_radius = 2.95
+    pin = cq.Solid.makeCylinder(pin_radius, pin_length, start, pin_direction)
+
+    result = cq.Assembly(name="lever_with_pivot_pin")
+    result.add(base_shape, name="original_lever")
+    result.add(pin, name="pivot_pin")
+
+    print("Detected pivot axis: %s" % axis_name)
+    print("Pivot centerline reference: (%.4f, %.4f, %.4f) mm" % (px, py, pz))
+    print("Created separate pivot pin: diameter %.3f mm, length %.3f mm" % (2.0 * pin_radius, pin_length))
+    print("Original lever geometry was preserved without fusion to the pin")
+    return result
+
+Program output:
+stdout: Loading function from: /home/adml/Research/Hackathon2026/IDETC26-Hackathon-Autodesk-neuralCAD-Edit/output/gpt-5.6-sol-final-full48/gpt-5.6-sol-final_cadquery-script_1787202093.903434/brep_end/1787202093.903434/temp_script.py
+Detected pivot axis: Y
+Pivot centerline reference: (-68.2500, -5.7652, 7.5000) mm
+Created separate pivot pin: diameter 5.900 mm, length 16.375 mm
+Original lever geometry was preserved without fusion to the pin
+Exported assembly to: /home/adml/Research/Hackathon2026/IDETC26-Hackathon-Autodesk-neuralCAD-Edit/output/gpt-5.6-sol-final-full48/gpt-5.6-sol-final_cadquery-script_1787202093.903434/brep_end/1787202093.903434/tmp.step
+Exported STL to: /home/adml/Research/Hackathon2026/IDETC26-Hackathon-Autodesk-neuralCAD-Edit/output/gpt-5.6-sol-final-full48/gpt-5.6-sol-final_cadquery-script_1787202093.903434/brep_end/1787202093.903434/tmp.stl
+Exported PNG image to: /home/adml/Research/Hackathon2026/IDETC26-Hackathon-Autodesk-neuralCAD-Edit/output/gpt-5.6-sol-final-full48/gpt-5.6-sol-final_cadquery-script_1787202093.903434/brep_end/1787202093.903434/tmp.png
+Script completed.
+
+stderr: /home/adml/Research/Hackathon2026/IDETC26-Hackathon-Autodesk-neuralCAD-Edit/.venv/lib/python3.12/site-packages/cadquery/utils.py:82: FutureWarning: save will be removed in the next release.
+  warn(f"{f.__name__} will be removed in the next release.", FutureWarning)
+
+
+Exported this iteration:
+tmp.step, tmp.stl, tmp.png, tmp_+Z.png, tmp_-Z.png, tmp_-X.png, tmp_+X.png, tmp_+Y.png, tmp_-Y.png, tmp_iso1.png, tmp_iso2.png

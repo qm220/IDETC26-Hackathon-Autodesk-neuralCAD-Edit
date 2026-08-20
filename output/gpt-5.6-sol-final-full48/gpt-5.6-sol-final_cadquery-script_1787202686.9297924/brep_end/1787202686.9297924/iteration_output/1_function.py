@@ -1,0 +1,24 @@
+def my_cad_function(args):
+    import os
+    input_file = os.path.expanduser(args["input_file"])
+    model = cq.importers.importStep(input_file)
+    bbox = model.val().BoundingBox()
+
+    slots = [
+        (-41.0, 7.5, 22.0, 5.0),
+        (-11.5, 7.5, 23.0, 4.5),
+        (21.5, 7.5, 27.0, 3.5),
+    ]
+
+    result = model
+    cut_depth = max(100.0, 2.0 * bbox.ylen + 10.0)
+    for center_x, center_z, length, width in slots:
+        cutter = (
+            cq.Workplane("XZ")
+            .center(center_x, center_z)
+            .slot2D(length, width, angle=0)
+            .extrude(cut_depth, both=True)
+        )
+        result = result.cut(cutter)
+
+    return result

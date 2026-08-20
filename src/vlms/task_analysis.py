@@ -36,19 +36,19 @@ if str(REPO_ROOT) not in sys.path:
 
 from src.utils.cadquery_rendering import STANDARD_VIEWS
 
-PROMPT_DIR = REPO_ROOT / "add-ons" / "prompts" / "cadquery"
+PROMPT_DIR = REPO_ROOT / "submission_folder" / "prompts" / "cadquery"
 DEFAULT_PROMPT_FILES = {
     "model": str(PROMPT_DIR / "final_planning_1.txt"),
     "parse": str(PROMPT_DIR / "final_planning_2.txt"),
     "localize": str(PROMPT_DIR / "final_planning_3.txt"),
 }
 ONTOLOGY_TTL_PATH = (
-    REPO_ROOT / "add-ons" / "prompts" / "cadquery" / "cad_model_hierarchical_ontology_v0.5_faces_only.ttl"
+    REPO_ROOT / "submission_folder" / "prompts" / "cadquery" / "cad_model_hierarchical_ontology_v0.5_faces_only.ttl"
 )
 OPERATION_ONTOLOGY_TTL_PATH = (
-    REPO_ROOT / "add-ons" / "prompts" / "cadquery" / "cadquery_operation_ontology.ttl"
+    REPO_ROOT / "submission_folder" / "prompts" / "cadquery" / "cadquery_operation_ontology.ttl"
 )
-EXTRACT_INFO_SCRIPT = REPO_ROOT / "add-ons" / "code" / "extract_info.py"
+EXTRACT_INFO_SCRIPT = REPO_ROOT / "submission_folder" / "code" / "extract_info.py"
 PLANNING_LOOP_PREFACE_FILE = PROMPT_DIR / "planning_loop_preface.txt"
 REQUEST_SENTINEL = "[insert natural language request]"
 REQUEST_SENTINELS = (REQUEST_SENTINEL, "[insert prompt]")

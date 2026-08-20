@@ -1,0 +1,96 @@
+def my_cad_function(args):
+    import os
+    import cadquery as cq
+
+    input_file = os.path.expanduser(args["input_file"])
+    imported = cq.importers.importStep(input_file)
+    root = imported.val()
+
+    solids = root.Solids()
+    if len(solids) != 1:
+        raise ValueError(f"Expected one solid in the input model, found {len(solids)}")
+    solid = solids[0]
+
+    faces = solid.Faces()
+    target_face_ids = [44, 46, 49, 50, 51, 52]
+    target_edges = []
+
+    def add_unique_edge(edge):
+        for existing in target_edges:
+            if edge.isSame(existing):
+                return
+        target_edges.append(edge)
+
+    # Use the bore-face indices identified from the source B-rep. Only circular
+    # boundary edges of those cylindrical faces are included.
+    valid_target_faces = 0
+    for face_id in target_face_ids:
+        if face_id >= len(faces):
+            continue
+        face = faces[face_id]
+        if face.geomType() != "CYLINDER":
+            continue
+        circular_edges = [e for e in face.Edges() if e.geomType() == "CIRCLE"]
+        if len(circular_edges) >= 2:
+            valid_target_faces += 1
+            for edge in circular_edges:
+                add_unique_edge(edge)
+
+    # Topological fallback in case STEP import changed face ordering. A true
+    # through-hole wall is a cylindrical face bounded by two complete circles.
+    if valid_target_faces != 6 or len(target_edges) != 12:
+        target_edges = []
+        bore_candidates = []
+        for face in faces:
+            if face.geomType() != "CYLINDER":
+                continue
+            circles = [e for e in face.Edges() if e.geomType() == "CIRCLE"]
+            if len(circles) != 2:
+                continue
+            try:
+                r0 = circles[0].radius()
+                r1 = circles[1].radius()
+            except Exception:
+                continue
+            if abs(r0 - r1) > 1.0e-5 or r0 <= 0.5:
+                continue
+            bore_candidates.append((r0, face, circles))
+
+        # Internal functional bores occur as repeated-radius groups: four base
+        # mounting bores and two clevis bores. Group by radius and retain groups
+        # having the expected multiplicities, preferring the six smallest such
+        # cylindrical faces over larger external boss cylinders.
+        groups = []
+        for radius, face, circles in sorted(bore_candidates, key=lambda x: x[0]):
+            matched = False
+            for group in groups:
+                if abs(group[0] - radius) < 1.0e-4:
+                    group[1].append((face, circles))
+                    matched = True
+                    break
+            if not matched:
+                groups.append([radius, [(face, circles)]])
+
+        selected = []
+        for radius, members in groups:
+            if len(members) in (2, 4, 6):
+                selected.extend(members)
+        if len(selected) != 6:
+            raise ValueError(
+                f"Could not identify six through-hole walls: found {len(selected)} candidates"
+            )
+        for face, circles in selected:
+            for edge in circles:
+                add_unique_edge(edge)
+
+    if len(target_edges) != 12:
+        raise ValueError(f"Expected 12 hole-rim edges, found {len(target_edges)}")
+
+    result = cq.Workplane(obj=solid).newObject(target_edges).chamfer(0.2)
+    result_solid = result.val()
+    if not result_solid.isValid():
+        raise ValueError("The chamfer operation produced an invalid solid")
+
+    print(f"Applied 0.2 mm equal-distance chamfers to {len(target_edges)} hole edges")
+    print(f"Result solids: {len(result_solid.Solids())}, valid: {result_solid.isValid()}")
+    return result

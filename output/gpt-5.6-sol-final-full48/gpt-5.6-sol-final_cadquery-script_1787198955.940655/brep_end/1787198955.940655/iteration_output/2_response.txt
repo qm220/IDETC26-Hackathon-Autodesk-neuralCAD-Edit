@@ -1,0 +1,95 @@
+Thinking text:
+
+
+Generated script:
+def my_cad_function(args):
+    import os
+    import cadquery as cq
+
+    input_file = os.path.expanduser(args["input_file"])
+    imported = cq.importers.importStep(input_file)
+    source_shape = imported.val()
+
+    solids = list(source_shape.Solids())
+    if not solids:
+        raise ValueError("The input STEP file contains no solids")
+
+    solids_by_volume = sorted(solids, key=lambda s: s.Volume(), reverse=True)
+    housing = solids_by_volume[0]
+    remaining = solids_by_volume[1:]
+
+    hb = housing.BoundingBox()
+    width_x = hb.xmax - hb.xmin
+    height_y = hb.ymax - hb.ymin
+    length_z = hb.zmax - hb.zmin
+    center_x = 0.5 * (hb.xmin + hb.xmax)
+
+    if remaining:
+        wheel = remaining[0]
+        wb = wheel.BoundingBox()
+        wheel_z = 0.5 * (wb.zmin + wb.zmax)
+        wheel_half_x = max(abs(wb.xmin - center_x), abs(wb.xmax - center_x))
+    else:
+        wheel_z = hb.zmin + 0.55 * length_z
+        wheel_half_x = 0.055 * width_x
+
+    z_back = max(hb.zmin + 0.40 * length_z, wheel_z - 0.11 * length_z)
+    z_front = hb.zmax - 0.065 * length_z
+    if z_front <= z_back + 0.18 * length_z:
+        z_back = hb.zmin + 0.43 * length_z
+        z_front = hb.zmax - 0.055 * length_z
+    z_mid = z_back + 0.58 * (z_front - z_back)
+
+    center_gap = max(wheel_half_x + 1.2, 0.075 * width_x)
+    outer_back = 0.31 * width_x
+    outer_mid = 0.425 * width_x
+    outer_front = 0.30 * width_x
+
+    def footprint_solid(side):
+        x_inner = center_x + side * center_gap
+        points = [
+            (x_inner, z_back),
+            (center_x + side * outer_back, z_back),
+            (center_x + side * outer_mid, z_mid),
+            (center_x + side * outer_front, z_front),
+            (x_inner, z_front),
+        ]
+        return (
+            cq.Workplane("XZ")
+            .polyline(points)
+            .close()
+            .extrude(2.0 * (height_y + 20.0), both=True)
+            .val()
+        )
+
+    raised_housing = housing.copy().translate((0.0, 2.0, 0.0))
+    raised_skin = raised_housing.cut(housing)
+
+    upper_cut_y = hb.ymin + 0.30 * height_y
+    upper_slab = cq.Solid.makeBox(
+        width_x + 20.0,
+        hb.ymax + 7.0 - upper_cut_y,
+        length_z + 20.0,
+        cq.Vector(hb.xmin - 10.0, upper_cut_y, hb.zmin - 10.0),
+    )
+    raised_skin = raised_skin.intersect(upper_slab)
+
+    button_solids = []
+    for side in (-1, 1):
+        footprint = footprint_solid(side)
+        raw_button = raised_skin.intersect(footprint)
+        candidates = [s for s in raw_button.Solids() if s.Volume() > 0.02]
+        if not candidates:
+            raise ValueError("Unable to construct a surface-conforming button")
+        button = max(candidates, key=lambda s: s.Volume())
+        try:
+            button = button.fillet(0.30, button.Edges())
+        except Exception:
+            pass
+        button_solids.append(button)
+
+    result = cq.Compound.makeCompound(solids + button_solids)
+    return cq.Workplane(obj=result)
+
+Program output:
+CadQuery skipped because complete=true.

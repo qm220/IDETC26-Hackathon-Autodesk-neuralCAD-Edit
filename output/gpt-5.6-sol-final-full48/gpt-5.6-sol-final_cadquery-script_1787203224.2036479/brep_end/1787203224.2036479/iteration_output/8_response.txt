@@ -1,0 +1,156 @@
+Thinking text:
+**Evaluating function parameters**
+
+I’m considering how to provide a concise function while keeping the user's expectations in mind. It seems like they expect something similar to what I've done before. I'll revisit the last iteration to see if I can incorporate that function. Since the schema requests a CadQuery function as a string, I have to be careful about how I format it. It looks like JSON only is required, so I’ll need to focus on that.
+
+Generated script:
+def my_cad_function(args):
+    import cadquery as cq
+
+    imported = cq.importers.importStep(args["input_file"])
+    source_shape = imported.val()
+    source_solids = list(source_shape.Solids())
+    if not source_solids:
+        raise ValueError("The input STEP file contains no solids")
+
+    blade_solids = []
+    preserved_solids = []
+    for solid in source_solids:
+        bb = solid.BoundingBox()
+        if max(bb.xlen, bb.zlen) > 80.0:
+            blade_solids.append(solid)
+        else:
+            preserved_solids.append(solid)
+
+    if len(blade_solids) != 2:
+        raise ValueError("Expected exactly two original rotor-blade solids")
+
+    edge_radius = 1.0
+
+    def round_long_edges(blade):
+        candidates = []
+        for edge in blade.Edges():
+            try:
+                if edge.geomType() == "LINE" and edge.Length() > 30.0:
+                    candidates.append(edge)
+            except Exception:
+                pass
+
+        if not candidates:
+            return blade, 0
+
+        try:
+            return blade.fillet(edge_radius, candidates), len(candidates)
+        except Exception:
+            result = blade
+            applied = 0
+            for original_edge in candidates:
+                center = original_edge.Center()
+                best = None
+                best_distance = 1.0e100
+                for current_edge in result.Edges():
+                    try:
+                        if current_edge.geomType() != "LINE" or current_edge.Length() <= 30.0:
+                            continue
+                        c = current_edge.Center()
+                        d = ((c.x - center.x) ** 2 +
+                             (c.y - center.y) ** 2 +
+                             (c.z - center.z) ** 2)
+                        if d < best_distance:
+                            best_distance = d
+                            best = current_edge
+                    except Exception:
+                        pass
+                if best is not None:
+                    try:
+                        result = result.fillet(edge_radius, [best])
+                        applied += 1
+                    except Exception:
+                        pass
+            return result, applied
+
+    rounded_blades = []
+    rounded_counts = []
+    for blade in blade_solids:
+        rounded, count = round_long_edges(blade)
+        rounded_blades.append(rounded)
+        rounded_counts.append(count)
+
+    template = max(rounded_blades, key=lambda s: s.BoundingBox().zlen)
+
+    central_thickness = 0.42
+    inner_radius = 14.0
+    transition_radius = 22.0
+
+    def make_transition_envelope(y_center, full_half_thickness):
+        thin_half = central_thickness / 2.0
+        full_half = max(full_half_thickness, thin_half + 0.05)
+        profile = (
+            cq.Workplane("XY")
+            .moveTo(0.0, y_center - thin_half)
+            .lineTo(inner_radius, y_center - thin_half)
+            .lineTo(transition_radius, y_center - full_half)
+            .lineTo(transition_radius, y_center + full_half)
+            .lineTo(inner_radius, y_center + thin_half)
+            .lineTo(0.0, y_center + thin_half)
+            .close()
+        )
+        return profile.revolve(
+            360.0,
+            axisStart=(0.0, y_center - full_half - 1.0),
+            axisEnd=(0.0, y_center + full_half + 1.0)
+        ).val()
+
+    edit_cylinder = cq.Solid.makeCylinder(
+        transition_radius,
+        200.0,
+        cq.Vector(0.0, -100.0, 0.0),
+        cq.Vector(0.0, 1.0, 0.0)
+    )
+
+    def thin_central_portion(blade):
+        bb = blade.BoundingBox()
+        y_center = 0.5 * (bb.ymin + bb.ymax)
+        half_thickness = 0.5 * bb.ylen
+        envelope = make_transition_envelope(y_center, half_thickness)
+
+        unchanged_outer = blade.cut(edit_cylinder)
+        transitioned_center = blade.intersect(edit_cylinder).intersect(envelope)
+        try:
+            return unchanged_outer.fuse(transitioned_center).clean()
+        except Exception:
+            return cq.Compound.makeCompound([unchanged_outer, transitioned_center])
+
+    modified_existing = [thin_central_portion(b) for b in rounded_blades]
+
+    existing_y_centers = [
+        0.5 * (b.BoundingBox().ymin + b.BoundingBox().ymax)
+        for b in rounded_blades
+    ]
+    stack_mid_y = sum(existing_y_centers) / 2.0
+    template_y = 0.5 * (
+        template.BoundingBox().ymin + template.BoundingBox().ymax
+    )
+
+    new_blade = template.translate(
+        cq.Vector(0.0, stack_mid_y - template_y, 0.0)
+    )
+    new_blade = new_blade.rotate(
+        cq.Vector(0.0, 0.0, 0.0),
+        cq.Vector(0.0, 1.0, 0.0),
+        -60.0
+    )
+    new_blade = thin_central_portion(new_blade)
+
+    result_shapes = preserved_solids + modified_existing + [new_blade]
+    result = cq.Compound.makeCompound(result_shapes)
+
+    print("Original solids:", len(source_solids))
+    print("Longitudinal fillet radius:", edge_radius, "mm")
+    print("Rounded longitudinal edges per existing blade:", rounded_counts)
+    print("Central thickness of all three blades:", central_thickness, "mm")
+    print("Added third blade at -60 degrees in the stack midpoint")
+    return cq.Workplane("XY").newObject([result])
+
+Program output:
+CadQuery skipped because complete=true.

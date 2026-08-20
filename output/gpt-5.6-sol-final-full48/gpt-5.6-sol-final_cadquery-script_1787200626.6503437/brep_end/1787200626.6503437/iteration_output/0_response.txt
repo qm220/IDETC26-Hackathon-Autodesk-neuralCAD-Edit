@@ -1,0 +1,152 @@
+Thinking text:
+**Considering geometry options**
+
+I’m exploring alternatives for intersecting with a very thin slab at a specific point and scaling in the Y direction. It seems like it could be problematic since it introduces tiny overlaps. One idea is to take a thin center slab with a thickness of epsilon and then stretch it by uniting multiple slabs. I wonder if that would help maintain the overall profile while avoiding those overlaps! Let’s see how that might work out.
+**Considering adjustments for centered alignment**
+
+I think I need to ensure an exact union in the center. It might be easier if I take the middle 5mm of the original piece and keep that intact while adjusting the top and bottom. Since the original middle slab already spans 5mm, that could simplify my process. I’ll make sure everything aligns well to maintain the intended design.
+**Planning geometric operations**
+
+I'm setting up a plan for deriving plane orientation from geometry. I need to figure out the axis from the shape using OBB and PCA; the bounding box isn't enough. I’ll identify the thinnest principal axis and the height. I think using vertex covariance and eigenvectors will help, although I might need to import numpy. I’ll sample shape vertices for PCA and check for any biases in distribution. Next, I'll find normals of broad planar faces to sort by area and identify the largest ones.
+**Transforming shapes in matrix space**
+
+I’m considering using the origin world zero for the matrix and then centering the coordinates. This approach allows me to transform the shape without translation. I can find the bounding box's local axis by looking at the vertex coordinate extrema. However, it's important to note that the shape's bounding box after rotation may reflect exactly what I need. I'm wanting to ensure precision in this transformation process!
+
+Generated script:
+def my_cad_function(args):
+    import os
+    import cadquery as cq
+
+    input_file = os.path.expanduser(args["input_file"])
+    imported = cq.importers.importStep(input_file)
+    imported_shape = imported.val()
+    solids = imported_shape.Solids()
+    if not solids:
+        raise ValueError("The input STEP file contains no solids")
+    solid = solids[0]
+
+    # Find one of the broad annular planar faces. Such a face has an outer
+    # boundary and an aperture boundary, and therefore at least two wires.
+    annular_faces = [
+        face for face in solid.Faces()
+        if face.geomType() == "PLANE" and len(face.Wires()) >= 2
+    ]
+    if not annular_faces:
+        raise ValueError("Could not identify a planar annular frame face")
+    reference_face = max(annular_faces, key=lambda face: face.Area())
+
+    normal = reference_face.normalAt().normalized()
+
+    # The longest straight edge on the annular face defines the frame width.
+    straight_edges = [
+        edge for edge in reference_face.Edges()
+        if edge.geomType() == "LINE"
+    ]
+    if not straight_edges:
+        raise ValueError("Could not identify the frame's straight width direction")
+    width_edge = max(straight_edges, key=lambda edge: edge.Length())
+    width_dir = width_edge.tangentAt().normalized()
+
+    # Remove any negligible component along the face normal.
+    width_dir = (width_dir - normal.multiply(width_dir.dot(normal))).normalized()
+    height_dir = normal.cross(width_dir).normalized()
+
+    # Rigidly map the frame into local coordinates: X=width, Y=height,
+    # Z=through-thickness. This preserves all analytic surfaces and radii.
+    world_to_local = cq.Matrix([
+        [width_dir.x,  width_dir.y,  width_dir.z,  0.0],
+        [height_dir.x, height_dir.y, height_dir.z, 0.0],
+        [normal.x,     normal.y,     normal.z,     0.0],
+        [0.0,          0.0,          0.0,          1.0]
+    ])
+    local_solid = solid.transformShape(world_to_local)
+    bb = local_solid.BoundingBox()
+    center_y = 0.5 * (bb.ymin + bb.ymax)
+
+    increase = 5.0
+    half_increase = increase / 2.0
+    margin = max(bb.xlen, bb.ylen, bb.zlen) + 20.0
+
+    x0 = bb.xmin - margin
+    z0 = bb.zmin - margin
+    box_dx = bb.xlen + 2.0 * margin
+    box_dz = bb.zlen + 2.0 * margin
+
+    # Separate the model through its central straight side spans. Moving the
+    # two halves apart retains all original corners, blends, lands, and wall
+    # profiles without scaling them.
+    lower_box = cq.Solid.makeBox(
+        box_dx,
+        (center_y - bb.ymin) + margin,
+        box_dz,
+        cq.Vector(x0, bb.ymin - margin, z0)
+    )
+    upper_box = cq.Solid.makeBox(
+        box_dx,
+        (bb.ymax - center_y) + margin,
+        box_dz,
+        cq.Vector(x0, center_y, z0)
+    )
+
+    lower = local_solid.intersect(lower_box).translate((0.0, -half_increase, 0.0))
+    upper = local_solid.intersect(upper_box).translate((0.0, half_increase, 0.0))
+
+    # The profile is constant through the central portion of each straight
+    # side. Reuse a 5 mm-wide central piece of the original model as the exact
+    # profile-preserving extension. A tiny overlap makes the final fuse robust.
+    overlap = 0.01
+    bridge_y0 = center_y - half_increase - overlap
+    bridge_dy = increase + 2.0 * overlap
+    bridge_box = cq.Solid.makeBox(
+        box_dx,
+        bridge_dy,
+        box_dz,
+        cq.Vector(x0, bridge_y0, z0)
+    )
+    bridge = local_solid.intersect(bridge_box)
+
+    stretched_local = lower.fuse(bridge).fuse(upper).clean()
+
+    # Transform back to the original model orientation.
+    local_to_world = cq.Matrix([
+        [width_dir.x, height_dir.x, normal.x, 0.0],
+        [width_dir.y, height_dir.y, normal.y, 0.0],
+        [width_dir.z, height_dir.z, normal.z, 0.0],
+        [0.0,         0.0,          0.0,      1.0]
+    ])
+    result = stretched_local.transformShape(local_to_world).clean()
+
+    result_solids = result.Solids()
+    if len(result_solids) != 1:
+        raise ValueError(f"Expected one fused solid after stretching, got {len(result_solids)}")
+    result = result_solids[0]
+
+    result_local = result.transformShape(world_to_local)
+    result_bb = result_local.BoundingBox()
+    print(f"Original local height: {bb.ylen:.6f} mm")
+    print(f"Modified local height: {result_bb.ylen:.6f} mm")
+    print(f"Height increase: {result_bb.ylen - bb.ylen:.6f} mm")
+    print(f"Width change: {result_bb.xlen - bb.xlen:.6f} mm")
+    print(f"Result valid: {result.isValid()}")
+
+    return cq.Workplane("XY").newObject([result])
+
+Program output:
+stdout: Loading function from: /home/adml/Research/Hackathon2026/IDETC26-Hackathon-Autodesk-neuralCAD-Edit/output/gpt-5.6-sol-final-full48/gpt-5.6-sol-final_cadquery-script_1787200626.6503437/brep_end/1787200626.6503437/temp_script.py
+Error executing LLM-provided function: gp_GTrsf::Trsf() - non-orthogonal GTrsf
+No CadQuery result returned; skipped STEP/STL/image export.
+Script completed.
+
+stderr: Traceback (most recent call last):
+  File "/home/adml/Research/Hackathon2026/IDETC26-Hackathon-Autodesk-neuralCAD-Edit/src/harnesses/cadquery_script.py", line 158, in load_and_execute_function
+    return my_cad_function(args)
+           ^^^^^^^^^^^^^^^^^^^^^
+  File "<string>", line 47, in my_cad_function
+  File "/home/adml/Research/Hackathon2026/IDETC26-Hackathon-Autodesk-neuralCAD-Edit/.venv/lib/python3.12/site-packages/cadquery/occ_impl/shapes.py", line 1194, in transformShape
+    BRepBuilderAPI_Transform(self.wrapped, tMatrix.wrapped.Trsf()).Shape()
+                                           ^^^^^^^^^^^^^^^^^^^^^^
+OCP.OCP.Standard.Standard_ConstructionError: gp_GTrsf::Trsf() - non-orthogonal GTrsf
+
+
+Exported this iteration:
+none (CadQuery failed or returned no shape)

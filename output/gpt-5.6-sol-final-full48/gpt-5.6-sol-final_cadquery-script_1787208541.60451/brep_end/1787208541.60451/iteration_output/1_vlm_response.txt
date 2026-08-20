@@ -1,0 +1,8 @@
+=== thinking_text ===
+
+
+=== response_text ===
+{
+  "complete": true,
+  "my_cad_function": "def my_cad_function(args):\n    input_file = os.path.expanduser(args[\"input_file\"])\n    imported = cq.importers.importStep(input_file)\n\n    solids = imported.solids().vals()\n    if not solids:\n        raise ValueError(\"The input STEP file contains no solid bodies\")\n\n    original = solids[0]\n    for solid in solids[1:]:\n        original = original.fuse(solid)\n    original = original.clean()\n\n    bbox = original.BoundingBox()\n    mirror_x = bbox.xmax\n    mirrored = original.mirror(\"YZ\", (mirror_x, 0.0, 0.0))\n\n    result_shape = original.fuse(mirrored).clean()\n    result_solids = result_shape.Solids()\n\n    if len(result_solids) != 1:\n        raise ValueError(\n            f\"Boolean union did not produce one body; found {len(result_solids)} solids\"\n        )\n    if not result_shape.isValid():\n        raise ValueError(\"The resulting mirrored and merged body is invalid\")\n\n    return cq.Workplane(obj=result_shape)"
+}

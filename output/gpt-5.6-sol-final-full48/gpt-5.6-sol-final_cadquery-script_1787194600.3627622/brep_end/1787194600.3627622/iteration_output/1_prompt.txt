@@ -1,0 +1,2064 @@
+Multi-view images from last iteration:
+
+View: +Z
+
+[IMAGE 0: /home/adml/Research/Hackathon2026/IDETC26-Hackathon-Autodesk-neuralCAD-Edit/output/gpt-5.6-sol-final-full48/gpt-5.6-sol-final_cadquery-script_1787194600.3627622/brep_end/1787194600.3627622/tmp_+Z.png]
+
+View: -Z
+
+[IMAGE 1: /home/adml/Research/Hackathon2026/IDETC26-Hackathon-Autodesk-neuralCAD-Edit/output/gpt-5.6-sol-final-full48/gpt-5.6-sol-final_cadquery-script_1787194600.3627622/brep_end/1787194600.3627622/tmp_-Z.png]
+
+View: -X
+
+[IMAGE 2: /home/adml/Research/Hackathon2026/IDETC26-Hackathon-Autodesk-neuralCAD-Edit/output/gpt-5.6-sol-final-full48/gpt-5.6-sol-final_cadquery-script_1787194600.3627622/brep_end/1787194600.3627622/tmp_-X.png]
+
+View: +X
+
+[IMAGE 3: /home/adml/Research/Hackathon2026/IDETC26-Hackathon-Autodesk-neuralCAD-Edit/output/gpt-5.6-sol-final-full48/gpt-5.6-sol-final_cadquery-script_1787194600.3627622/brep_end/1787194600.3627622/tmp_+X.png]
+
+View: +Y
+
+[IMAGE 4: /home/adml/Research/Hackathon2026/IDETC26-Hackathon-Autodesk-neuralCAD-Edit/output/gpt-5.6-sol-final-full48/gpt-5.6-sol-final_cadquery-script_1787194600.3627622/brep_end/1787194600.3627622/tmp_+Y.png]
+
+View: -Y
+
+[IMAGE 5: /home/adml/Research/Hackathon2026/IDETC26-Hackathon-Autodesk-neuralCAD-Edit/output/gpt-5.6-sol-final-full48/gpt-5.6-sol-final_cadquery-script_1787194600.3627622/brep_end/1787194600.3627622/tmp_-Y.png]
+
+View: iso1
+
+[IMAGE 6: /home/adml/Research/Hackathon2026/IDETC26-Hackathon-Autodesk-neuralCAD-Edit/output/gpt-5.6-sol-final-full48/gpt-5.6-sol-final_cadquery-script_1787194600.3627622/brep_end/1787194600.3627622/tmp_iso1.png]
+
+View: iso2
+
+[IMAGE 7: /home/adml/Research/Hackathon2026/IDETC26-Hackathon-Autodesk-neuralCAD-Edit/output/gpt-5.6-sol-final-full48/gpt-5.6-sol-final_cadquery-script_1787194600.3627622/brep_end/1787194600.3627622/tmp_iso2.png]
+
+CadQuery function from last iteration:
+
+def my_cad_function(args):
+    import os
+    shape = cq.importers.importStep(os.path.expanduser(args["input_file"]))
+    solid = shape.val()
+    bb = solid.BoundingBox()
+    print("VALID", solid.isValid(), "VOLUME", solid.Volume())
+    print("BBOX", (bb.xmin, bb.xmax, bb.ymin, bb.ymax, bb.zmin, bb.zmax))
+    print("CENTER", (bb.center.x, bb.center.y, bb.center.z))
+
+    faces = solid.Faces()
+    print("FACE_COUNT", len(faces))
+    wanted = set([44,46,49,50,51,52,68,69,74,75,77,78,79,89,90,91,92,99,101,102,103,104,107,178,218,223])
+    for i, face in enumerate(faces):
+        if i not in wanted:
+            continue
+        try:
+            c = face.Center()
+            fbb = face.BoundingBox()
+            info = ["FACE", i, face.geomType(), "CENTER", (round(c.x,4),round(c.y,4),round(c.z,4)),
+                    "BBOX", (round(fbb.xmin,4),round(fbb.xmax,4),round(fbb.ymin,4),round(fbb.ymax,4),round(fbb.zmin,4),round(fbb.zmax,4)),
+                    "AREA", round(face.Area(),4)]
+            if face.geomType() == "PLANE":
+                n = face.normalAt()
+                info += ["NORMAL", (round(n.x,4),round(n.y,4),round(n.z,4))]
+            elif face.geomType() == "CYLINDER":
+                try:
+                    cyl = face._geomAdaptor().Cylinder()
+                    ax = cyl.Axis().Direction()
+                    loc = cyl.Axis().Location()
+                    info += ["RADIUS", round(cyl.Radius(),4), "AXIS", (round(ax.X(),4),round(ax.Y(),4),round(ax.Z(),4)), "LOC", (round(loc.X(),4),round(loc.Y(),4),round(loc.Z(),4))]
+                except Exception as e:
+                    info += ["CYLINDER_INFO_ERROR", str(e)]
+            print(*info)
+        except Exception as e:
+            print("FACE_ERROR", i, str(e))
+    return shape
+
+Program output from last iteration:
+
+stdout: Loading function from: /home/adml/Research/Hackathon2026/IDETC26-Hackathon-Autodesk-neuralCAD-Edit/output/gpt-5.6-sol-final-full48/gpt-5.6-sol-final_cadquery-script_1787194600.3627622/brep_end/1787194600.3627622/temp_script.py
+VALID True VOLUME 67.0898206546998
+BBOX (-0.48637285896756194, 12.793627341032407, -0.010000100000000409, 4.9100001, -3.906470074268222, 4.34317957994568)
+CENTER (6.153627241032423, 2.45, 0.21835475283872907)
+FACE_COUNT 266
+FACE 44 CYLINDER CENTER (4.9976, 3.51, 2.9432) BBOX (4.6976, 5.2976, 2.76, 4.26, 2.1932, 3.6932) AREA 2.8274 RADIUS 0.75 AXIS (-1.0, 0.0, 0.0) LOC (12.7936, 3.51, 2.9432)
+FACE 46 CYLINDER CENTER (7.2476, 3.51, 2.9432) BBOX (6.9476, 7.5476, 2.76, 4.26, 2.1932, 3.6932) AREA 2.8274 RADIUS 0.75 AXIS (-1.0, 0.0, 0.0) LOC (12.7936, 3.51, 2.9432)
+FACE 49 CYLINDER CENTER (0.2936, 0.29, 1.4735) BBOX (-0.1064, 0.6936, -0.01, 0.59, 1.0735, 1.8735) AREA 1.508 RADIUS 0.4 AXIS (0.0, -1.0, 0.0) LOC (0.2936, 19.99, 1.4735)
+FACE 50 CYLINDER CENTER (0.2936, 0.29, -1.5265) BBOX (-0.1064, 0.6936, -0.01, 0.59, -1.9265, -1.1265) AREA 1.508 RADIUS 0.4 AXIS (0.0, -1.0, 0.0) LOC (0.2936, 19.99, -1.5265)
+FACE 51 CYLINDER CENTER (11.9536, 0.29, 1.1235) BBOX (11.5536, 12.3536, -0.01, 0.59, 0.7235, 1.5235) AREA 1.508 RADIUS 0.4 AXIS (0.0, -1.0, 0.0) LOC (11.9536, 19.99, 1.1235)
+FACE 52 CYLINDER CENTER (11.9536, 0.29, -2.9865) BBOX (11.5536, 12.3536, -0.01, 0.59, -3.3865, -2.5865) AREA 1.508 RADIUS 0.4 AXIS (0.0, -1.0, 0.0) LOC (11.9536, 19.99, -2.9865)
+FACE 68 CYLINDER CENTER (7.2476, 4.2136, 3.7967) BBOX (6.9476, 7.5476, 2.8744, 4.91, 2.5573, 4.3432) AREA 1.9499 RADIUS 1.4 AXIS (1.0, 0.0, 0.0) LOC (-19.7064, 3.51, 2.9432)
+FACE 69 PLANE CENTER (7.2475, 4.3394, 0.7566) BBOX (6.8876, 7.5476, 3.8237, 4.8558, -1.0421, 2.5573) AREA 2.2479 NORMAL (0.0, 0.9613, -0.2756)
+FACE 74 CYLINDER CENTER (4.9976, 4.2136, 3.7967) BBOX (4.6976, 5.2976, 2.8744, 4.91, 2.5573, 4.3432) AREA 1.9499 RADIUS 1.4 AXIS (1.0, 0.0, 0.0) LOC (-19.7064, 3.51, 2.9432)
+FACE 75 PLANE CENTER (4.9978, 4.3394, 0.7566) BBOX (4.6976, 5.3576, 3.8237, 4.8558, -1.0421, 2.5573) AREA 2.2479 NORMAL (0.0, 0.9613, -0.2756)
+FACE 77 PLANE CENTER (6.2628, -0.01, 0.2919) BBOX (-0.4664, 12.7736, -0.01, -0.01, -3.8865, 2.6682) AREA 37.9147 NORMAL (0.0, -1.0, -0.0)
+FACE 78 PLANE CENTER (4.6976, 3.5316, 2.2025) BBOX (4.6976, 4.6976, 1.6762, 4.91, -1.0494, 4.3432) AREA 7.333 NORMAL (-1.0, -0.0, -0.0)
+FACE 79 PLANE CENTER (7.5476, 3.5316, 2.2024) BBOX (7.5476, 7.5476, 1.6453, 4.91, -1.0507, 4.3432) AREA 7.3327 NORMAL (1.0, -0.0, -0.0)
+FACE 89 PLANE CENTER (6.9476, 3.5318, 2.2031) BBOX (6.9476, 6.9476, 1.7294, 4.91, -0.9542, 4.3432) AREA 7.3297 NORMAL (-1.0, 0.0, 0.0)
+FACE 90 PLANE CENTER (5.2976, 3.5318, 2.2031) BBOX (5.2976, 5.2976, 1.7294, 4.91, -0.9542, 4.3432) AREA 7.3297 NORMAL (1.0, -0.0, -0.0)
+FACE 91 PLANE CENTER (6.1226, 2.7499, 1.2605) BBOX (5.3576, 6.8876, 1.6762, 3.8237, -1.0421, 3.5632) AREA 7.7745 NORMAL (-0.0, 0.9063, 0.4226)
+FACE 92 PLANE CENTER (6.0594, 1.0401, 3.2301) BBOX (3.4335, 8.46, 0.0007, 2.8744, 2.6859, 4.1906) AREA 8.7693 NORMAL (-0.0, -0.4639, 0.8859)
+FACE 99 PLANE CENTER (6.0709, 2.3098, 1.0212) BBOX (2.2816, 9.7929, 1.4885, 3.194, -0.8749, 2.7825) AREA 20.1709 NORMAL (-0.0, -0.9063, -0.4226)
+FACE 101 PLANE CENTER (6.1955, 0.09, 1.0803) BBOX (3.3496, 9.0415, 0.03, 0.15, 1.0803, 1.0803) AREA 0.683 NORMAL (0.0, 0.0, -1.0)
+FACE 102 PLANE CENTER (2.3148, 0.8388, -1.6572) BBOX (2.0905, 3.1593, 0.03, 2.4742, -2.3475, 0.9421) AREA 1.4199 NORMAL (0.9511, 0.0, -0.309)
+FACE 103 PLANE CENTER (6.2764, 0.19, 0.5034) BBOX (0.4171, 11.4894, 0.19, 0.19, -3.0105, 2.1601) AREA 16.7503 NORMAL (-0.0, 1.0, -0.0)
+FACE 104 PLANE CENTER (10.0135, 0.6939, -2.441) BBOX (9.2363, 10.2378, 0.03, 2.1415, -3.4127, 0.9253) AREA 1.5197 NORMAL (-0.9744, 0.0, -0.225)
+FACE 107 CYLINDER CENTER (5.8917, 2.5905, -1.7252) BBOX (2.2882, 10.0565, 1.58, 3.3719, -2.6917, -1.4571) AREA 5.8411 RADIUS 11.71 AXIS (0.0, -1.0, 0.0) LOC (4.8229, 4.19, -13.1671)
+FACE 178 BSPLINE CENTER (5.7475, 2.4472, -1.4755) BBOX (4.7423, 6.7614, 2.174, 2.637, -1.6165, -1.3827) AREA 0.2164
+FACE 218 BSPLINE CENTER (7.9952, 2.903, -1.9697) BBOX (5.6973, 10.0654, 2.1813, 3.3867, -2.6921, -1.4838) AREA 0.079
+FACE 223 CYLINDER CENTER (3.7421, 3.2968, -1.3321) BBOX (2.7829, 4.6976, 2.7692, 3.8237, -1.6317, -1.029) AREA 0.0509 RADIUS 0.02 AXIS (0.8475, 0.4633, 0.259) LOC (1.0504, 1.8072, -2.1466)
+Exported shape to: /home/adml/Research/Hackathon2026/IDETC26-Hackathon-Autodesk-neuralCAD-Edit/output/gpt-5.6-sol-final-full48/gpt-5.6-sol-final_cadquery-script_1787194600.3627622/brep_end/1787194600.3627622/tmp.step
+Exported STL to: /home/adml/Research/Hackathon2026/IDETC26-Hackathon-Autodesk-neuralCAD-Edit/output/gpt-5.6-sol-final-full48/gpt-5.6-sol-final_cadquery-script_1787194600.3627622/brep_end/1787194600.3627622/tmp.stl
+Exported PNG image to: /home/adml/Research/Hackathon2026/IDETC26-Hackathon-Autodesk-neuralCAD-Edit/output/gpt-5.6-sol-final-full48/gpt-5.6-sol-final_cadquery-script_1787194600.3627622/brep_end/1787194600.3627622/tmp.png
+Script completed.
+
+stderr: 
+
+model.json from the planning stage:
+
+{
+  "part": {
+    "id": "ZK22J6VYRKQ2RTFD_1758873955.818716",
+    "name": "four-point clevis mounting bracket",
+    "source_views": [
+      "+Z",
+      "-Z",
+      "-X",
+      "+X",
+      "+Y",
+      "-Y",
+      "iso1"
+    ],
+    "solid_ids": [
+      "0"
+    ],
+    "semantic_orientation": {
+      "confidence": 0.84,
+      "view_sides": {
+        "+X": "right",
+        "-X": "left",
+        "+Y": "top",
+        "-Y": "bottom",
+        "+Z": "front",
+        "-Z": "back"
+      }
+    },
+    "part_functions": [
+      {
+        "name": "base attachment",
+        "function": "Attach the bracket to a supporting structure through four distributed mounting holes.",
+        "confidence": 0.96
+      },
+      {
+        "name": "pinned joint support",
+        "function": "Provide a two-lug clevis interface for a transverse pivot pin or fastener.",
+        "confidence": 0.97
+      },
+      {
+        "name": "load transfer",
+        "function": "Transfer loads between the elevated clevis and the four-point base while limiting mass through shaped webs and underside relief.",
+        "confidence": 0.93
+      }
+    ],
+    "sections": [
+      {
+        "id": "section_mounting_base",
+        "name": "four-point mounting base",
+        "solid_ids": [
+          "0"
+        ],
+        "section_functions": [
+          {
+            "name": "distributed support interface",
+            "function": "Spread reaction loads into four corner mounting bosses and provide a stable footprint.",
+            "confidence": 0.96
+          }
+        ],
+        "features": [
+          {
+            "id": "feature_mounting_bosses",
+            "name": "four mounting bosses and through holes",
+            "feature_functions": [
+              {
+                "name": "fastener interface",
+                "function": "Receive four mounting fasteners; the enlarged boss walls and annular seats resist bearing, pull-through and local bending.",
+                "confidence": 0.97
+              },
+              {
+                "name": "symmetric load distribution",
+                "function": "The two bosses at each longitudinal end act as paired attachment points around the bracket centerline.",
+                "confidence": 0.93
+              }
+            ],
+            "brep_faces": [
+              {
+                "cadquery_face_id": "49",
+                "geometry_type": "CYLINDER",
+                "semantic_role": "Cylindrical bore of the first left-end mounting hole.",
+                "feature_assignment_confidence": 0.99
+              },
+              {
+                "cadquery_face_id": "84",
+                "geometry_type": "PLANE",
+                "semantic_role": "Annular shoulder surrounding the first left-end mounting bore.",
+                "feature_assignment_confidence": 0.97
+              },
+              {
+                "cadquery_face_id": "83",
+                "geometry_type": "CYLINDER",
+                "semantic_role": "Outer curved wall of the first left-end mounting boss.",
+                "feature_assignment_confidence": 0.96
+              },
+              {
+                "cadquery_face_id": "50",
+                "geometry_type": "CYLINDER",
+                "semantic_role": "Cylindrical bore of the second left-end mounting hole.",
+                "feature_assignment_confidence": 0.99
+              },
+              {
+                "cadquery_face_id": "86",
+                "geometry_type": "PLANE",
+                "semantic_role": "Annular shoulder surrounding the second left-end mounting bore.",
+                "feature_assignment_confidence": 0.97
+              },
+              {
+                "cadquery_face_id": "85",
+                "geometry_type": "CYLINDER",
+                "semantic_role": "Outer curved wall of the second left-end mounting boss.",
+                "feature_assignment_confidence": 0.96
+              },
+              {
+                "cadquery_face_id": "51",
+                "geometry_type": "CYLINDER",
+                "semantic_role": "Cylindrical bore of the first right-end mounting hole.",
+                "feature_assignment_confidence": 0.99
+              },
+              {
+                "cadquery_face_id": "87",
+                "geometry_type": "PLANE",
+                "semantic_role": "Annular shoulder surrounding the first right-end mounting bore.",
+                "feature_assignment_confidence": 0.97
+              },
+              {
+                "cadquery_face_id": "41",
+                "geometry_type": "CYLINDER",
+                "semantic_role": "Outer curved wall of the first right-end mounting boss.",
+                "feature_assignment_confidence": 0.96
+              },
+              {
+                "cadquery_face_id": "52",
+                "geometry_type": "CYLINDER",
+                "semantic_role": "Cylindrical bore of the second right-end mounting hole.",
+                "feature_assignment_confidence": 0.99
+              },
+              {
+                "cadquery_face_id": "88",
+                "geometry_type": "PLANE",
+                "semantic_role": "Annular shoulder surrounding the second right-end mounting bore.",
+                "feature_assignment_confidence": 0.97
+              },
+              {
+                "cadquery_face_id": "40",
+                "geometry_type": "CYLINDER",
+                "semantic_role": "Outer curved wall of the second right-end mounting boss.",
+                "feature_assignment_confidence": 0.96
+              },
+              {
+                "cadquery_face_id": "42",
+                "geometry_type": "CYLINDER",
+                "semantic_role": "Large curved transition joining a left mounting boss to the base.",
+                "feature_assignment_confidence": 0.86
+              },
+              {
+                "cadquery_face_id": "45",
+                "geometry_type": "CYLINDER",
+                "semantic_role": "Large curved transition joining the opposite left mounting boss to the base.",
+                "feature_assignment_confidence": 0.86
+              },
+              {
+                "cadquery_face_id": "43",
+                "geometry_type": "CYLINDER",
+                "semantic_role": "Curved transition between the right boss pair.",
+                "feature_assignment_confidence": 0.86
+              },
+              {
+                "cadquery_face_id": "47",
+                "geometry_type": "CYLINDER",
+                "semantic_role": "Blended outer wall adjoining the first right mounting boss.",
+                "feature_assignment_confidence": 0.86
+              },
+              {
+                "cadquery_face_id": "48",
+                "geometry_type": "CYLINDER",
+                "semantic_role": "Blended outer wall adjoining the second right mounting boss.",
+                "feature_assignment_confidence": 0.86
+              },
+              {
+                "cadquery_face_id": "61",
+                "geometry_type": "CYLINDER",
+                "semantic_role": "Curved neck surface between the left boss pair.",
+                "feature_assignment_confidence": 0.84
+              },
+              {
+                "cadquery_face_id": "62",
+                "geometry_type": "CYLINDER",
+                "semantic_role": "Load-spreading wall around the first left mounting boss.",
+                "feature_assignment_confidence": 0.88
+              },
+              {
+                "cadquery_face_id": "63",
+                "geometry_type": "CYLINDER",
+                "semantic_role": "Load-spreading wall around the second left mounting boss.",
+                "feature_assignment_confidence": 0.88
+              },
+              {
+                "cadquery_face_id": "64",
+                "geometry_type": "CYLINDER",
+                "semantic_role": "Load-spreading wall around a right mounting boss.",
+                "feature_assignment_confidence": 0.88
+              },
+              {
+                "cadquery_face_id": "70",
+                "geometry_type": "CYLINDER",
+                "semantic_role": "Outer end wall surrounding the rear-right mounting region.",
+                "feature_assignment_confidence": 0.86
+              },
+              {
+                "cadquery_face_id": "71",
+                "geometry_type": "CYLINDER",
+                "semantic_role": "Outer end wall surrounding the front-right mounting region.",
+                "feature_assignment_confidence": 0.86
+              },
+              {
+                "cadquery_face_id": "76",
+                "geometry_type": "CYLINDER",
+                "semantic_role": "Outer end wall surrounding the left mounting region.",
+                "feature_assignment_confidence": 0.86
+              }
+            ],
+            "confidence": 0.96
+          },
+          {
+            "id": "feature_base_perimeter_blends",
+            "name": "sculpted base perimeter and boss blends",
+            "feature_functions": [
+              {
+                "name": "stress smoothing",
+                "function": "Blend the mounting bosses into the body to reduce stress concentration and remove non-load-bearing material.",
+                "confidence": 0.92
+              },
+              {
+                "name": "edge protection",
+                "function": "Rounded perimeter surfaces eliminate sharp exposed edges.",
+                "confidence": 0.9
+              }
+            ],
+            "brep_faces": [
+              {
+                "cadquery_face_id": "0",
+                "geometry_type": "TORUS",
+                "semantic_role": "Small rounded edge at the left mounting perimeter.",
+                "feature_assignment_confidence": 0.82
+              },
+              {
+                "cadquery_face_id": "1",
+                "geometry_type": "TORUS",
+                "semantic_role": "Small rounded edge on the left rear perimeter.",
+                "feature_assignment_confidence": 0.82
+              },
+              {
+                "cadquery_face_id": "2",
+                "geometry_type": "TORUS",
+                "semantic_role": "Small rounded edge on the left front perimeter.",
+                "feature_assignment_confidence": 0.82
+              },
+              {
+                "cadquery_face_id": "3",
+                "geometry_type": "TORUS",
+                "semantic_role": "Small rounded edge at the opposite left mounting corner.",
+                "feature_assignment_confidence": 0.82
+              },
+              {
+                "cadquery_face_id": "7",
+                "geometry_type": "BSPLINE",
+                "semantic_role": "Freeform transition near a left mounting boss.",
+                "feature_assignment_confidence": 0.8
+              },
+              {
+                "cadquery_face_id": "8",
+                "geometry_type": "CYLINDER",
+                "semantic_role": "Small-radius wall adjoining the left mounting transition.",
+                "feature_assignment_confidence": 0.81
+              },
+              {
+                "cadquery_face_id": "9",
+                "geometry_type": "BSPLINE",
+                "semantic_role": "Freeform edge transition at the left rear perimeter.",
+                "feature_assignment_confidence": 0.79
+              },
+              {
+                "cadquery_face_id": "10",
+                "geometry_type": "CYLINDER",
+                "semantic_role": "Small-radius perimeter wall at the left rear corner.",
+                "feature_assignment_confidence": 0.81
+              },
+              {
+                "cadquery_face_id": "14",
+                "geometry_type": "TORUS",
+                "semantic_role": "Bottom edge round along the left end contour.",
+                "feature_assignment_confidence": 0.87
+              },
+              {
+                "cadquery_face_id": "21",
+                "geometry_type": "SPHERE",
+                "semantic_role": "Spherical corner patch in the left boss blend network.",
+                "feature_assignment_confidence": 0.8
+              },
+              {
+                "cadquery_face_id": "22",
+                "geometry_type": "SPHERE",
+                "semantic_role": "Spherical transition patch on the left load-spreading contour.",
+                "feature_assignment_confidence": 0.78
+              },
+              {
+                "cadquery_face_id": "23",
+                "geometry_type": "SPHERE",
+                "semantic_role": "Spherical transition patch adjacent to the left rear boss.",
+                "feature_assignment_confidence": 0.78
+              },
+              {
+                "cadquery_face_id": "25",
+                "geometry_type": "SPHERE",
+                "semantic_role": "Spherical transition patch adjacent to the left front boss.",
+                "feature_assignment_confidence": 0.78
+              },
+              {
+                "cadquery_face_id": "138",
+                "geometry_type": "TORUS",
+                "semantic_role": "Rounded junction around the first left boss.",
+                "feature_assignment_confidence": 0.9
+              },
+              {
+                "cadquery_face_id": "139",
+                "geometry_type": "CYLINDER",
+                "semantic_role": "Small blend wall rising from the first left boss.",
+                "feature_assignment_confidence": 0.87
+              },
+              {
+                "cadquery_face_id": "140",
+                "geometry_type": "BSPLINE",
+                "semantic_role": "Freeform continuation from the first left boss into the body.",
+                "feature_assignment_confidence": 0.85
+              },
+              {
+                "cadquery_face_id": "141",
+                "geometry_type": "SPHERE",
+                "semantic_role": "Corner patch terminating the first left boss blend.",
+                "feature_assignment_confidence": 0.82
+              },
+              {
+                "cadquery_face_id": "133",
+                "geometry_type": "SPHERE",
+                "semantic_role": "Lower corner round adjoining the left front boss.",
+                "feature_assignment_confidence": 0.83
+              },
+              {
+                "cadquery_face_id": "130",
+                "geometry_type": "TORUS",
+                "semantic_role": "Broad rounded perimeter around the left front boss.",
+                "feature_assignment_confidence": 0.89
+              },
+              {
+                "cadquery_face_id": "143",
+                "geometry_type": "SPHERE",
+                "semantic_role": "Lower corner round adjoining the left rear boss.",
+                "feature_assignment_confidence": 0.83
+              },
+              {
+                "cadquery_face_id": "137",
+                "geometry_type": "TORUS",
+                "semantic_role": "Rounded outer transition beside the left rear boss.",
+                "feature_assignment_confidence": 0.86
+              },
+              {
+                "cadquery_face_id": "146",
+                "geometry_type": "BSPLINE",
+                "semantic_role": "Freeform continuation above the left rear boss.",
+                "feature_assignment_confidence": 0.84
+              },
+              {
+                "cadquery_face_id": "147",
+                "geometry_type": "CYLINDER",
+                "semantic_role": "Small-radius wall above the left rear boss.",
+                "feature_assignment_confidence": 0.86
+              },
+              {
+                "cadquery_face_id": "148",
+                "geometry_type": "TORUS",
+                "semantic_role": "Broad rounded junction around the left rear boss.",
+                "feature_assignment_confidence": 0.9
+              },
+              {
+                "cadquery_face_id": "149",
+                "geometry_type": "TORUS",
+                "semantic_role": "Center scallop round between the left boss pair.",
+                "feature_assignment_confidence": 0.9
+              },
+              {
+                "cadquery_face_id": "150",
+                "geometry_type": "CYLINDER",
+                "semantic_role": "Small wall forming one side of the left center scallop.",
+                "feature_assignment_confidence": 0.87
+              },
+              {
+                "cadquery_face_id": "144",
+                "geometry_type": "SPHERE",
+                "semantic_role": "Corner patch at the left center scallop.",
+                "feature_assignment_confidence": 0.84
+              },
+              {
+                "cadquery_face_id": "151",
+                "geometry_type": "BSPLINE",
+                "semantic_role": "Freeform load-spreading surface from the left front boss.",
+                "feature_assignment_confidence": 0.87
+              },
+              {
+                "cadquery_face_id": "153",
+                "geometry_type": "SPHERE",
+                "semantic_role": "Corner patch at the opposite side of the left scallop.",
+                "feature_assignment_confidence": 0.84
+              },
+              {
+                "cadquery_face_id": "154",
+                "geometry_type": "SPHERE",
+                "semantic_role": "Upper corner patch on the left boss transition.",
+                "feature_assignment_confidence": 0.82
+              },
+              {
+                "cadquery_face_id": "157",
+                "geometry_type": "CYLINDER",
+                "semantic_role": "Small-radius wall joining the left rear blend.",
+                "feature_assignment_confidence": 0.85
+              },
+              {
+                "cadquery_face_id": "158",
+                "geometry_type": "BSPLINE",
+                "semantic_role": "Freeform bridge between the left mounting blends.",
+                "feature_assignment_confidence": 0.84
+              },
+              {
+                "cadquery_face_id": "159",
+                "geometry_type": "BSPLINE",
+                "semantic_role": "Freeform load-spreading surface from the left rear boss.",
+                "feature_assignment_confidence": 0.87
+              },
+              {
+                "cadquery_face_id": "264",
+                "geometry_type": "TORUS",
+                "semantic_role": "Top edge round surrounding the first left boss.",
+                "feature_assignment_confidence": 0.94
+              },
+              {
+                "cadquery_face_id": "265",
+                "geometry_type": "TORUS",
+                "semantic_role": "Top edge round surrounding the second left boss.",
+                "feature_assignment_confidence": 0.94
+              },
+              {
+                "cadquery_face_id": "4",
+                "geometry_type": "TORUS",
+                "semantic_role": "Small rounded edge at the first right mounting corner.",
+                "feature_assignment_confidence": 0.82
+              },
+              {
+                "cadquery_face_id": "5",
+                "geometry_type": "TORUS",
+                "semantic_role": "Small rounded edge at the second right mounting corner.",
+                "feature_assignment_confidence": 0.82
+              },
+              {
+                "cadquery_face_id": "6",
+                "geometry_type": "TORUS",
+                "semantic_role": "Small rounded edge at the right rear perimeter.",
+                "feature_assignment_confidence": 0.82
+              },
+              {
+                "cadquery_face_id": "11",
+                "geometry_type": "CYLINDER",
+                "semantic_role": "Small-radius wall at the right front mounting transition.",
+                "feature_assignment_confidence": 0.81
+              },
+              {
+                "cadquery_face_id": "12",
+                "geometry_type": "BSPLINE",
+                "semantic_role": "Freeform edge transition at the right mounting perimeter.",
+                "feature_assignment_confidence": 0.79
+              },
+              {
+                "cadquery_face_id": "16",
+                "geometry_type": "TORUS",
+                "semantic_role": "Bottom edge round along the right rear end contour.",
+                "feature_assignment_confidence": 0.87
+              },
+              {
+                "cadquery_face_id": "17",
+                "geometry_type": "TORUS",
+                "semantic_role": "Bottom edge round along the right front end contour.",
+                "feature_assignment_confidence": 0.87
+              },
+              {
+                "cadquery_face_id": "18",
+                "geometry_type": "BSPLINE",
+                "semantic_role": "Freeform corner transition at the right rear extremity.",
+                "feature_assignment_confidence": 0.8
+              },
+              {
+                "cadquery_face_id": "20",
+                "geometry_type": "CYLINDER",
+                "semantic_role": "Small-radius wall approaching the right rear boss.",
+                "feature_assignment_confidence": 0.82
+              },
+              {
+                "cadquery_face_id": "28",
+                "geometry_type": "SPHERE",
+                "semantic_role": "Corner patch in the right front boss blend network.",
+                "feature_assignment_confidence": 0.82
+              },
+              {
+                "cadquery_face_id": "29",
+                "geometry_type": "SPHERE",
+                "semantic_role": "Corner patch between the right mounting bosses.",
+                "feature_assignment_confidence": 0.82
+              },
+              {
+                "cadquery_face_id": "30",
+                "geometry_type": "SPHERE",
+                "semantic_role": "Upper corner patch on the right front boss blend.",
+                "feature_assignment_confidence": 0.82
+              },
+              {
+                "cadquery_face_id": "31",
+                "geometry_type": "CYLINDER",
+                "semantic_role": "Small-radius wall above the right front boss.",
+                "feature_assignment_confidence": 0.85
+              },
+              {
+                "cadquery_face_id": "32",
+                "geometry_type": "TORUS",
+                "semantic_role": "Broad rounded junction around the right front boss.",
+                "feature_assignment_confidence": 0.9
+              },
+              {
+                "cadquery_face_id": "33",
+                "geometry_type": "CYLINDER",
+                "semantic_role": "Small wall forming one side of the right center scallop.",
+                "feature_assignment_confidence": 0.86
+              },
+              {
+                "cadquery_face_id": "34",
+                "geometry_type": "SPHERE",
+                "semantic_role": "Corner patch at the right center scallop.",
+                "feature_assignment_confidence": 0.84
+              },
+              {
+                "cadquery_face_id": "35",
+                "geometry_type": "TORUS",
+                "semantic_role": "Broad rounded junction around the right rear boss.",
+                "feature_assignment_confidence": 0.9
+              },
+              {
+                "cadquery_face_id": "36",
+                "geometry_type": "SPHERE",
+                "semantic_role": "Lower corner patch adjoining the right rear boss.",
+                "feature_assignment_confidence": 0.84
+              },
+              {
+                "cadquery_face_id": "37",
+                "geometry_type": "SPHERE",
+                "semantic_role": "Upper corner patch adjoining the right center scallop.",
+                "feature_assignment_confidence": 0.82
+              },
+              {
+                "cadquery_face_id": "38",
+                "geometry_type": "CYLINDER",
+                "semantic_role": "Small-radius wall at the right center scallop.",
+                "feature_assignment_confidence": 0.85
+              },
+              {
+                "cadquery_face_id": "39",
+                "geometry_type": "TORUS",
+                "semantic_role": "Rounded bridge between the right mounting bosses.",
+                "feature_assignment_confidence": 0.89
+              },
+              {
+                "cadquery_face_id": "56",
+                "geometry_type": "CYLINDER",
+                "semantic_role": "Large-radius side contour approaching the right rear boss.",
+                "feature_assignment_confidence": 0.82
+              },
+              {
+                "cadquery_face_id": "58",
+                "geometry_type": "CYLINDER",
+                "semantic_role": "Offset curved contour beside the right rear mounting region.",
+                "feature_assignment_confidence": 0.8
+              },
+              {
+                "cadquery_face_id": "59",
+                "geometry_type": "CYLINDER",
+                "semantic_role": "Large-radius upper transition into the right front boss.",
+                "feature_assignment_confidence": 0.79
+              },
+              {
+                "cadquery_face_id": "60",
+                "geometry_type": "CYLINDER",
+                "semantic_role": "Large-radius upper transition into the left front boss.",
+                "feature_assignment_confidence": 0.79
+              },
+              {
+                "cadquery_face_id": "67",
+                "geometry_type": "CYLINDER",
+                "semantic_role": "Large-radius side contour approaching the left rear boss.",
+                "feature_assignment_confidence": 0.82
+              },
+              {
+                "cadquery_face_id": "96",
+                "geometry_type": "CYLINDER",
+                "semantic_role": "Offset curved contour beside the left rear mounting region.",
+                "feature_assignment_confidence": 0.8
+              },
+              {
+                "cadquery_face_id": "108",
+                "geometry_type": "BSPLINE",
+                "semantic_role": "Freeform upper transition from the right front boss.",
+                "feature_assignment_confidence": 0.86
+              },
+              {
+                "cadquery_face_id": "109",
+                "geometry_type": "BSPLINE",
+                "semantic_role": "Freeform bridge between the right boss pair.",
+                "feature_assignment_confidence": 0.86
+              },
+              {
+                "cadquery_face_id": "110",
+                "geometry_type": "CYLINDER",
+                "semantic_role": "Small-radius wall on the right rear load-spreading contour.",
+                "feature_assignment_confidence": 0.83
+              },
+              {
+                "cadquery_face_id": "111",
+                "geometry_type": "BSPLINE",
+                "semantic_role": "Freeform transition above the right rear contour.",
+                "feature_assignment_confidence": 0.82
+              },
+              {
+                "cadquery_face_id": "112",
+                "geometry_type": "SPHERE",
+                "semantic_role": "Corner patch terminating the right rear transition.",
+                "feature_assignment_confidence": 0.81
+              },
+              {
+                "cadquery_face_id": "113",
+                "geometry_type": "BSPLINE",
+                "semantic_role": "Freeform load path leaving the right front boss.",
+                "feature_assignment_confidence": 0.82
+              },
+              {
+                "cadquery_face_id": "114",
+                "geometry_type": "BSPLINE",
+                "semantic_role": "Freeform load path between the right boss regions.",
+                "feature_assignment_confidence": 0.82
+              },
+              {
+                "cadquery_face_id": "115",
+                "geometry_type": "BSPLINE",
+                "semantic_role": "Freeform transition into the right rear boss.",
+                "feature_assignment_confidence": 0.82
+              },
+              {
+                "cadquery_face_id": "116",
+                "geometry_type": "TORUS",
+                "semantic_role": "Broad rounded perimeter adjoining the right front boss.",
+                "feature_assignment_confidence": 0.87
+              },
+              {
+                "cadquery_face_id": "117",
+                "geometry_type": "SPHERE",
+                "semantic_role": "Corner patch at the inner right front transition.",
+                "feature_assignment_confidence": 0.8
+              },
+              {
+                "cadquery_face_id": "118",
+                "geometry_type": "SPHERE",
+                "semantic_role": "Corner patch at the inner right rear transition.",
+                "feature_assignment_confidence": 0.8
+              },
+              {
+                "cadquery_face_id": "248",
+                "geometry_type": "CYLINDER",
+                "semantic_role": "Small-radius wall at the right front perimeter.",
+                "feature_assignment_confidence": 0.83
+              },
+              {
+                "cadquery_face_id": "249",
+                "geometry_type": "BSPLINE",
+                "semantic_role": "Freeform cap transition on the right front perimeter.",
+                "feature_assignment_confidence": 0.81
+              },
+              {
+                "cadquery_face_id": "250",
+                "geometry_type": "BSPLINE",
+                "semantic_role": "Freeform edge patch near the right front boss.",
+                "feature_assignment_confidence": 0.81
+              },
+              {
+                "cadquery_face_id": "251",
+                "geometry_type": "CYLINDER",
+                "semantic_role": "Small-radius wall at the right rear perimeter.",
+                "feature_assignment_confidence": 0.83
+              },
+              {
+                "cadquery_face_id": "252",
+                "geometry_type": "BSPLINE",
+                "semantic_role": "Freeform cap transition on the right rear perimeter.",
+                "feature_assignment_confidence": 0.81
+              },
+              {
+                "cadquery_face_id": "253",
+                "geometry_type": "CYLINDER",
+                "semantic_role": "Small-radius wall at the extreme right rear corner.",
+                "feature_assignment_confidence": 0.83
+              },
+              {
+                "cadquery_face_id": "254",
+                "geometry_type": "BSPLINE",
+                "semantic_role": "Freeform cap at the extreme right rear corner.",
+                "feature_assignment_confidence": 0.81
+              },
+              {
+                "cadquery_face_id": "255",
+                "geometry_type": "BSPLINE",
+                "semantic_role": "Small freeform transition at the left rear perimeter.",
+                "feature_assignment_confidence": 0.8
+              },
+              {
+                "cadquery_face_id": "256",
+                "geometry_type": "CYLINDER",
+                "semantic_role": "Small-radius wall at the extreme left rear corner.",
+                "feature_assignment_confidence": 0.83
+              },
+              {
+                "cadquery_face_id": "257",
+                "geometry_type": "BSPLINE",
+                "semantic_role": "Freeform cap at the extreme left rear corner.",
+                "feature_assignment_confidence": 0.81
+              },
+              {
+                "cadquery_face_id": "258",
+                "geometry_type": "CYLINDER",
+                "semantic_role": "Small-radius wall at the left front perimeter.",
+                "feature_assignment_confidence": 0.83
+              },
+              {
+                "cadquery_face_id": "259",
+                "geometry_type": "BSPLINE",
+                "semantic_role": "Freeform cap transition on the left front perimeter.",
+                "feature_assignment_confidence": 0.81
+              },
+              {
+                "cadquery_face_id": "260",
+                "geometry_type": "BSPLINE",
+                "semantic_role": "Small freeform patch at the left front edge.",
+                "feature_assignment_confidence": 0.79
+              },
+              {
+                "cadquery_face_id": "261",
+                "geometry_type": "TORUS",
+                "semantic_role": "Rounded edge at the extreme right rear mounting contour.",
+                "feature_assignment_confidence": 0.85
+              },
+              {
+                "cadquery_face_id": "262",
+                "geometry_type": "TORUS",
+                "semantic_role": "Top edge round surrounding the right rear boss.",
+                "feature_assignment_confidence": 0.94
+              },
+              {
+                "cadquery_face_id": "263",
+                "geometry_type": "TORUS",
+                "semantic_role": "Top edge round surrounding the right front boss.",
+                "feature_assignment_confidence": 0.94
+              }
+            ],
+            "confidence": 0.88
+          }
+        ]
+      },
+      {
+        "id": "section_load_transfer_body",
+        "name": "load-transfer shell and side webs",
+        "solid_ids": [
+          "0"
+        ],
+        "section_functions": [
+          {
+            "name": "clevis-to-base load transfer",
+            "function": "Carry pin loads from the central clevis outward and downward into the mounting footprint through broad sloped panels and curved webs.",
+            "confidence": 0.95
+          }
+        ],
+        "features": [
+          {
+            "id": "feature_outer_shell_panels",
+            "name": "sloped outer shell panels",
+            "feature_functions": [
+              {
+                "name": "bending resistance",
+                "function": "Use inclined planar and cylindrical surfaces to create deep load paths between the raised joint and the base.",
+                "confidence": 0.94
+              }
+            ],
+            "brep_faces": [
+              {
+                "cadquery_face_id": "53",
+                "geometry_type": "PLANE",
+                "semantic_role": "Primary sloped panel on the left side of the bracket.",
+                "feature_assignment_confidence": 0.97
+              },
+              {
+                "cadquery_face_id": "54",
+                "geometry_type": "PLANE",
+                "semantic_role": "Small coplanar continuation of the left sloped panel.",
+                "feature_assignment_confidence": 0.89
+              },
+              {
+                "cadquery_face_id": "55",
+                "geometry_type": "PLANE",
+                "semantic_role": "Primary sloped panel on the right side of the bracket.",
+                "feature_assignment_confidence": 0.97
+              },
+              {
+                "cadquery_face_id": "57",
+                "geometry_type": "PLANE",
+                "semantic_role": "Inclined rear load-transfer panel.",
+                "feature_assignment_confidence": 0.91
+              },
+              {
+                "cadquery_face_id": "65",
+                "geometry_type": "PLANE",
+                "semantic_role": "Inclined upper panel spanning toward the clevis.",
+                "feature_assignment_confidence": 0.93
+              },
+              {
+                "cadquery_face_id": "66",
+                "geometry_type": "PLANE",
+                "semantic_role": "Long inclined lower panel forming a rear load path.",
+                "feature_assignment_confidence": 0.93
+              },
+              {
+                "cadquery_face_id": "72",
+                "geometry_type": "CYLINDER",
+                "semantic_role": "Broad convex shell surface on the right side.",
+                "feature_assignment_confidence": 0.92
+              },
+              {
+                "cadquery_face_id": "73",
+                "geometry_type": "CYLINDER",
+                "semantic_role": "Broad convex shell surface on the left side.",
+                "feature_assignment_confidence": 0.92
+              },
+              {
+                "cadquery_face_id": "77",
+                "geometry_type": "PLANE",
+                "semantic_role": "Large bottom footprint face surrounding the four mounting openings.",
+                "feature_assignment_confidence": 0.95
+              },
+              {
+                "cadquery_face_id": "80",
+                "geometry_type": "PLANE",
+                "semantic_role": "Triangular inclined panel adjoining the left clevis support.",
+                "feature_assignment_confidence": 0.94
+              },
+              {
+                "cadquery_face_id": "81",
+                "geometry_type": "PLANE",
+                "semantic_role": "Triangular inclined panel adjoining the right clevis support.",
+                "feature_assignment_confidence": 0.94
+              },
+              {
+                "cadquery_face_id": "82",
+                "geometry_type": "PLANE",
+                "semantic_role": "Inclined left-rear shell panel.",
+                "feature_assignment_confidence": 0.91
+              },
+              {
+                "cadquery_face_id": "93",
+                "geometry_type": "PLANE",
+                "semantic_role": "Narrow inclined panel at the left side of the center body.",
+                "feature_assignment_confidence": 0.87
+              },
+              {
+                "cadquery_face_id": "94",
+                "geometry_type": "PLANE",
+                "semantic_role": "Opposing inclined panel in the center load path.",
+                "feature_assignment_confidence": 0.88
+              },
+              {
+                "cadquery_face_id": "95",
+                "geometry_type": "PLANE",
+                "semantic_role": "Inner inclined panel extending toward the right side.",
+                "feature_assignment_confidence": 0.9
+              },
+              {
+                "cadquery_face_id": "97",
+                "geometry_type": "PLANE",
+                "semantic_role": "Inner face of the right longitudinal side web.",
+                "feature_assignment_confidence": 0.93
+              },
+              {
+                "cadquery_face_id": "98",
+                "geometry_type": "PLANE",
+                "semantic_role": "Inner face of the left longitudinal side web.",
+                "feature_assignment_confidence": 0.93
+              },
+              {
+                "cadquery_face_id": "99",
+                "geometry_type": "PLANE",
+                "semantic_role": "Large central inclined panel linking both side webs.",
+                "feature_assignment_confidence": 0.96
+              },
+              {
+                "cadquery_face_id": "100",
+                "geometry_type": "PLANE",
+                "semantic_role": "Lower inclined panel completing the left load path.",
+                "feature_assignment_confidence": 0.9
+              }
+            ],
+            "confidence": 0.95
+          },
+          {
+            "id": "feature_web_transitions",
+            "name": "curved web transitions and junction fillets",
+            "feature_functions": [
+              {
+                "name": "reinforcement",
+                "function": "Smoothly connect shell panels and mounting regions so that shear and bending loads do not terminate at sharp corners.",
+                "confidence": 0.91
+              }
+            ],
+            "brep_faces": [
+              {
+                "cadquery_face_id": "13",
+                "geometry_type": "BSPLINE",
+                "semantic_role": "Small freeform transition between the left shell and perimeter.",
+                "feature_assignment_confidence": 0.76
+              },
+              {
+                "cadquery_face_id": "15",
+                "geometry_type": "BSPLINE",
+                "semantic_role": "Freeform transition between the right shell and rear perimeter.",
+                "feature_assignment_confidence": 0.78
+              },
+              {
+                "cadquery_face_id": "19",
+                "geometry_type": "BSPLINE",
+                "semantic_role": "Small junction patch near the central web.",
+                "feature_assignment_confidence": 0.75
+              },
+              {
+                "cadquery_face_id": "24",
+                "geometry_type": "CYLINDER",
+                "semantic_role": "Rounded junction at one end of a central transverse web.",
+                "feature_assignment_confidence": 0.82
+              },
+              {
+                "cadquery_face_id": "26",
+                "geometry_type": "CYLINDER",
+                "semantic_role": "Long rounded junction along the central transverse web.",
+                "feature_assignment_confidence": 0.86
+              },
+              {
+                "cadquery_face_id": "27",
+                "geometry_type": "SPHERE",
+                "semantic_role": "Corner patch terminating the central transverse junction.",
+                "feature_assignment_confidence": 0.81
+              },
+              {
+                "cadquery_face_id": "120",
+                "geometry_type": "BSPLINE",
+                "semantic_role": "Freeform transition from the upper shell into the right web.",
+                "feature_assignment_confidence": 0.86
+              },
+              {
+                "cadquery_face_id": "121",
+                "geometry_type": "BSPLINE",
+                "semantic_role": "Large freeform right-side load-transfer web.",
+                "feature_assignment_confidence": 0.91
+              },
+              {
+                "cadquery_face_id": "122",
+                "geometry_type": "CYLINDER",
+                "semantic_role": "Rounded diagonal edge of the right-side web.",
+                "feature_assignment_confidence": 0.87
+              },
+              {
+                "cadquery_face_id": "123",
+                "geometry_type": "CYLINDER",
+                "semantic_role": "Rounded diagonal edge of the right-rear web.",
+                "feature_assignment_confidence": 0.87
+              },
+              {
+                "cadquery_face_id": "124",
+                "geometry_type": "CYLINDER",
+                "semantic_role": "Long transverse round at the upper shell boundary.",
+                "feature_assignment_confidence": 0.88
+              },
+              {
+                "cadquery_face_id": "125",
+                "geometry_type": "SPHERE",
+                "semantic_role": "Corner round at the right end of the transverse boundary.",
+                "feature_assignment_confidence": 0.83
+              },
+              {
+                "cadquery_face_id": "126",
+                "geometry_type": "SPHERE",
+                "semantic_role": "Corner round at the left end of the transverse boundary.",
+                "feature_assignment_confidence": 0.83
+              },
+              {
+                "cadquery_face_id": "127",
+                "geometry_type": "BSPLINE",
+                "semantic_role": "Freeform transition from the upper shell into the left web.",
+                "feature_assignment_confidence": 0.86
+              },
+              {
+                "cadquery_face_id": "128",
+                "geometry_type": "CYLINDER",
+                "semantic_role": "Rounded transverse junction between the left and right webs.",
+                "feature_assignment_confidence": 0.89
+              },
+              {
+                "cadquery_face_id": "129",
+                "geometry_type": "CYLINDER",
+                "semantic_role": "Short diagonal round at a lower web intersection.",
+                "feature_assignment_confidence": 0.82
+              },
+              {
+                "cadquery_face_id": "131",
+                "geometry_type": "SPHERE",
+                "semantic_role": "Corner patch at the left upper-web junction.",
+                "feature_assignment_confidence": 0.82
+              },
+              {
+                "cadquery_face_id": "132",
+                "geometry_type": "SPHERE",
+                "semantic_role": "Corner patch at the lower central-web junction.",
+                "feature_assignment_confidence": 0.8
+              },
+              {
+                "cadquery_face_id": "134",
+                "geometry_type": "BSPLINE",
+                "semantic_role": "Large freeform left-side load-transfer web.",
+                "feature_assignment_confidence": 0.91
+              },
+              {
+                "cadquery_face_id": "135",
+                "geometry_type": "CYLINDER",
+                "semantic_role": "Rounded diagonal edge joining the left web to the base.",
+                "feature_assignment_confidence": 0.87
+              },
+              {
+                "cadquery_face_id": "136",
+                "geometry_type": "CYLINDER",
+                "semantic_role": "Short vertical round at the left web boundary.",
+                "feature_assignment_confidence": 0.83
+              }
+            ],
+            "confidence": 0.89
+          }
+        ]
+      },
+      {
+        "id": "section_central_clevis",
+        "name": "central two-lug clevis",
+        "solid_ids": [
+          "0"
+        ],
+        "section_functions": [
+          {
+            "name": "pivot interface",
+            "function": "Support a mating link between two parallel lugs and carry a transverse pin in double shear.",
+            "confidence": 0.98
+          }
+        ],
+        "features": [
+          {
+            "id": "feature_clevis_pin_bores",
+            "name": "coaxial clevis pin bores",
+            "feature_functions": [
+              {
+                "name": "pin guidance",
+                "function": "Provide two coaxial cylindrical bearing openings for a pivot pin.",
+                "confidence": 0.99
+              }
+            ],
+            "brep_faces": [
+              {
+                "cadquery_face_id": "44",
+                "geometry_type": "CYLINDER",
+                "semantic_role": "Pin bore through the first clevis lug.",
+                "feature_assignment_confidence": 0.99
+              },
+              {
+                "cadquery_face_id": "46",
+                "geometry_type": "CYLINDER",
+                "semantic_role": "Pin bore through the second clevis lug, coaxial with face 44.",
+                "feature_assignment_confidence": 0.99
+              }
+            ],
+            "confidence": 0.99
+          },
+          {
+            "id": "feature_clevis_lugs",
+            "name": "parallel clevis lugs and roots",
+            "feature_functions": [
+              {
+                "name": "double-shear support",
+                "function": "Retain a mating member between two spaced plates and react pin loads through both lug walls.",
+                "confidence": 0.98
+              },
+              {
+                "name": "root reinforcement",
+                "function": "Transfer lug bending and bearing loads into the surrounding shell through deep triangular roots.",
+                "confidence": 0.95
+              }
+            ],
+            "brep_faces": [
+              {
+                "cadquery_face_id": "78",
+                "geometry_type": "PLANE",
+                "semantic_role": "Outer planar side face of the first clevis lug.",
+                "feature_assignment_confidence": 0.98
+              },
+              {
+                "cadquery_face_id": "74",
+                "geometry_type": "CYLINDER",
+                "semantic_role": "Rounded crown surface of the first clevis lug.",
+                "feature_assignment_confidence": 0.98
+              },
+              {
+                "cadquery_face_id": "89",
+                "geometry_type": "PLANE",
+                "semantic_role": "Inner planar side face of the first clevis lug.",
+                "feature_assignment_confidence": 0.98
+              },
+              {
+                "cadquery_face_id": "160",
+                "geometry_type": "CYLINDER",
+                "semantic_role": "Root edge round along the first clevis lug.",
+                "feature_assignment_confidence": 0.93
+              },
+              {
+                "cadquery_face_id": "241",
+                "geometry_type": "BSPLINE",
+                "semantic_role": "Small corner transition at the first lug root.",
+                "feature_assignment_confidence": 0.79
+              },
+              {
+                "cadquery_face_id": "78",
+                "geometry_type": "PLANE",
+                "semantic_role": "Outer planar lug surface surrounding the first bore.",
+                "feature_assignment_confidence": 0.98
+              },
+              {
+                "cadquery_face_id": "79",
+                "geometry_type": "PLANE",
+                "semantic_role": "Outer planar side face of the second clevis lug.",
+                "feature_assignment_confidence": 0.98
+              },
+              {
+                "cadquery_face_id": "68",
+                "geometry_type": "CYLINDER",
+                "semantic_role": "Rounded crown surface of the second clevis lug.",
+                "feature_assignment_confidence": 0.98
+              },
+              {
+                "cadquery_face_id": "90",
+                "geometry_type": "PLANE",
+                "semantic_role": "Inner planar side face of the second clevis lug.",
+                "feature_assignment_confidence": 0.98
+              },
+              {
+                "cadquery_face_id": "163",
+                "geometry_type": "CYLINDER",
+                "semantic_role": "Root edge round along the second clevis lug.",
+                "feature_assignment_confidence": 0.93
+              },
+              {
+                "cadquery_face_id": "187",
+                "geometry_type": "BSPLINE",
+                "semantic_role": "Small corner transition at the second lug root.",
+                "feature_assignment_confidence": 0.8
+              },
+              {
+                "cadquery_face_id": "69",
+                "geometry_type": "PLANE",
+                "semantic_role": "Longitudinal connecting face adjacent to the second lug.",
+                "feature_assignment_confidence": 0.91
+              },
+              {
+                "cadquery_face_id": "75",
+                "geometry_type": "PLANE",
+                "semantic_role": "Longitudinal connecting face adjacent to the first lug.",
+                "feature_assignment_confidence": 0.91
+              },
+              {
+                "cadquery_face_id": "91",
+                "geometry_type": "PLANE",
+                "semantic_role": "Central inclined bridge face between the lug roots.",
+                "feature_assignment_confidence": 0.95
+              },
+              {
+                "cadquery_face_id": "92",
+                "geometry_type": "PLANE",
+                "semantic_role": "Upper bridge panel supporting both clevis lugs.",
+                "feature_assignment_confidence": 0.94
+              },
+              {
+                "cadquery_face_id": "161",
+                "geometry_type": "CYLINDER",
+                "semantic_role": "Rounded edge at the inner side of the first lug root.",
+                "feature_assignment_confidence": 0.92
+              },
+              {
+                "cadquery_face_id": "162",
+                "geometry_type": "CYLINDER",
+                "semantic_role": "Rounded edge at the inner side of the second lug root.",
+                "feature_assignment_confidence": 0.92
+              },
+              {
+                "cadquery_face_id": "188",
+                "geometry_type": "BSPLINE",
+                "semantic_role": "Small transition patch at a clevis-root corner.",
+                "feature_assignment_confidence": 0.76
+              },
+              {
+                "cadquery_face_id": "189",
+                "geometry_type": "BSPLINE",
+                "semantic_role": "Freeform reinforcing surface beneath one lug root.",
+                "feature_assignment_confidence": 0.86
+              },
+              {
+                "cadquery_face_id": "190",
+                "geometry_type": "CYLINDER",
+                "semantic_role": "Rounded diagonal edge beneath the clevis bridge.",
+                "feature_assignment_confidence": 0.85
+              },
+              {
+                "cadquery_face_id": "191",
+                "geometry_type": "SPHERE",
+                "semantic_role": "Corner patch terminating the diagonal clevis edge.",
+                "feature_assignment_confidence": 0.8
+              },
+              {
+                "cadquery_face_id": "192",
+                "geometry_type": "BSPLINE",
+                "semantic_role": "Freeform transition from the clevis bridge toward the right end.",
+                "feature_assignment_confidence": 0.84
+              },
+              {
+                "cadquery_face_id": "193",
+                "geometry_type": "BSPLINE",
+                "semantic_role": "Freeform outer transition at the right clevis support.",
+                "feature_assignment_confidence": 0.82
+              },
+              {
+                "cadquery_face_id": "194",
+                "geometry_type": "BSPLINE",
+                "semantic_role": "Broad reinforcing transition under the right clevis support.",
+                "feature_assignment_confidence": 0.86
+              },
+              {
+                "cadquery_face_id": "195",
+                "geometry_type": "BSPLINE",
+                "semantic_role": "Freeform transition from the clevis support into the right base.",
+                "feature_assignment_confidence": 0.8
+              },
+              {
+                "cadquery_face_id": "196",
+                "geometry_type": "BSPLINE",
+                "semantic_role": "Central right-side clevis support transition.",
+                "feature_assignment_confidence": 0.84
+              },
+              {
+                "cadquery_face_id": "197",
+                "geometry_type": "BSPLINE",
+                "semantic_role": "Rear-right transition from the clevis support to the base.",
+                "feature_assignment_confidence": 0.81
+              },
+              {
+                "cadquery_face_id": "198",
+                "geometry_type": "TORUS",
+                "semantic_role": "Bottom edge round along the right clevis-support contour.",
+                "feature_assignment_confidence": 0.84
+              },
+              {
+                "cadquery_face_id": "199",
+                "geometry_type": "BSPLINE",
+                "semantic_role": "Freeform transition beneath the rear-right clevis root.",
+                "feature_assignment_confidence": 0.83
+              },
+              {
+                "cadquery_face_id": "200",
+                "geometry_type": "CYLINDER",
+                "semantic_role": "Rounded diagonal edge linking the right support to the center.",
+                "feature_assignment_confidence": 0.85
+              },
+              {
+                "cadquery_face_id": "201",
+                "geometry_type": "SPHERE",
+                "semantic_role": "Corner patch terminating the right diagonal support edge.",
+                "feature_assignment_confidence": 0.8
+              },
+              {
+                "cadquery_face_id": "202",
+                "geometry_type": "BSPLINE",
+                "semantic_role": "Freeform transition beneath the opposite clevis root.",
+                "feature_assignment_confidence": 0.83
+              },
+              {
+                "cadquery_face_id": "203",
+                "geometry_type": "TORUS",
+                "semantic_role": "Bottom edge round along the clevis-support crown.",
+                "feature_assignment_confidence": 0.84
+              },
+              {
+                "cadquery_face_id": "206",
+                "geometry_type": "SPHERE",
+                "semantic_role": "Small corner patch at a lug-root edge termination.",
+                "feature_assignment_confidence": 0.78
+              },
+              {
+                "cadquery_face_id": "209",
+                "geometry_type": "CYLINDER",
+                "semantic_role": "Long rounded transverse edge at the clevis support.",
+                "feature_assignment_confidence": 0.86
+              }
+            ],
+            "confidence": 0.94
+          }
+        ]
+      },
+      {
+        "id": "section_underside",
+        "name": "underside relief cavity and stiffening network",
+        "solid_ids": [
+          "0"
+        ],
+        "section_functions": [
+          {
+            "name": "mass reduction",
+            "function": "Remove low-stress material from the underside while preserving a continuous perimeter and primary load paths.",
+            "confidence": 0.95
+          },
+          {
+            "name": "local stiffness retention",
+            "function": "Use recessed walls, diagonal ribs and rounded junctions to maintain torsional and bending stiffness.",
+            "confidence": 0.94
+          }
+        ],
+        "features": [
+          {
+            "id": "feature_underside_cavity",
+            "name": "recessed underside cavity",
+            "feature_functions": [
+              {
+                "name": "weight reduction",
+                "function": "Create a broad recessed pocket bounded by sloped walls and a thin internal floor.",
+                "confidence": 0.96
+              }
+            ],
+            "brep_faces": [
+              {
+                "cadquery_face_id": "101",
+                "geometry_type": "PLANE",
+                "semantic_role": "Flat internal floor strip of the underside recess.",
+                "feature_assignment_confidence": 0.93
+              },
+              {
+                "cadquery_face_id": "102",
+                "geometry_type": "PLANE",
+                "semantic_role": "Inclined left wall of the underside recess.",
+                "feature_assignment_confidence": 0.94
+              },
+              {
+                "cadquery_face_id": "103",
+                "geometry_type": "PLANE",
+                "semantic_role": "Large planar floor of the underside cavity.",
+                "feature_assignment_confidence": 0.97
+              },
+              {
+                "cadquery_face_id": "104",
+                "geometry_type": "PLANE",
+                "semantic_role": "Inclined right wall of the underside recess.",
+                "feature_assignment_confidence": 0.94
+              },
+              {
+                "cadquery_face_id": "105",
+                "geometry_type": "CYLINDER",
+                "semantic_role": "Rounded lower junction at the left cavity wall.",
+                "feature_assignment_confidence": 0.9
+              },
+              {
+                "cadquery_face_id": "106",
+                "geometry_type": "CYLINDER",
+                "semantic_role": "Rounded lower junction at the right cavity wall.",
+                "feature_assignment_confidence": 0.9
+              },
+              {
+                "cadquery_face_id": "107",
+                "geometry_type": "CYLINDER",
+                "semantic_role": "Broad curved rear wall of the underside cavity.",
+                "feature_assignment_confidence": 0.93
+              },
+              {
+                "cadquery_face_id": "164",
+                "geometry_type": "CYLINDER",
+                "semantic_role": "Long rounded boundary along the right cavity wall.",
+                "feature_assignment_confidence": 0.88
+              },
+              {
+                "cadquery_face_id": "165",
+                "geometry_type": "TORUS",
+                "semantic_role": "Rounded corner at the right end of the cavity floor.",
+                "feature_assignment_confidence": 0.86
+              },
+              {
+                "cadquery_face_id": "166",
+                "geometry_type": "CYLINDER",
+                "semantic_role": "Long transverse round along the cavity floor edge.",
+                "feature_assignment_confidence": 0.9
+              },
+              {
+                "cadquery_face_id": "168",
+                "geometry_type": "TORUS",
+                "semantic_role": "Rounded corner at the left end of the cavity floor.",
+                "feature_assignment_confidence": 0.86
+              },
+              {
+                "cadquery_face_id": "171",
+                "geometry_type": "CYLINDER",
+                "semantic_role": "Long rounded boundary along the left cavity wall.",
+                "feature_assignment_confidence": 0.88
+              },
+              {
+                "cadquery_face_id": "173",
+                "geometry_type": "BSPLINE",
+                "semantic_role": "Freeform corner transition at the left cavity wall.",
+                "feature_assignment_confidence": 0.81
+              },
+              {
+                "cadquery_face_id": "175",
+                "geometry_type": "CYLINDER",
+                "semantic_role": "Vertical rounded edge along the left cavity wall.",
+                "feature_assignment_confidence": 0.87
+              },
+              {
+                "cadquery_face_id": "177",
+                "geometry_type": "BSPLINE",
+                "semantic_role": "Small freeform transition at the upper left cavity corner.",
+                "feature_assignment_confidence": 0.79
+              },
+              {
+                "cadquery_face_id": "179",
+                "geometry_type": "CYLINDER",
+                "semantic_role": "Rounded diagonal edge at the left cavity corner.",
+                "feature_assignment_confidence": 0.84
+              },
+              {
+                "cadquery_face_id": "182",
+                "geometry_type": "CYLINDER",
+                "semantic_role": "Bottom counterpart of the long right cavity boundary.",
+                "feature_assignment_confidence": 0.88
+              },
+              {
+                "cadquery_face_id": "183",
+                "geometry_type": "TORUS",
+                "semantic_role": "Bottom corner round at the right cavity-floor end.",
+                "feature_assignment_confidence": 0.86
+              },
+              {
+                "cadquery_face_id": "184",
+                "geometry_type": "CYLINDER",
+                "semantic_role": "Bottom counterpart of the transverse cavity-floor round.",
+                "feature_assignment_confidence": 0.9
+              },
+              {
+                "cadquery_face_id": "185",
+                "geometry_type": "TORUS",
+                "semantic_role": "Bottom corner round at the left cavity-floor end.",
+                "feature_assignment_confidence": 0.86
+              },
+              {
+                "cadquery_face_id": "186",
+                "geometry_type": "CYLINDER",
+                "semantic_role": "Bottom counterpart of the long left cavity boundary.",
+                "feature_assignment_confidence": 0.88
+              }
+            ],
+            "confidence": 0.94
+          },
+          {
+            "id": "feature_underside_ribs",
+            "name": "underside diagonal ribs and filleted junctions",
+            "feature_functions": [
+              {
+                "name": "reinforce cavity",
+                "function": "Bridge the recessed pocket with diagonal and longitudinal load paths while avoiding sharp rib intersections.",
+                "confidence": 0.93
+              }
+            ],
+            "brep_faces": [
+              {
+                "cadquery_face_id": "167",
+                "geometry_type": "BSPLINE",
+                "semantic_role": "Freeform transition from the right cavity wall into a diagonal rib.",
+                "feature_assignment_confidence": 0.82
+              },
+              {
+                "cadquery_face_id": "169",
+                "geometry_type": "CYLINDER",
+                "semantic_role": "Short rounded edge on the right diagonal rib.",
+                "feature_assignment_confidence": 0.84
+              },
+              {
+                "cadquery_face_id": "170",
+                "geometry_type": "CYLINDER",
+                "semantic_role": "Longitudinal rounded edge continuing the right rib.",
+                "feature_assignment_confidence": 0.85
+              },
+              {
+                "cadquery_face_id": "172",
+                "geometry_type": "BSPLINE",
+                "semantic_role": "Small junction patch between right rib-edge rounds.",
+                "feature_assignment_confidence": 0.79
+              },
+              {
+                "cadquery_face_id": "174",
+                "geometry_type": "BSPLINE",
+                "semantic_role": "Broad freeform face of the right diagonal stiffener.",
+                "feature_assignment_confidence": 0.9
+              },
+              {
+                "cadquery_face_id": "176",
+                "geometry_type": "BSPLINE",
+                "semantic_role": "Small transition at the inner end of the right stiffener.",
+                "feature_assignment_confidence": 0.8
+              },
+              {
+                "cadquery_face_id": "178",
+                "geometry_type": "BSPLINE",
+                "semantic_role": "Broad central transition between underside ribs.",
+                "feature_assignment_confidence": 0.88
+              },
+              {
+                "cadquery_face_id": "180",
+                "geometry_type": "BSPLINE",
+                "semantic_role": "Small fillet patch at the center-left rib boundary.",
+                "feature_assignment_confidence": 0.78
+              },
+              {
+                "cadquery_face_id": "181",
+                "geometry_type": "BSPLINE",
+                "semantic_role": "Broad freeform face of the left diagonal stiffener.",
+                "feature_assignment_confidence": 0.9
+              },
+              {
+                "cadquery_face_id": "204",
+                "geometry_type": "TORUS",
+                "semantic_role": "Bottom edge round at the right-rear rib perimeter.",
+                "feature_assignment_confidence": 0.82
+              },
+              {
+                "cadquery_face_id": "205",
+                "geometry_type": "BSPLINE",
+                "semantic_role": "Freeform outer transition at the right-rear underside rib.",
+                "feature_assignment_confidence": 0.8
+              },
+              {
+                "cadquery_face_id": "207",
+                "geometry_type": "BSPLINE",
+                "semantic_role": "Small underside patch at the right cavity boundary.",
+                "feature_assignment_confidence": 0.77
+              },
+              {
+                "cadquery_face_id": "208",
+                "geometry_type": "BSPLINE",
+                "semantic_role": "Small end transition on the right-rear stiffening contour.",
+                "feature_assignment_confidence": 0.77
+              },
+              {
+                "cadquery_face_id": "210",
+                "geometry_type": "CYLINDER",
+                "semantic_role": "Vertical rounded edge at the right-rear rib boundary.",
+                "feature_assignment_confidence": 0.84
+              },
+              {
+                "cadquery_face_id": "211",
+                "geometry_type": "BSPLINE",
+                "semantic_role": "Freeform right-rear rib junction.",
+                "feature_assignment_confidence": 0.81
+              },
+              {
+                "cadquery_face_id": "213",
+                "geometry_type": "SPHERE",
+                "semantic_role": "Corner patch at the right-rear rib junction.",
+                "feature_assignment_confidence": 0.79
+              },
+              {
+                "cadquery_face_id": "215",
+                "geometry_type": "CYLINDER",
+                "semantic_role": "Rounded diagonal edge extending from the right-rear rib.",
+                "feature_assignment_confidence": 0.84
+              },
+              {
+                "cadquery_face_id": "216",
+                "geometry_type": "BSPLINE",
+                "semantic_role": "Small termination patch on the right-rear diagonal edge.",
+                "feature_assignment_confidence": 0.78
+              },
+              {
+                "cadquery_face_id": "218",
+                "geometry_type": "BSPLINE",
+                "semantic_role": "Long freeform underside reinforcing surface.",
+                "feature_assignment_confidence": 0.86
+              },
+              {
+                "cadquery_face_id": "220",
+                "geometry_type": "BSPLINE",
+                "semantic_role": "Narrow transition along the central underside rib.",
+                "feature_assignment_confidence": 0.81
+              },
+              {
+                "cadquery_face_id": "222",
+                "geometry_type": "BSPLINE",
+                "semantic_role": "Freeform transition along the left half of the central rib.",
+                "feature_assignment_confidence": 0.82
+              },
+              {
+                "cadquery_face_id": "223",
+                "geometry_type": "CYLINDER",
+                "semantic_role": "Rounded diagonal edge connecting the central rib to the lug support.",
+                "feature_assignment_confidence": 0.86
+              },
+              {
+                "cadquery_face_id": "225",
+                "geometry_type": "SPHERE",
+                "semantic_role": "Corner patch at the central diagonal rib termination.",
+                "feature_assignment_confidence": 0.79
+              },
+              {
+                "cadquery_face_id": "228",
+                "geometry_type": "BSPLINE",
+                "semantic_role": "Small freeform transition adjacent to the left diagonal rib.",
+                "feature_assignment_confidence": 0.8
+              },
+              {
+                "cadquery_face_id": "230",
+                "geometry_type": "CYLINDER",
+                "semantic_role": "Rounded diagonal edge on the left internal rib.",
+                "feature_assignment_confidence": 0.85
+              },
+              {
+                "cadquery_face_id": "231",
+                "geometry_type": "CYLINDER",
+                "semantic_role": "Short rounded edge at a left rib intersection.",
+                "feature_assignment_confidence": 0.82
+              },
+              {
+                "cadquery_face_id": "233",
+                "geometry_type": "SPHERE",
+                "semantic_role": "Corner patch at the left rib intersection.",
+                "feature_assignment_confidence": 0.79
+              },
+              {
+                "cadquery_face_id": "235",
+                "geometry_type": "CYLINDER",
+                "semantic_role": "Long rounded edge forming the principal left diagonal rib.",
+                "feature_assignment_confidence": 0.87
+              },
+              {
+                "cadquery_face_id": "236",
+                "geometry_type": "BSPLINE",
+                "semantic_role": "Broad freeform transition from the left rib into the perimeter.",
+                "feature_assignment_confidence": 0.84
+              },
+              {
+                "cadquery_face_id": "237",
+                "geometry_type": "BSPLINE",
+                "semantic_role": "Rear-left underside corner transition.",
+                "feature_assignment_confidence": 0.8
+              },
+              {
+                "cadquery_face_id": "238",
+                "geometry_type": "BSPLINE",
+                "semantic_role": "Center-left underside scallop transition.",
+                "feature_assignment_confidence": 0.8
+              },
+              {
+                "cadquery_face_id": "239",
+                "geometry_type": "BSPLINE",
+                "semantic_role": "Front-left underside corner transition.",
+                "feature_assignment_confidence": 0.8
+              },
+              {
+                "cadquery_face_id": "240",
+                "geometry_type": "BSPLINE",
+                "semantic_role": "Broad freeform transition from the opposite left rib into the perimeter.",
+                "feature_assignment_confidence": 0.84
+              },
+              {
+                "cadquery_face_id": "242",
+                "geometry_type": "BSPLINE",
+                "semantic_role": "Freeform outer transition at the left clevis-support rib.",
+                "feature_assignment_confidence": 0.82
+              },
+              {
+                "cadquery_face_id": "243",
+                "geometry_type": "BSPLINE",
+                "semantic_role": "Broad reinforcing surface beneath the left clevis root.",
+                "feature_assignment_confidence": 0.87
+              },
+              {
+                "cadquery_face_id": "244",
+                "geometry_type": "BSPLINE",
+                "semantic_role": "Small freeform transition beside the left clevis-root rib.",
+                "feature_assignment_confidence": 0.81
+              },
+              {
+                "cadquery_face_id": "245",
+                "geometry_type": "SPHERE",
+                "semantic_role": "Corner patch at the left clevis-root rib.",
+                "feature_assignment_confidence": 0.79
+              },
+              {
+                "cadquery_face_id": "246",
+                "geometry_type": "CYLINDER",
+                "semantic_role": "Rounded diagonal edge linking the left support to the center.",
+                "feature_assignment_confidence": 0.86
+              },
+              {
+                "cadquery_face_id": "247",
+                "geometry_type": "BSPLINE",
+                "semantic_role": "Small corner transition at the end of the left diagonal edge.",
+                "feature_assignment_confidence": 0.78
+              }
+            ],
+            "confidence": 0.89
+          },
+          {
+            "id": "feature_underside_perimeter_rounds",
+            "name": "underside perimeter rounds",
+            "feature_functions": [
+              {
+                "name": "cavity edge smoothing",
+                "function": "Blend the underside pocket into the exterior shell and prevent abrupt section changes.",
+                "confidence": 0.9
+              }
+            ],
+            "brep_faces": [
+              {
+                "cadquery_face_id": "212",
+                "geometry_type": "TORUS",
+                "semantic_role": "Bottom edge round along the left-front underside contour.",
+                "feature_assignment_confidence": 0.84
+              },
+              {
+                "cadquery_face_id": "214",
+                "geometry_type": "TORUS",
+                "semantic_role": "Bottom edge round around the left front mounting contour.",
+                "feature_assignment_confidence": 0.85
+              },
+              {
+                "cadquery_face_id": "217",
+                "geometry_type": "TORUS",
+                "semantic_role": "Bottom edge round around the left rear mounting contour.",
+                "feature_assignment_confidence": 0.85
+              },
+              {
+                "cadquery_face_id": "219",
+                "geometry_type": "TORUS",
+                "semantic_role": "Bottom edge round along the left-rear underside contour.",
+                "feature_assignment_confidence": 0.84
+              },
+              {
+                "cadquery_face_id": "221",
+                "geometry_type": "BSPLINE",
+                "semantic_role": "Small underside transition at the left-rear perimeter round.",
+                "feature_assignment_confidence": 0.78
+              },
+              {
+                "cadquery_face_id": "224",
+                "geometry_type": "CYLINDER",
+                "semantic_role": "Vertical rounded boundary at the left underside perimeter.",
+                "feature_assignment_confidence": 0.84
+              },
+              {
+                "cadquery_face_id": "226",
+                "geometry_type": "BSPLINE",
+                "semantic_role": "Freeform transition between the left perimeter and internal rib.",
+                "feature_assignment_confidence": 0.8
+              },
+              {
+                "cadquery_face_id": "227",
+                "geometry_type": "SPHERE",
+                "semantic_role": "Corner patch at the left perimeter transition.",
+                "feature_assignment_confidence": 0.79
+              },
+              {
+                "cadquery_face_id": "229",
+                "geometry_type": "BSPLINE",
+                "semantic_role": "Freeform underside transition near the extreme left end.",
+                "feature_assignment_confidence": 0.8
+              },
+              {
+                "cadquery_face_id": "232",
+                "geometry_type": "SPHERE",
+                "semantic_role": "Corner patch at the extreme left underside edge.",
+                "feature_assignment_confidence": 0.79
+              },
+              {
+                "cadquery_face_id": "234",
+                "geometry_type": "BSPLINE",
+                "semantic_role": "Small freeform patch connecting the left edge and rib network.",
+                "feature_assignment_confidence": 0.79
+              }
+            ],
+            "confidence": 0.86
+          }
+        ]
+      }
+    ]
+  }
+}
+
+aim.json (desired final state). Check the last-iteration images, CadQuery function, and program output against this:
+
+{
+  "request": {
+    "request_id": "request_001",
+    "raw_text": "Add a 1.5 millimetre rib to increase support and make the structure strong.",
+    "word_categories": {
+      "action_words": [
+        "Add",
+        "1.5",
+        "millimetre",
+        "rib"
+      ],
+      "reference_geometry_words": [
+        "structure"
+      ],
+      "intention_words": [
+        "increase",
+        "support",
+        "make",
+        "strong"
+      ],
+      "grammatical_words": [
+        "a",
+        "to",
+        "and",
+        "the"
+      ]
+    }
+  },
+  "aim": {
+    "areas_to_change": [
+      {
+        "action": "Create a rib with a nominal thickness of 1.5 millimetres.",
+        "reference_geometry": "The junction between the central clevis support and the main base or supporting web.",
+        "location": "At the central raised clevis region, extending between an existing clevis-support wall and the adjacent base/web surface, preferably on or symmetric about the model center plane.",
+        "description": "Add a thin reinforcing web that merges continuously with the existing bracket and strengthens the load path from the clevis lugs into the broad mounting base. Terminate the rib at existing faces without entering any mounting or pivot holes.",
+        "confidence": 0.48
+      }
+    ],
+    "areas_to_preserve": [
+      {
+        "reference_geometry": "Four mounting holes and their surrounding end bosses",
+        "preservation_rule": "Preserve hole diameters, axes, positions, counterbore-like recesses, and required tool or fastener clearances."
+      },
+      {
+        "reference_geometry": "Two central clevis ears and their coaxial pivot holes",
+        "preservation_rule": "Preserve ear spacing, thickness, profiles, hole diameters, hole alignment, and the open gap between the ears."
+      },
+      {
+        "reference_geometry": "Existing exterior base outline, sloped walls, curved transitions, and underside cavity",
+        "preservation_rule": "Keep the existing envelope and surfaces unchanged except where the new rib must join them."
+      },
+      {
+        "reference_geometry": "Existing symmetry and mating interfaces",
+        "preservation_rule": "Avoid altering functional contact surfaces or introducing unintended asymmetry; place a single rib on the center plane when feasible."
+      }
+    ],
+    "predicted_final_outcome": {
+      "geometry": "The model will include one 1.5 mm thick integral reinforcing rib spanning a selected unsupported junction near the central clevis support and blending into the base/web.",
+      "function": "The rib will provide additional support to the central loaded region and improve force transfer into the mounting base.",
+      "behavior": "The reinforced junction should exhibit lower local bending and deflection and improved structural stiffness while retaining existing mounting and pivot interfaces."
+    },
+    "ambiguities": [
+      {
+        "description": "The request does not specify the rib's exact location, orientation, length, height, or attachment faces.",
+        "candidate_interpretations": [
+          "Add a center-plane rib between the central clevis support and the main base.",
+          "Add a transverse rib connecting the two clevis-support ears.",
+          "Add a rib within the underside cavity between the cavity wall and the base.",
+          "Add a side gusset between one clevis ear and an adjacent sloped web."
+        ]
+      },
+      {
+        "description": "The 1.5 millimetre value is not explicitly identified as thickness.",
+        "candidate_interpretations": [
+          "Use 1.5 mm as the rib thickness.",
+          "Use 1.5 mm as the rib height.",
+          "Use 1.5 mm as an offset or extrusion distance."
+        ]
+      },
+      {
+        "description": "The requested number and symmetry arrangement of ribs are not fully defined.",
+        "candidate_interpretations": [
+          "Create one rib on the model center plane.",
+          "Create one rib on a selected side.",
+          "Create a mirrored pair of 1.5 mm ribs to maintain bilateral symmetry."
+        ]
+      }
+    ]
+  }
+}
+
+
+The multiview images generated from the code sent in your last response are attached, followed by the CadQuery function and program output from the last iteration. First, judge whether the current model satisfies the desired final state described in aim.json. Four perspectives should be considered: (1) Geometric consistency: Verify the model matches the predicted geometric outcome and comply with the constraints if any. (2) Functional alignment: Verify that the model can perform intended functions as described in aim.json. (3) Behavioral correctness: Assess whether the model can behave as expected based on the intended behavior described in aim.json. (4) Preservation of geometry: Ensure the model preserves the geometries that are identified as area to preserve in aim.json. Considering the flexible nature of design, do not be too strict on those validations, make sensible judgements.
+
+If all four perspectives are satisfied, report the operation is finished in your response.
+
+If not, analyse errors and update the code accordingly. You would have access to the last iteration's results and the original CAD geometries stored in model.json. Use them to help you identify the errors and update the code accordingly.
+
+Once you have generated the new function, it will be executed in CadQuery on the original CAD model. You will then be provided with the latest rendering of the CAD model created by your function, and any prints, debug or error messages. You will then have the opportunity to refine your function based on this feedback, and it will be re-executed.
+
+Continue this process until the task is complete, or you reach the maximum number of iterations. If the task involves editing an existing model, the path to that model's .step file is passed to your function as args["input_file"], and is also listed as brep_start_path_step in the task information. Load it from args["input_file"] rather than hard-coding a path.
+
+        Return a json object with two fields. Do not include any other text outside of the json object in your response:
+        'complete': true if the task has been completed. IMPORTANT: This should only be judged by looking at the output from the last iteration, not whether a function has been returned this iteration. If there is no valid output that corresponds to the instruction, the task is not complete. The first iteration can never be complete. If this is true, then the current function will NOT be executed, and the function from the last iteration will be used.
+        'my_cad_function': CadQuery python function as a string. Use the same definition and arguments as the example..
+        
+
+Instruction:
+
+Edit the existing model according to the provided instructions.
+
+Task information:
+
+request_text:
+
+Add a 1.5 millimetre rib to increase support and make the structure strong.
+
+brep_start_path_step:
+
+/home/adml/Research/Hackathon2026/IDETC26-Hackathon-Autodesk-neuralCAD-Edit/data/edit_192_external/breps/ZK22J6VYRKQ2RTFD_1758873955.818716.step
+
+Iterations remaining: 9

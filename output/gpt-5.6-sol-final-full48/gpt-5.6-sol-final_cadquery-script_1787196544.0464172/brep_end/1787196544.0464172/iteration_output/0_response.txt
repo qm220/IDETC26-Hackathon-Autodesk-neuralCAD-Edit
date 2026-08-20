@@ -1,0 +1,128 @@
+Thinking text:
+
+
+Generated script:
+def my_cad_function(args):
+    import os
+    import math
+
+    input_file = os.path.expanduser(args["input_file"])
+    bracket_wp = cq.importers.importStep(input_file)
+    bracket = bracket_wp.val()
+
+    # Locate the two existing 15 mm base mounting holes directly from the B-rep.
+    hole_faces = []
+    for face in bracket.Faces():
+        try:
+            if face.geomType() != "CYLINDER":
+                continue
+            bb = face.BoundingBox()
+            c = face.Center()
+            # Through-hole walls span the 15 mm base thickness along Y and have
+            # approximately 15 mm extents in X and Z.
+            if (bb.ymin < 0.1 and bb.ymax > 14.9 and
+                    14.5 < bb.xlen < 15.5 and
+                    14.5 < bb.zlen < 15.5 and
+                    650.0 < face.Area() < 760.0):
+                hole_faces.append((c.x, c.z))
+        except Exception:
+            pass
+
+    # Remove duplicate centers, if any, and sort along the elongated base.
+    hole_centers = []
+    for x, z in hole_faces:
+        if not any(abs(x - px) < 0.1 and abs(z - pz) < 0.1
+                   for px, pz in hole_centers):
+            hole_centers.append((x, z))
+    hole_centers.sort(key=lambda p: p[0])
+
+    if len(hole_centers) != 2:
+        raise ValueError(
+            "Unable to identify exactly two 15 mm base mounting holes; "
+            "found centers: %s" % hole_centers
+        )
+
+    # Provisional M14 socket-head screws for the existing 15 mm clearance holes.
+    shank_radius = 6.8
+    under_head_length = 35.0
+    head_radius = 10.5
+    head_height = 14.0
+    top_chamfer_height = 2.0
+    tip_chamfer_height = 1.5
+    base_top_y = 15.0
+
+    def make_mounting_screw(cx, cz):
+        # Shank projects through the 15 mm plate and 20 mm below its underside.
+        straight_shank = cq.Solid.makeCylinder(
+            shank_radius,
+            under_head_length - tip_chamfer_height,
+            cq.Vector(cx, base_top_y, cz),
+            cq.Vector(0, -1, 0)
+        )
+        tip = cq.Solid.makeCone(
+            shank_radius,
+            shank_radius - 1.0,
+            tip_chamfer_height,
+            cq.Vector(cx, base_top_y - under_head_length + tip_chamfer_height, cz),
+            cq.Vector(0, -1, 0)
+        )
+
+        # Cylindrical socket-head cap screw head with a small top edge chamfer.
+        head_body = cq.Solid.makeCylinder(
+            head_radius,
+            head_height - top_chamfer_height,
+            cq.Vector(cx, base_top_y, cz),
+            cq.Vector(0, 1, 0)
+        )
+        head_top = cq.Solid.makeCone(
+            head_radius,
+            head_radius - 1.0,
+            top_chamfer_height,
+            cq.Vector(cx, base_top_y + head_height - top_chamfer_height, cz),
+            cq.Vector(0, 1, 0)
+        )
+
+        screw = straight_shank.fuse(tip).fuse(head_body).fuse(head_top)
+
+        # 10 mm across-flats hexagonal drive recess, cut from the accessible top.
+        socket_plane = cq.Plane(
+            origin=(cx, base_top_y + head_height + 0.1, cz),
+            xDir=(1, 0, 0),
+            normal=(0, -1, 0)
+        )
+        socket_circum_diameter = 10.0 / math.cos(math.radians(30.0))
+        socket_cut = (
+            cq.Workplane(socket_plane)
+            .polygon(6, socket_circum_diameter)
+            .extrude(7.1)
+            .val()
+        )
+        return screw.cut(socket_cut)
+
+    left_screw = make_mounting_screw(*hole_centers[0])
+    right_screw = make_mounting_screw(*hole_centers[1])
+
+    result = cq.Assembly(name="table_mounting_assembly")
+    result.add(bracket, name="clamp_bracket", color=cq.Color(0.72, 0.71, 0.66))
+    result.add(left_screw, name="left_M14_mounting_screw", color=cq.Color(0.25, 0.27, 0.30))
+    result.add(right_screw, name="right_M14_mounting_screw", color=cq.Color(0.25, 0.27, 0.30))
+
+    print("Located base-hole centers:", hole_centers)
+    print("Inserted two separate simplified M14 socket-head mounting screws.")
+    return result
+
+Program output:
+stdout: Loading function from: /home/adml/Research/Hackathon2026/IDETC26-Hackathon-Autodesk-neuralCAD-Edit/output/gpt-5.6-sol-final-full48/gpt-5.6-sol-final_cadquery-script_1787196544.0464172/brep_end/1787196544.0464172/temp_script.py
+Located base-hole centers: [(15.000000000000004, -30.0), (153.0, -30.0)]
+Inserted two separate simplified M14 socket-head mounting screws.
+Exported assembly to: /home/adml/Research/Hackathon2026/IDETC26-Hackathon-Autodesk-neuralCAD-Edit/output/gpt-5.6-sol-final-full48/gpt-5.6-sol-final_cadquery-script_1787196544.0464172/brep_end/1787196544.0464172/tmp.step
+Exported STL to: /home/adml/Research/Hackathon2026/IDETC26-Hackathon-Autodesk-neuralCAD-Edit/output/gpt-5.6-sol-final-full48/gpt-5.6-sol-final_cadquery-script_1787196544.0464172/brep_end/1787196544.0464172/tmp.stl
+Exported PNG image to: /home/adml/Research/Hackathon2026/IDETC26-Hackathon-Autodesk-neuralCAD-Edit/output/gpt-5.6-sol-final-full48/gpt-5.6-sol-final_cadquery-script_1787196544.0464172/brep_end/1787196544.0464172/tmp.png
+Script completed.
+
+stderr: /home/adml/Research/Hackathon2026/IDETC26-Hackathon-Autodesk-neuralCAD-Edit/.venv/lib/python3.12/site-packages/cadquery/utils.py:82: FutureWarning: save will be removed in the next release.
+  warn(f"{f.__name__} will be removed in the next release.", FutureWarning)
+
+
+Exported this iteration:
+tmp.step, tmp.stl, tmp.png, tmp_+Z.png, tmp_-Z.png, tmp_-X.png, tmp_+X.png, tmp_+Y.png, tmp_-Y.png, tmp_iso1.png, tmp_iso2.png

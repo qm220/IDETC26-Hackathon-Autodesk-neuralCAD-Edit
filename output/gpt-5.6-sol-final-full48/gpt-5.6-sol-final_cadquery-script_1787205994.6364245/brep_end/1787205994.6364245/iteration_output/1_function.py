@@ -1,0 +1,158 @@
+def my_cad_function(args):
+    import os
+    import math
+
+    input_file = os.path.expanduser(args["input_file"])
+    imported = cq.importers.importStep(input_file)
+    root = imported.val() if hasattr(imported, "val") else imported
+    solids = list(root.Solids())
+    if not solids:
+        raise ValueError("The input STEP file contains no solids")
+
+    def info(shape):
+        bb = shape.BoundingBox()
+        c = bb.center
+        dx, dy, dz = bb.xlen, bb.ylen, bb.zlen
+        diag = math.sqrt(dx * dx + dy * dy + dz * dz)
+        box_volume = max(dx * dy * dz, 1.0e-9)
+        volume = abs(shape.Volume())
+        return {
+            "shape": shape,
+            "center": cq.Vector(c.x, c.y, c.z),
+            "dims": (dx, dy, dz),
+            "diag": diag,
+            "volume": volume,
+            "fill": volume / box_volume,
+        }
+
+    data = [info(s) for s in solids]
+    main_index = max(range(len(data)), key=lambda i: data[i]["volume"])
+    main_center = data[main_index]["center"]
+    main_volume = data[main_index]["volume"]
+
+    candidates = []
+    for i, d in enumerate(data):
+        if i == main_index:
+            continue
+        distance = (d["center"] - main_center).Length
+        if d["fill"] > 0.08 and d["volume"] < main_volume * 0.08 and d["diag"] < 80.0:
+            candidates.append((distance, i))
+
+    if candidates:
+        plug_index = max(candidates)[1]
+    else:
+        plug_index = max(
+            (i for i in range(len(data)) if i != main_index),
+            key=lambda i: (data[i]["center"] - main_center).Length
+            * max(min(data[i]["fill"], 1.0), 0.02),
+        )
+
+    plug_center = data[plug_index]["center"]
+
+    cord_candidates = []
+    for i, d in enumerate(data):
+        if i in (main_index, plug_index):
+            continue
+        distance = (d["center"] - main_center).Length
+        elongation = d["diag"] / max(min(d["dims"]), 0.1)
+        score = distance * elongation / max(d["fill"], 0.01)
+        if d["volume"] < main_volume * 0.08 and d["diag"] > 20.0:
+            cord_candidates.append((score, i))
+
+    if not cord_candidates:
+        raise ValueError("Unable to identify the preserved power cord")
+    cord_index = max(cord_candidates)[1]
+    cord = data[cord_index]["shape"]
+
+    cord_points = []
+    for vertex in cord.Vertices():
+        p = vertex.Center()
+        v = cq.Vector(p.x, p.y, p.z)
+        cord_points.append(((v - plug_center).Length, v))
+    cord_points.sort(key=lambda item: item[0])
+    nearest = [item[1] for item in cord_points[:min(6, len(cord_points))]]
+    if not nearest:
+        raise ValueError("The identified cord has no usable vertices")
+
+    attach = cq.Vector(
+        sum(p.x for p in nearest) / len(nearest),
+        sum(p.y for p in nearest) / len(nearest),
+        sum(p.z for p in nearest) / len(nearest),
+    )
+
+    insertion_axis = plug_center - attach
+    if insertion_axis.Length < 1.0e-6:
+        insertion_axis = plug_center - main_center
+    insertion_axis = insertion_axis.normalized()
+
+    planar_axis = cq.Vector(insertion_axis.x, insertion_axis.y, 0.0)
+    if planar_axis.Length > 0.25:
+        insertion_axis = planar_axis.normalized()
+
+    thickness_dir = cq.Vector(0, 0, 1)
+    width_dir = thickness_dir.cross(insertion_axis)
+    if width_dir.Length < 1.0e-6:
+        width_dir = cq.Vector(0, 1, 0)
+    width_dir = width_dir.normalized()
+
+    body_length = 30.0
+    nose = attach + insertion_axis.multiply(body_length)
+    nose_plane = cq.Plane(
+        origin=(nose.x, nose.y, nose.z),
+        xDir=(width_dir.x, width_dir.y, width_dir.z),
+        normal=(insertion_axis.x, insertion_axis.y, insertion_axis.z),
+    )
+
+    body = (
+        cq.Workplane(nose_plane)
+        .ellipse(17.0, 7.0)
+        .workplane(offset=-4.0)
+        .ellipse(17.0, 7.0)
+        .workplane(offset=-18.0)
+        .ellipse(11.0, 5.5)
+        .workplane(offset=-6.0)
+        .ellipse(7.0, 4.5)
+        .workplane(offset=-2.0)
+        .ellipse(4.5, 4.0)
+        .loft(combine=True, ruled=False)
+        .val()
+    )
+
+    boot_shapes = [
+        cq.Solid.makeCone(4.5, 2.8, 12.0, attach, insertion_axis.multiply(-1.0))
+    ]
+    for offset, radius, length in [(2.0, 4.8, 1.5), (5.0, 4.2, 1.4), (8.0, 3.6, 1.3), (10.5, 3.1, 1.1)]:
+        rib_start = attach - insertion_axis.multiply(offset)
+        boot_shapes.append(
+            cq.Solid.makeCylinder(radius, length, rib_start, insertion_axis.multiply(-1.0))
+        )
+
+    pin_shapes = []
+    pin_spacing = 19.0
+    pin_radius = 2.0
+    sleeve_projection = 10.0
+    conductive_straight = 8.3
+    tip_length = 0.7
+
+    for side in (-1.0, 1.0):
+        pin_center = nose + width_dir.multiply(side * pin_spacing / 2.0)
+        sleeve_start = pin_center - insertion_axis.multiply(1.0)
+        sleeve = cq.Solid.makeCylinder(
+            pin_radius, sleeve_projection + 1.0, sleeve_start, insertion_axis
+        )
+        metal_start = pin_center + insertion_axis.multiply(sleeve_projection)
+        metal = cq.Solid.makeCylinder(
+            pin_radius, conductive_straight, metal_start, insertion_axis
+        )
+        tip_start = metal_start + insertion_axis.multiply(conductive_straight)
+        rounded_tip = cq.Solid.makeCone(
+            pin_radius, 1.65, tip_length, tip_start, insertion_axis
+        )
+        pin_shapes.extend([sleeve, metal, rounded_tip])
+
+    kept = [d["shape"] for i, d in enumerate(data) if i != plug_index]
+    result = cq.Compound.makeCompound(kept + [body] + boot_shapes + pin_shapes)
+
+    print("Replaced the original plug with a CEE 7/16-style Europlug.")
+    print("Result validity:", result.isValid())
+    return result

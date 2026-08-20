@@ -1,0 +1,56 @@
+Thinking text:
+**Evaluating fusion process**
+
+I need to determine how to use the Shape.clean method on the returned workplane object. Maybe I should consider that the import might yield multiple values when I only expect one. It's important to select the largest solid to preserve the whole part. If there's a compound with a single solid, I might opt to mirror or fuse it. I'll ensure to fuse all original solids first before mirroring for the best results. Finally, I should validate the number of solids to confirm it yields one.
+
+Generated script:
+def my_cad_function(args):
+    input_file = os.path.expanduser(args["input_file"])
+    imported = cq.importers.importStep(input_file)
+
+    # Consolidate the imported model into its original solid body.
+    solids = imported.solids().vals()
+    if not solids:
+        raise ValueError("The input STEP file contains no solid bodies")
+
+    original = solids[0]
+    for solid in solids[1:]:
+        original = original.fuse(solid)
+    original = original.clean()
+
+    # The non-rounded terminal is the maximum-X planar end face. Mirror about
+    # the coincident YZ-oriented plane at that end.
+    bbox = original.BoundingBox()
+    mirror_x = bbox.xmax
+    mirrored = original.mirror("YZ", (mirror_x, 0.0, 0.0))
+
+    # Fuse the reflected copy to the original across the complete end face and
+    # refine the result to remove the obsolete coplanar interface.
+    result_shape = original.fuse(mirrored).clean()
+
+    result_solids = result_shape.Solids()
+    print(f"Mirror plane: X = {mirror_x:.6f}")
+    print(f"Original bounds: X=[{bbox.xmin:.6f}, {bbox.xmax:.6f}]")
+    print(f"Result solids: {len(result_solids)}")
+    print(f"Result valid: {result_shape.isValid()}")
+
+    if len(result_solids) != 1:
+        raise ValueError(f"Boolean union did not produce one body; found {len(result_solids)} solids")
+
+    return cq.Workplane(obj=result_shape)
+
+Program output:
+stdout: Loading function from: /home/adml/Research/Hackathon2026/IDETC26-Hackathon-Autodesk-neuralCAD-Edit/output/gpt-5.6-sol-final-full48/gpt-5.6-sol-final_cadquery-script_1787208541.60451/brep_end/1787208541.60451/temp_script.py
+Mirror plane: X = 80.000000
+Original bounds: X=[-25.000000, 80.000000]
+Result solids: 1
+Result valid: True
+Exported shape to: /home/adml/Research/Hackathon2026/IDETC26-Hackathon-Autodesk-neuralCAD-Edit/output/gpt-5.6-sol-final-full48/gpt-5.6-sol-final_cadquery-script_1787208541.60451/brep_end/1787208541.60451/tmp.step
+Exported STL to: /home/adml/Research/Hackathon2026/IDETC26-Hackathon-Autodesk-neuralCAD-Edit/output/gpt-5.6-sol-final-full48/gpt-5.6-sol-final_cadquery-script_1787208541.60451/brep_end/1787208541.60451/tmp.stl
+Exported PNG image to: /home/adml/Research/Hackathon2026/IDETC26-Hackathon-Autodesk-neuralCAD-Edit/output/gpt-5.6-sol-final-full48/gpt-5.6-sol-final_cadquery-script_1787208541.60451/brep_end/1787208541.60451/tmp.png
+Script completed.
+
+stderr: 
+
+Exported this iteration:
+tmp.step, tmp.stl, tmp.png, tmp_+Z.png, tmp_-Z.png, tmp_-X.png, tmp_+X.png, tmp_+Y.png, tmp_-Y.png, tmp_iso1.png, tmp_iso2.png

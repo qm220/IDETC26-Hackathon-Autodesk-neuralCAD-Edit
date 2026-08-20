@@ -1,0 +1,65 @@
+Thinking text:
+
+
+Generated script:
+def my_cad_function(args):
+    import os
+    import cadquery as cq
+
+    input_file = os.path.expanduser(args["input_file"])
+    imported = cq.importers.importStep(input_file)
+    root = imported.val()
+    solids = list(root.Solids())
+
+    if len(solids) < 2:
+        raise ValueError("Expected separate housing and scroll-wheel solids")
+
+    solids_by_volume = sorted(solids, key=lambda solid: solid.Volume(), reverse=True)
+    housing = solids_by_volume[0]
+    preserved_solids = solids_by_volume[1:]
+
+    faces = list(housing.Faces())
+    if len(faces) < 7:
+        raise ValueError("Housing does not contain the expected wheel-slot topology")
+
+    well_walls = [faces[index] for index in (0, 1, 2, 3)]
+    top_deck = faces[6]
+
+    def same_shape(shape_a, shape_b):
+        try:
+            return shape_a.wrapped.IsSame(shape_b.wrapped)
+        except Exception:
+            return shape_a.isSame(shape_b)
+
+    deck_edges = list(top_deck.Edges())
+    slot_rim_edges = []
+    for wall in well_walls:
+        for wall_edge in wall.Edges():
+            if any(same_shape(wall_edge, deck_edge) for deck_edge in deck_edges):
+                if not any(same_shape(wall_edge, edge) for edge in slot_rim_edges):
+                    slot_rim_edges.append(wall_edge)
+
+    if len(slot_rim_edges) != 4:
+        raise ValueError(
+            "Expected four exposed wheel-slot perimeter edges, found %d"
+            % len(slot_rim_edges)
+        )
+
+    filleted_housing = (
+        cq.Workplane(obj=housing)
+        .newObject(slot_rim_edges)
+        .fillet(2.0)
+        .val()
+    )
+
+    if filleted_housing is None or not filleted_housing.isValid():
+        raise ValueError("The 2 mm wheel-slot fillet produced an invalid housing")
+
+    result = cq.Compound.makeCompound([filleted_housing] + preserved_solids)
+    if not result.isValid():
+        raise ValueError("The resulting housing and preserved wheel compound is invalid")
+
+    return result
+
+Program output:
+CadQuery skipped because complete=true.

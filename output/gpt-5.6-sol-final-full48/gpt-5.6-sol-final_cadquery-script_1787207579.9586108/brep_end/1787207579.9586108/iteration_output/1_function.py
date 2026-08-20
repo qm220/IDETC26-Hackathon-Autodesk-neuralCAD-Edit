@@ -1,0 +1,62 @@
+def my_cad_function(args):
+    import os
+    import cadquery as cq
+
+    input_file = os.path.expanduser(args["input_file"])
+    imported = cq.importers.importStep(input_file)
+    base_shape = imported.val()
+    bbox = base_shape.BoundingBox()
+
+    candidates = []
+    for face in base_shape.Faces():
+        try:
+            if face.geomType() != "PLANE":
+                continue
+            center = face.Center()
+            normal = face.normalAt(center)
+            if abs(normal.x) < 0.95:
+                continue
+            if abs(center.x - bbox.xmin) > 1.0e-3:
+                continue
+            candidates.append((face.Area(), face))
+        except Exception:
+            pass
+
+    if candidates:
+        selected_face = max(candidates, key=lambda item: item[0])[1]
+        face_center = selected_face.Center()
+        attachment_x = face_center.x
+        center_y = face_center.y
+        center_z = face_center.z
+    else:
+        attachment_x = bbox.xmin
+        center_y = (bbox.ymin + bbox.ymax) / 2.0
+        center_z = (bbox.zmin + bbox.zmax) / 2.0
+
+    outer_radius = 20.0
+    hole_radius = 10.0
+    thickness = 30.0
+    overlap = 1.0
+
+    eye_center_x = attachment_x - outer_radius + overlap
+    axis_start_y = center_y - thickness / 2.0
+
+    outer = cq.Solid.makeCylinder(
+        outer_radius,
+        thickness,
+        cq.Vector(eye_center_x, axis_start_y, center_z),
+        cq.Vector(0, 1, 0)
+    )
+
+    fused = base_shape.fuse(outer)
+
+    cutter_extension = 1.0
+    hole = cq.Solid.makeCylinder(
+        hole_radius,
+        thickness + 2.0 * cutter_extension,
+        cq.Vector(eye_center_x, axis_start_y - cutter_extension, center_z),
+        cq.Vector(0, 1, 0)
+    )
+
+    result_shape = fused.cut(hole)
+    return cq.Workplane(obj=result_shape)

@@ -1,0 +1,3266 @@
+Multi-view images from last iteration:
+
+View: +Z
+
+[IMAGE 0: /home/adml/Research/Hackathon2026/IDETC26-Hackathon-Autodesk-neuralCAD-Edit/output/gpt-5.6-sol-final-full48/gpt-5.6-sol-final_cadquery-script_1787206413.4226987/brep_end/1787206413.4226987/tmp_+Z.png]
+
+View: -Z
+
+[IMAGE 1: /home/adml/Research/Hackathon2026/IDETC26-Hackathon-Autodesk-neuralCAD-Edit/output/gpt-5.6-sol-final-full48/gpt-5.6-sol-final_cadquery-script_1787206413.4226987/brep_end/1787206413.4226987/tmp_-Z.png]
+
+View: -X
+
+[IMAGE 2: /home/adml/Research/Hackathon2026/IDETC26-Hackathon-Autodesk-neuralCAD-Edit/output/gpt-5.6-sol-final-full48/gpt-5.6-sol-final_cadquery-script_1787206413.4226987/brep_end/1787206413.4226987/tmp_-X.png]
+
+View: +X
+
+[IMAGE 3: /home/adml/Research/Hackathon2026/IDETC26-Hackathon-Autodesk-neuralCAD-Edit/output/gpt-5.6-sol-final-full48/gpt-5.6-sol-final_cadquery-script_1787206413.4226987/brep_end/1787206413.4226987/tmp_+X.png]
+
+View: +Y
+
+[IMAGE 4: /home/adml/Research/Hackathon2026/IDETC26-Hackathon-Autodesk-neuralCAD-Edit/output/gpt-5.6-sol-final-full48/gpt-5.6-sol-final_cadquery-script_1787206413.4226987/brep_end/1787206413.4226987/tmp_+Y.png]
+
+View: -Y
+
+[IMAGE 5: /home/adml/Research/Hackathon2026/IDETC26-Hackathon-Autodesk-neuralCAD-Edit/output/gpt-5.6-sol-final-full48/gpt-5.6-sol-final_cadquery-script_1787206413.4226987/brep_end/1787206413.4226987/tmp_-Y.png]
+
+View: iso1
+
+[IMAGE 6: /home/adml/Research/Hackathon2026/IDETC26-Hackathon-Autodesk-neuralCAD-Edit/output/gpt-5.6-sol-final-full48/gpt-5.6-sol-final_cadquery-script_1787206413.4226987/brep_end/1787206413.4226987/tmp_iso1.png]
+
+View: iso2
+
+[IMAGE 7: /home/adml/Research/Hackathon2026/IDETC26-Hackathon-Autodesk-neuralCAD-Edit/output/gpt-5.6-sol-final-full48/gpt-5.6-sol-final_cadquery-script_1787206413.4226987/brep_end/1787206413.4226987/tmp_iso2.png]
+
+CadQuery function from last iteration:
+
+def my_cad_function(args):
+    import os
+
+    input_file = os.path.expanduser(args["input_file"])
+    imported = cq.importers.importStep(input_file)
+    solids = list(imported.solids().vals())
+    print(f"Imported {len(solids)} solids")
+
+    for i, solid in enumerate(solids):
+        bb = solid.BoundingBox()
+        print(
+            f"solid {i}: volume={solid.Volume():.6f}, "
+            f"bbox=({bb.xmin:.3f},{bb.ymin:.3f},{bb.zmin:.3f}) to "
+            f"({bb.xmax:.3f},{bb.ymax:.3f},{bb.zmax:.3f})"
+        )
+
+    if len(solids) < 10:
+        raise ValueError("Expected at least 10 solids in the source assembly")
+
+    # Feature-to-solid assignments supplied by the planning model:
+    # 7 = front pull handle, 8 = outer coffee-pot vessel, 9 = inner liner.
+    handle_index = 7
+    pot_indices = (8, 9)
+    handle = solids[handle_index]
+    pots = [solids[i] for i in pot_indices]
+
+    original_handle_volume = handle.Volume()
+    initial_interference = 0.0
+    for pot in pots:
+        try:
+            common = handle.intersect(pot)
+            initial_interference += common.Volume()
+        except Exception as exc:
+            print(f"Initial interference check warning: {exc}")
+    print(f"Initial handle/pot common volume: {initial_interference:.6f} mm^3")
+
+    # Make a small outward clearance envelope around each pot component. Scaling
+    # is performed about each component's bounding-box center and adds about
+    # 0.5 mm at every bounding-box side. This robustly handles the cylindrical
+    # vessel, rim, tabs, and liner without modifying their source geometry.
+    clearance = 0.5
+    clearance_tools = []
+    for pot in pots:
+        bb = pot.BoundingBox()
+        cx = (bb.xmin + bb.xmax) * 0.5
+        cy = (bb.ymin + bb.ymax) * 0.5
+        cz = (bb.zmin + bb.zmax) * 0.5
+        hx = max((bb.xmax - bb.xmin) * 0.5, clearance)
+        hy = max((bb.ymax - bb.ymin) * 0.5, clearance)
+        hz = max((bb.zmax - bb.zmin) * 0.5, clearance)
+        sx = 1.0 + clearance / hx
+        sy = 1.0 + clearance / hy
+        sz = 1.0 + clearance / hz
+        matrix = cq.Matrix([
+            [sx, 0.0, 0.0, cx * (1.0 - sx)],
+            [0.0, sy, 0.0, cy * (1.0 - sy)],
+            [0.0, 0.0, sz, cz * (1.0 - sz)],
+            [0.0, 0.0, 0.0, 1.0],
+        ])
+        try:
+            clearance_tools.append(pot.transformGeometry(matrix))
+        except Exception as exc:
+            print(f"Clearance scaling failed; using exact pot tool: {exc}")
+            clearance_tools.append(pot)
+
+    edited_handle = handle
+    for tool in clearance_tools:
+        try:
+            edited_handle = edited_handle.cut(tool)
+        except Exception as exc:
+            print(f"Clearance cut failed ({exc}); attempting exact-pot cut")
+
+    # Always repeat an exact trim to guarantee removal of positive-volume
+    # penetration even if a clearance-envelope operation was unavailable.
+    for pot in pots:
+        edited_handle = edited_handle.cut(pot)
+
+    try:
+        edited_handle = edited_handle.clean()
+    except Exception as exc:
+        print(f"Handle cleanup warning: {exc}")
+
+    edited_parts = list(edited_handle.Solids())
+    if not edited_parts:
+        raise ValueError("Clearance operation removed the complete handle")
+
+    # Discard only negligible Boolean slivers. Preserve all meaningful handle
+    # pieces if the imported handle was already represented as disconnected
+    # mounting/grip regions.
+    largest_volume = max(s.Volume() for s in edited_parts)
+    edited_parts = [s for s in edited_parts if s.Volume() >= largest_volume * 1.0e-5]
+    edited_handle_shape = (edited_parts[0] if len(edited_parts) == 1
+                           else cq.Compound.makeCompound(edited_parts))
+
+    final_interference = 0.0
+    for pot in pots:
+        try:
+            final_interference += edited_handle_shape.intersect(pot).Volume()
+        except Exception as exc:
+            print(f"Final interference check warning: {exc}")
+
+    print(f"Original handle volume: {original_handle_volume:.6f} mm^3")
+    print(f"Edited handle volume: {edited_handle_shape.Volume():.6f} mm^3")
+    print(f"Final handle/pot common volume: {final_interference:.9f} mm^3")
+    print(f"Applied nominal handle-to-pot clearance: {clearance:.3f} mm")
+
+    # Rebuild the assembly as a compound, replacing only the target handle.
+    # Every non-handle solid retains its original B-rep and transform.
+    output_shapes = []
+    for i, solid in enumerate(solids):
+        if i == handle_index:
+            output_shapes.extend(edited_parts)
+        else:
+            output_shapes.append(solid)
+
+    result = cq.Compound.makeCompound(output_shapes)
+    print(f"Output contains {len(result.Solids())} solids")
+    return result
+
+Program output from last iteration:
+
+stdout: Loading function from: /home/adml/Research/Hackathon2026/IDETC26-Hackathon-Autodesk-neuralCAD-Edit/output/gpt-5.6-sol-final-full48/gpt-5.6-sol-final_cadquery-script_1787206413.4226987/brep_end/1787206413.4226987/temp_script.py
+Imported 20 solids
+solid 0: volume=6519959.271058, bbox=(-101.600,0.000,-127.000) to (101.600,355.600,127.000)
+solid 1: volume=283249.276298, bbox=(-76.200,26.359,-38.100) to (76.200,39.059,127.000)
+solid 2: volume=258216.959341, bbox=(-95.224,356.324,-116.417) to (95.276,362.674,128.703)
+solid 3: volume=52563.291938, bbox=(-82.052,347.488,-109.924) to (83.048,353.838,-1.970)
+solid 4: volume=196.644781, bbox=(-4.582,353.838,-62.936) to (5.578,357.648,-57.856)
+solid 5: volume=45348.634403, bbox=(-82.052,347.488,-109.924) to (83.048,353.838,-1.970)
+solid 6: volume=113222.134096, bbox=(-88.900,342.900,-114.298) to (88.900,347.980,114.300)
+solid 7: volume=119603.946764, bbox=(-66.855,332.756,-121.438) to (53.795,341.646,77.465)
+solid 8: volume=189558.700913, bbox=(-94.446,224.301,-56.050) to (83.354,328.441,83.650)
+solid 9: volume=79857.519090, bbox=(-73.959,234.461,-54.612) to (62.866,310.661,82.213)
+solid 10: volume=1209.814777, bbox=(-60.325,35.884,-34.925) to (60.325,38.424,85.725)
+solid 11: volume=102147.874897, bbox=(-62.230,38.424,-38.100) to (62.230,178.124,87.630)
+solid 12: volume=41068.592502, bbox=(-10.160,48.260,83.820) to (10.160,139.700,121.920)
+solid 13: volume=279030.962673, bbox=(-60.967,178.124,-35.567) to (60.967,203.524,86.367)
+solid 14: volume=22321.929231, bbox=(-12.700,228.600,-95.250) to (12.700,330.200,-69.850)
+solid 15: volume=4349.388061, bbox=(-27.940,2.540,-142.861) to (-10.160,20.320,-117.461)
+solid 16: volume=4349.388061, bbox=(10.160,2.540,-142.861) to (27.940,20.320,-117.461)
+solid 17: volume=295929.466870, bbox=(-127.000,279.400,-152.398) to (127.000,304.800,38.100)
+solid 18: volume=7873.624559, bbox=(-155.591,30.099,-267.474) to (16.043,33.401,-38.100)
+solid 19: volume=1845.824516, bbox=(-169.956,30.480,-290.722) to (-145.158,35.560,-262.980)
+Initial handle/pot common volume: 0.000000 mm^3
+Original handle volume: 119603.946764 mm^3
+Edited handle volume: 119603.946764 mm^3
+Final handle/pot common volume: 0.000000000 mm^3
+Applied nominal handle-to-pot clearance: 0.500 mm
+Output contains 20 solids
+Exported shape to: /home/adml/Research/Hackathon2026/IDETC26-Hackathon-Autodesk-neuralCAD-Edit/output/gpt-5.6-sol-final-full48/gpt-5.6-sol-final_cadquery-script_1787206413.4226987/brep_end/1787206413.4226987/tmp.step
+Exported STL to: /home/adml/Research/Hackathon2026/IDETC26-Hackathon-Autodesk-neuralCAD-Edit/output/gpt-5.6-sol-final-full48/gpt-5.6-sol-final_cadquery-script_1787206413.4226987/brep_end/1787206413.4226987/tmp.stl
+Exported PNG image to: /home/adml/Research/Hackathon2026/IDETC26-Hackathon-Autodesk-neuralCAD-Edit/output/gpt-5.6-sol-final-full48/gpt-5.6-sol-final_cadquery-script_1787206413.4226987/brep_end/1787206413.4226987/tmp.png
+Script completed.
+
+stderr: 
+
+model.json from the planning stage:
+
+{
+  "part": {
+    "id": "3YH2WFSRM22W7DKT_1769783424.5735083",
+    "name": "countertop electric coffee maker assembly",
+    "source_views": [
+      "+Z",
+      "-Z",
+      "-X",
+      "+X",
+      "+Y",
+      "-Y",
+      "iso1"
+    ],
+    "solid_ids": [
+      0,
+      1,
+      2,
+      3,
+      4,
+      5,
+      6,
+      7,
+      8,
+      9,
+      10,
+      11,
+      12,
+      13,
+      14,
+      15,
+      16,
+      17,
+      18,
+      19
+    ],
+    "semantic_orientation": {
+      "confidence": 0.93,
+      "view_sides": {
+        "+X": "right",
+        "-X": "left",
+        "+Y": "front",
+        "-Y": "back",
+        "+Z": "top",
+        "-Z": "bottom"
+      }
+    },
+    "part_functions": [
+      {
+        "name": "coffee preparation",
+        "function": "Encloses a powered brewing mechanism and presents a front-accessible vessel or brewing chamber.",
+        "confidence": 0.78
+      },
+      {
+        "name": "containment and support",
+        "function": "The rounded housing, internal bulkheads, front cradle and base features support and retain the removable brewing components.",
+        "confidence": 0.91
+      },
+      {
+        "name": "electrical power",
+        "function": "The rear cable, strain-relief geometry and two-pin plug provide external mains power.",
+        "confidence": 0.99
+      }
+    ],
+    "sections": [
+      {
+        "id": "SEC-01",
+        "name": "main enclosure",
+        "solid_ids": [
+          0
+        ],
+        "section_functions": [
+          {
+            "name": "protective shell",
+            "function": "Forms the primary rigid enclosure, surrounds the internal mechanism and supports the front and side-mounted sections.",
+            "confidence": 0.98
+          }
+        ],
+        "features": [
+          {
+            "id": "F-01",
+            "name": "rounded outer housing shell",
+            "feature_functions": [
+              {
+                "name": "structural enclosure",
+                "function": "Large extruded shell with planar side walls, rounded upper corners and a curved lower spine; adjacent end faces close the enclosure while side interfaces support the cradle.",
+                "confidence": 0.98
+              }
+            ],
+            "brep_faces": [
+              {
+                "cadquery_face_id": "0",
+                "geometry_type": "CONE",
+                "semantic_role": "Right-side tapered mounting transition.",
+                "feature_assignment_confidence": 0.86
+              },
+              {
+                "cadquery_face_id": "1",
+                "geometry_type": "CYLINDER",
+                "semantic_role": "Right-side cylindrical mounting recess.",
+                "feature_assignment_confidence": 0.9
+              },
+              {
+                "cadquery_face_id": "2",
+                "geometry_type": "CONE",
+                "semantic_role": "Left-side tapered mounting transition.",
+                "feature_assignment_confidence": 0.86
+              },
+              {
+                "cadquery_face_id": "3",
+                "geometry_type": "CYLINDER",
+                "semantic_role": "Left-side cylindrical mounting recess.",
+                "feature_assignment_confidence": 0.9
+              },
+              {
+                "cadquery_face_id": "4",
+                "geometry_type": "CYLINDER",
+                "semantic_role": "Internal cylindrical passage at the enclosure partition.",
+                "feature_assignment_confidence": 0.78
+              },
+              {
+                "cadquery_face_id": "5",
+                "geometry_type": "PLANE",
+                "semantic_role": "Planar internal partition face adjoining the cylindrical passage.",
+                "feature_assignment_confidence": 0.91
+              },
+              {
+                "cadquery_face_id": "6",
+                "geometry_type": "PLANE",
+                "semantic_role": "Narrow left internal wall.",
+                "feature_assignment_confidence": 0.85
+              },
+              {
+                "cadquery_face_id": "7",
+                "geometry_type": "PLANE",
+                "semantic_role": "Left upper ledge adjoining the internal wall.",
+                "feature_assignment_confidence": 0.85
+              },
+              {
+                "cadquery_face_id": "8",
+                "geometry_type": "PLANE",
+                "semantic_role": "Outer left side-wall segment.",
+                "feature_assignment_confidence": 0.96
+              },
+              {
+                "cadquery_face_id": "9",
+                "geometry_type": "BSPLINE",
+                "semantic_role": "Narrow curved lower transition surface.",
+                "feature_assignment_confidence": 0.93
+              },
+              {
+                "cadquery_face_id": "10",
+                "geometry_type": "PLANE",
+                "semantic_role": "Rearward transverse enclosure ledge.",
+                "feature_assignment_confidence": 0.91
+              },
+              {
+                "cadquery_face_id": "11",
+                "geometry_type": "BSPLINE",
+                "semantic_role": "Left portion of the rounded lower shell.",
+                "feature_assignment_confidence": 0.98
+              },
+              {
+                "cadquery_face_id": "14",
+                "geometry_type": "BSPLINE",
+                "semantic_role": "Central seam strip of the rounded lower shell.",
+                "feature_assignment_confidence": 0.92
+              },
+              {
+                "cadquery_face_id": "12",
+                "geometry_type": "BSPLINE",
+                "semantic_role": "Right portion of the rounded lower shell.",
+                "feature_assignment_confidence": 0.98
+              },
+              {
+                "cadquery_face_id": "13",
+                "geometry_type": "BSPLINE",
+                "semantic_role": "Long right lower curved enclosure surface.",
+                "feature_assignment_confidence": 0.98
+              },
+              {
+                "cadquery_face_id": "15",
+                "geometry_type": "PLANE",
+                "semantic_role": "Opposing transverse enclosure ledge.",
+                "feature_assignment_confidence": 0.91
+              },
+              {
+                "cadquery_face_id": "16",
+                "geometry_type": "PLANE",
+                "semantic_role": "Right upper ledge.",
+                "feature_assignment_confidence": 0.86
+              },
+              {
+                "cadquery_face_id": "17",
+                "geometry_type": "PLANE",
+                "semantic_role": "Narrow right internal wall.",
+                "feature_assignment_confidence": 0.86
+              },
+              {
+                "cadquery_face_id": "18",
+                "geometry_type": "PLANE",
+                "semantic_role": "Long left inner side wall.",
+                "feature_assignment_confidence": 0.95
+              },
+              {
+                "cadquery_face_id": "19",
+                "geometry_type": "CYLINDER",
+                "semantic_role": "Left upper longitudinal corner fillet.",
+                "feature_assignment_confidence": 0.98
+              },
+              {
+                "cadquery_face_id": "20",
+                "geometry_type": "PLANE",
+                "semantic_role": "Long upper enclosure panel.",
+                "feature_assignment_confidence": 0.98
+              },
+              {
+                "cadquery_face_id": "21",
+                "geometry_type": "CYLINDER",
+                "semantic_role": "Right upper longitudinal corner fillet.",
+                "feature_assignment_confidence": 0.98
+              },
+              {
+                "cadquery_face_id": "22",
+                "geometry_type": "PLANE",
+                "semantic_role": "Long right inner side wall.",
+                "feature_assignment_confidence": 0.95
+              },
+              {
+                "cadquery_face_id": "23",
+                "geometry_type": "BSPLINE",
+                "semantic_role": "Central lower seam surface.",
+                "feature_assignment_confidence": 0.91
+              },
+              {
+                "cadquery_face_id": "24",
+                "geometry_type": "BSPLINE",
+                "semantic_role": "Long left lower curved enclosure surface.",
+                "feature_assignment_confidence": 0.98
+              },
+              {
+                "cadquery_face_id": "25",
+                "geometry_type": "PLANE",
+                "semantic_role": "Second internal partition face.",
+                "feature_assignment_confidence": 0.92
+              },
+              {
+                "cadquery_face_id": "30",
+                "geometry_type": "CYLINDER",
+                "semantic_role": "Left short upper corner transition.",
+                "feature_assignment_confidence": 0.93
+              },
+              {
+                "cadquery_face_id": "31",
+                "geometry_type": "PLANE",
+                "semantic_role": "Left short side-wall transition.",
+                "feature_assignment_confidence": 0.9
+              },
+              {
+                "cadquery_face_id": "32",
+                "geometry_type": "PLANE",
+                "semantic_role": "Transverse wall between enclosure compartments.",
+                "feature_assignment_confidence": 0.94
+              },
+              {
+                "cadquery_face_id": "28",
+                "geometry_type": "BSPLINE",
+                "semantic_role": "Short curved underside between partitions.",
+                "feature_assignment_confidence": 0.94
+              },
+              {
+                "cadquery_face_id": "27",
+                "geometry_type": "PLANE",
+                "semantic_role": "Right short side-wall transition.",
+                "feature_assignment_confidence": 0.9
+              },
+              {
+                "cadquery_face_id": "26",
+                "geometry_type": "CYLINDER",
+                "semantic_role": "Right short upper corner transition.",
+                "feature_assignment_confidence": 0.93
+              },
+              {
+                "cadquery_face_id": "29",
+                "geometry_type": "PLANE",
+                "semantic_role": "Short upper panel between partitions.",
+                "feature_assignment_confidence": 0.92
+              },
+              {
+                "cadquery_face_id": "33",
+                "geometry_type": "PLANE",
+                "semantic_role": "Left wall of the rectangular upper cavity.",
+                "feature_assignment_confidence": 0.97
+              },
+              {
+                "cadquery_face_id": "34",
+                "geometry_type": "PLANE",
+                "semantic_role": "Front lip of the upper cavity.",
+                "feature_assignment_confidence": 0.95
+              },
+              {
+                "cadquery_face_id": "35",
+                "geometry_type": "PLANE",
+                "semantic_role": "Right wall of the rectangular upper cavity.",
+                "feature_assignment_confidence": 0.97
+              },
+              {
+                "cadquery_face_id": "36",
+                "geometry_type": "PLANE",
+                "semantic_role": "Rear wall of the upper cavity.",
+                "feature_assignment_confidence": 0.97
+              },
+              {
+                "cadquery_face_id": "37",
+                "geometry_type": "PLANE",
+                "semantic_role": "Floor of the upper cavity.",
+                "feature_assignment_confidence": 0.97
+              },
+              {
+                "cadquery_face_id": "38",
+                "geometry_type": "PLANE",
+                "semantic_role": "Rear upper rim panel.",
+                "feature_assignment_confidence": 0.92
+              },
+              {
+                "cadquery_face_id": "39",
+                "geometry_type": "PLANE",
+                "semantic_role": "Front upper rim panel.",
+                "feature_assignment_confidence": 0.92
+              },
+              {
+                "cadquery_face_id": "40",
+                "geometry_type": "PLANE",
+                "semantic_role": "Outer left longitudinal side face.",
+                "feature_assignment_confidence": 0.99
+              },
+              {
+                "cadquery_face_id": "41",
+                "geometry_type": "BSPLINE",
+                "semantic_role": "Primary rounded lower exterior surface.",
+                "feature_assignment_confidence": 0.99
+              },
+              {
+                "cadquery_face_id": "42",
+                "geometry_type": "PLANE",
+                "semantic_role": "Outer right longitudinal side face.",
+                "feature_assignment_confidence": 0.99
+              },
+              {
+                "cadquery_face_id": "43",
+                "geometry_type": "CYLINDER",
+                "semantic_role": "Outer right upper corner radius.",
+                "feature_assignment_confidence": 0.99
+              },
+              {
+                "cadquery_face_id": "20",
+                "geometry_type": "PLANE",
+                "semantic_role": "Outer top span adjoining both corner radii.",
+                "feature_assignment_confidence": 0.99
+              },
+              {
+                "cadquery_face_id": "44",
+                "geometry_type": "CYLINDER",
+                "semantic_role": "Outer left upper corner radius.",
+                "feature_assignment_confidence": 0.99
+              },
+              {
+                "cadquery_face_id": "45",
+                "geometry_type": "PLANE",
+                "semantic_role": "Front end closure and interface face.",
+                "feature_assignment_confidence": 0.98
+              },
+              {
+                "cadquery_face_id": "46",
+                "geometry_type": "PLANE",
+                "semantic_role": "Rear end closure and cable-side interface face.",
+                "feature_assignment_confidence": 0.98
+              }
+            ],
+            "confidence": 0.98
+          }
+        ]
+      },
+      {
+        "id": "SEC-02",
+        "name": "rear service and reservoir assembly",
+        "solid_ids": [
+          1,
+          10,
+          11,
+          12,
+          13
+        ],
+        "section_functions": [
+          {
+            "name": "internal fluid and service support",
+            "function": "A coaxial rear cylindrical assembly, collar and raised channel locate internal brewing or reservoir parts and transfer loads to the main housing.",
+            "confidence": 0.76
+          }
+        ],
+        "features": [
+          {
+            "id": "F-02",
+            "name": "rear rectangular bulkhead",
+            "feature_functions": [
+              {
+                "name": "bulkhead and circular interface",
+                "function": "Closes the rear cavity while its circular opening locates the adjacent coaxial sleeve.",
+                "confidence": 0.9
+              }
+            ],
+            "brep_faces": [
+              {
+                "cadquery_face_id": "47",
+                "geometry_type": "PLANE",
+                "semantic_role": "Annular bulkhead face surrounding the circular opening.",
+                "feature_assignment_confidence": 0.94
+              },
+              {
+                "cadquery_face_id": "48",
+                "geometry_type": "CYLINDER",
+                "semantic_role": "Cylindrical wall of the bulkhead opening.",
+                "feature_assignment_confidence": 0.97
+              },
+              {
+                "cadquery_face_id": "49",
+                "geometry_type": "PLANE",
+                "semantic_role": "Lower edge wall of the bulkhead.",
+                "feature_assignment_confidence": 0.91
+              },
+              {
+                "cadquery_face_id": "50",
+                "geometry_type": "PLANE",
+                "semantic_role": "Left edge wall of the bulkhead.",
+                "feature_assignment_confidence": 0.91
+              },
+              {
+                "cadquery_face_id": "52",
+                "geometry_type": "PLANE",
+                "semantic_role": "Upper edge wall of the bulkhead.",
+                "feature_assignment_confidence": 0.91
+              },
+              {
+                "cadquery_face_id": "51",
+                "geometry_type": "PLANE",
+                "semantic_role": "Right edge wall of the bulkhead.",
+                "feature_assignment_confidence": 0.91
+              },
+              {
+                "cadquery_face_id": "53",
+                "geometry_type": "PLANE",
+                "semantic_role": "Forward bulkhead face with circular cutout.",
+                "feature_assignment_confidence": 0.96
+              },
+              {
+                "cadquery_face_id": "54",
+                "geometry_type": "PLANE",
+                "semantic_role": "Rear bulkhead face.",
+                "feature_assignment_confidence": 0.96
+              }
+            ],
+            "confidence": 0.94
+          },
+          {
+            "id": "F-03",
+            "name": "coaxial rear collar",
+            "feature_functions": [
+              {
+                "name": "radial spacing",
+                "function": "Thin annular collar spaces and retains the long cylindrical chamber concentrically with the bulkhead opening.",
+                "confidence": 0.93
+              }
+            ],
+            "brep_faces": [
+              {
+                "cadquery_face_id": "281",
+                "geometry_type": "CYLINDER",
+                "semantic_role": "Inner cylindrical collar wall.",
+                "feature_assignment_confidence": 0.98
+              },
+              {
+                "cadquery_face_id": "283",
+                "geometry_type": "PLANE",
+                "semantic_role": "Front annular collar face.",
+                "feature_assignment_confidence": 0.98
+              },
+              {
+                "cadquery_face_id": "282",
+                "geometry_type": "CYLINDER",
+                "semantic_role": "Outer cylindrical collar wall.",
+                "feature_assignment_confidence": 0.98
+              },
+              {
+                "cadquery_face_id": "284",
+                "geometry_type": "PLANE",
+                "semantic_role": "Rear annular collar face.",
+                "feature_assignment_confidence": 0.98
+              }
+            ],
+            "confidence": 0.97
+          },
+          {
+            "id": "F-04",
+            "name": "long cylindrical reservoir sleeve",
+            "feature_functions": [
+              {
+                "name": "contain and guide",
+                "function": "Long concentric sleeve forms an internal chamber; stepped openings and local planar cuts provide clearance and indexing.",
+                "confidence": 0.79
+              }
+            ],
+            "brep_faces": [
+              {
+                "cadquery_face_id": "295",
+                "geometry_type": "PLANE",
+                "semantic_role": "Rear annular end face of the sleeve.",
+                "feature_assignment_confidence": 0.96
+              },
+              {
+                "cadquery_face_id": "290",
+                "geometry_type": "CYLINDER",
+                "semantic_role": "Inner cylindrical wall of the long sleeve.",
+                "feature_assignment_confidence": 0.98
+              },
+              {
+                "cadquery_face_id": "285",
+                "geometry_type": "CYLINDER",
+                "semantic_role": "Local cylindrical relief near the forward end.",
+                "feature_assignment_confidence": 0.87
+              },
+              {
+                "cadquery_face_id": "286",
+                "geometry_type": "PLANE",
+                "semantic_role": "Planar end of the cylindrical relief.",
+                "feature_assignment_confidence": 0.85
+              },
+              {
+                "cadquery_face_id": "291",
+                "geometry_type": "PLANE",
+                "semantic_role": "First inclined transition of the local clearance notch.",
+                "feature_assignment_confidence": 0.84
+              },
+              {
+                "cadquery_face_id": "292",
+                "geometry_type": "PLANE",
+                "semantic_role": "Second inclined transition of the local clearance notch.",
+                "feature_assignment_confidence": 0.84
+              },
+              {
+                "cadquery_face_id": "293",
+                "geometry_type": "PLANE",
+                "semantic_role": "Third inclined transition of the local clearance notch.",
+                "feature_assignment_confidence": 0.84
+              },
+              {
+                "cadquery_face_id": "288",
+                "geometry_type": "PLANE",
+                "semantic_role": "Planar shoulder adjoining the forward notch.",
+                "feature_assignment_confidence": 0.86
+              },
+              {
+                "cadquery_face_id": "289",
+                "geometry_type": "CYLINDER",
+                "semantic_role": "Short cylindrical shoulder at the forward opening.",
+                "feature_assignment_confidence": 0.9
+              },
+              {
+                "cadquery_face_id": "287",
+                "geometry_type": "PLANE",
+                "semantic_role": "Forward annular end face with local cutout.",
+                "feature_assignment_confidence": 0.95
+              },
+              {
+                "cadquery_face_id": "294",
+                "geometry_type": "CYLINDER",
+                "semantic_role": "Outer cylindrical wall of the long sleeve.",
+                "feature_assignment_confidence": 0.99
+              }
+            ],
+            "confidence": 0.91
+          },
+          {
+            "id": "F-05",
+            "name": "raised internal channel",
+            "feature_functions": [
+              {
+                "name": "fluid or component guide",
+                "function": "Narrow raised channel bridges the reservoir region and provides a protected path or locating rail between adjacent chamber parts.",
+                "confidence": 0.73
+              }
+            ],
+            "brep_faces": [
+              {
+                "cadquery_face_id": "303",
+                "geometry_type": "PLANE",
+                "semantic_role": "Rear end face of the raised channel.",
+                "feature_assignment_confidence": 0.92
+              },
+              {
+                "cadquery_face_id": "296",
+                "geometry_type": "CYLINDER",
+                "semantic_role": "Rounded rear upper transition of the channel.",
+                "feature_assignment_confidence": 0.94
+              },
+              {
+                "cadquery_face_id": "298",
+                "geometry_type": "PLANE",
+                "semantic_role": "Upper horizontal channel surface.",
+                "feature_assignment_confidence": 0.95
+              },
+              {
+                "cadquery_face_id": "299",
+                "geometry_type": "CYLINDER",
+                "semantic_role": "Rounded front upper transition of the channel.",
+                "feature_assignment_confidence": 0.94
+              },
+              {
+                "cadquery_face_id": "304",
+                "geometry_type": "PLANE",
+                "semantic_role": "Front end face of the raised channel.",
+                "feature_assignment_confidence": 0.92
+              },
+              {
+                "cadquery_face_id": "305",
+                "geometry_type": "PLANE",
+                "semantic_role": "Front lower shelf of the channel.",
+                "feature_assignment_confidence": 0.9
+              },
+              {
+                "cadquery_face_id": "306",
+                "geometry_type": "PLANE",
+                "semantic_role": "Front internal step wall.",
+                "feature_assignment_confidence": 0.9
+              },
+              {
+                "cadquery_face_id": "300",
+                "geometry_type": "PLANE",
+                "semantic_role": "Lower central channel surface.",
+                "feature_assignment_confidence": 0.95
+              },
+              {
+                "cadquery_face_id": "301",
+                "geometry_type": "PLANE",
+                "semantic_role": "Rear internal step wall.",
+                "feature_assignment_confidence": 0.9
+              },
+              {
+                "cadquery_face_id": "302",
+                "geometry_type": "PLANE",
+                "semantic_role": "Rear lower shelf of the channel.",
+                "feature_assignment_confidence": 0.9
+              },
+              {
+                "cadquery_face_id": "297",
+                "geometry_type": "PLANE",
+                "semantic_role": "Left longitudinal channel side.",
+                "feature_assignment_confidence": 0.96
+              },
+              {
+                "cadquery_face_id": "307",
+                "geometry_type": "PLANE",
+                "semantic_role": "Right longitudinal channel side.",
+                "feature_assignment_confidence": 0.96
+              }
+            ],
+            "confidence": 0.91
+          },
+          {
+            "id": "F-06",
+            "name": "front annular chamber flange",
+            "feature_functions": [
+              {
+                "name": "sealed transition",
+                "function": "Stepped cylindrical and toroidal surfaces create a smooth, coaxial interface between the long sleeve and the front chamber.",
+                "confidence": 0.87
+              }
+            ],
+            "brep_faces": [
+              {
+                "cadquery_face_id": "313",
+                "geometry_type": "PLANE",
+                "semantic_role": "Rear annular flange face.",
+                "feature_assignment_confidence": 0.96
+              },
+              {
+                "cadquery_face_id": "312",
+                "geometry_type": "CYLINDER",
+                "semantic_role": "Outer cylindrical flange wall.",
+                "feature_assignment_confidence": 0.98
+              },
+              {
+                "cadquery_face_id": "311",
+                "geometry_type": "TORUS",
+                "semantic_role": "Outer rounded flange lip.",
+                "feature_assignment_confidence": 0.99
+              },
+              {
+                "cadquery_face_id": "310",
+                "geometry_type": "PLANE",
+                "semantic_role": "Front annular flange face.",
+                "feature_assignment_confidence": 0.97
+              },
+              {
+                "cadquery_face_id": "308",
+                "geometry_type": "TORUS",
+                "semantic_role": "Inner rounded transition around the offset opening.",
+                "feature_assignment_confidence": 0.91
+              },
+              {
+                "cadquery_face_id": "309",
+                "geometry_type": "CYLINDER",
+                "semantic_role": "Inner cylindrical flange wall.",
+                "feature_assignment_confidence": 0.93
+              }
+            ],
+            "confidence": 0.95
+          }
+        ]
+      },
+      {
+        "id": "SEC-03",
+        "name": "front fascia and internal support plates",
+        "solid_ids": [
+          2,
+          3,
+          4,
+          5,
+          6
+        ],
+        "section_functions": [
+          {
+            "name": "front closure and reinforcement",
+            "function": "Thin front plates, paired patterned inserts and an inner support plate close the enclosure, align the opening and reinforce the front-accessed mechanism.",
+            "confidence": 0.9
+          }
+        ],
+        "features": [
+          {
+            "id": "F-07",
+            "name": "outer front fascia",
+            "feature_functions": [
+              {
+                "name": "front closure",
+                "function": "Thin shaped panel follows the enclosure profile and provides the visible front boundary and attachment surface.",
+                "confidence": 0.96
+              }
+            ],
+            "brep_faces": [
+              {
+                "cadquery_face_id": "55",
+                "geometry_type": "PLANE",
+                "semantic_role": "Left wall of the upper fascia tab.",
+                "feature_assignment_confidence": 0.9
+              },
+              {
+                "cadquery_face_id": "56",
+                "geometry_type": "PLANE",
+                "semantic_role": "Rear face of the upper fascia tab.",
+                "feature_assignment_confidence": 0.9
+              },
+              {
+                "cadquery_face_id": "57",
+                "geometry_type": "PLANE",
+                "semantic_role": "Right wall of the upper fascia tab.",
+                "feature_assignment_confidence": 0.9
+              },
+              {
+                "cadquery_face_id": "58",
+                "geometry_type": "PLANE",
+                "semantic_role": "Front face of the upper fascia tab.",
+                "feature_assignment_confidence": 0.9
+              },
+              {
+                "cadquery_face_id": "59",
+                "geometry_type": "PLANE",
+                "semantic_role": "Lower face of the upper fascia tab.",
+                "feature_assignment_confidence": 0.88
+              },
+              {
+                "cadquery_face_id": "60",
+                "geometry_type": "PLANE",
+                "semantic_role": "Outer wall of the left lower mounting lug.",
+                "feature_assignment_confidence": 0.9
+              },
+              {
+                "cadquery_face_id": "61",
+                "geometry_type": "PLANE",
+                "semantic_role": "Bottom face of the left lower mounting lug.",
+                "feature_assignment_confidence": 0.9
+              },
+              {
+                "cadquery_face_id": "63",
+                "geometry_type": "CYLINDER",
+                "semantic_role": "Fastener hole through the left mounting lug.",
+                "feature_assignment_confidence": 0.98
+              },
+              {
+                "cadquery_face_id": "67",
+                "geometry_type": "PLANE",
+                "semantic_role": "Inner wall of the left lower mounting lug.",
+                "feature_assignment_confidence": 0.9
+              },
+              {
+                "cadquery_face_id": "75",
+                "geometry_type": "BSPLINE",
+                "semantic_role": "Curved lower bridge between mounting lugs.",
+                "feature_assignment_confidence": 0.9
+              },
+              {
+                "cadquery_face_id": "62",
+                "geometry_type": "PLANE",
+                "semantic_role": "Inner wall of the right lower mounting lug.",
+                "feature_assignment_confidence": 0.9
+              },
+              {
+                "cadquery_face_id": "64",
+                "geometry_type": "CYLINDER",
+                "semantic_role": "Fastener hole through the right mounting lug.",
+                "feature_assignment_confidence": 0.98
+              },
+              {
+                "cadquery_face_id": "65",
+                "geometry_type": "PLANE",
+                "semantic_role": "Bottom face of the right lower mounting lug.",
+                "feature_assignment_confidence": 0.9
+              },
+              {
+                "cadquery_face_id": "66",
+                "geometry_type": "PLANE",
+                "semantic_role": "Outer wall of the right lower mounting lug.",
+                "feature_assignment_confidence": 0.9
+              },
+              {
+                "cadquery_face_id": "68",
+                "geometry_type": "BSPLINE",
+                "semantic_role": "Right curved lower fascia perimeter.",
+                "feature_assignment_confidence": 0.97
+              },
+              {
+                "cadquery_face_id": "69",
+                "geometry_type": "PLANE",
+                "semantic_role": "Right vertical fascia edge.",
+                "feature_assignment_confidence": 0.96
+              },
+              {
+                "cadquery_face_id": "70",
+                "geometry_type": "CYLINDER",
+                "semantic_role": "Right rounded upper fascia corner.",
+                "feature_assignment_confidence": 0.98
+              },
+              {
+                "cadquery_face_id": "71",
+                "geometry_type": "PLANE",
+                "semantic_role": "Upper fascia edge and tab opening boundary.",
+                "feature_assignment_confidence": 0.95
+              },
+              {
+                "cadquery_face_id": "72",
+                "geometry_type": "CYLINDER",
+                "semantic_role": "Left rounded upper fascia corner.",
+                "feature_assignment_confidence": 0.98
+              },
+              {
+                "cadquery_face_id": "73",
+                "geometry_type": "PLANE",
+                "semantic_role": "Left vertical fascia edge.",
+                "feature_assignment_confidence": 0.96
+              },
+              {
+                "cadquery_face_id": "74",
+                "geometry_type": "BSPLINE",
+                "semantic_role": "Left curved lower fascia perimeter.",
+                "feature_assignment_confidence": 0.97
+              },
+              {
+                "cadquery_face_id": "76",
+                "geometry_type": "PLANE",
+                "semantic_role": "Visible front face of the fascia.",
+                "feature_assignment_confidence": 0.99
+              },
+              {
+                "cadquery_face_id": "77",
+                "geometry_type": "PLANE",
+                "semantic_role": "Rear mating face of the fascia.",
+                "feature_assignment_confidence": 0.99
+              }
+            ],
+            "confidence": 0.96
+          },
+          {
+            "id": "F-08",
+            "name": "patterned front reinforcement plate",
+            "feature_functions": [
+              {
+                "name": "reinforcement and vent pattern",
+                "function": "Thin profiled plate follows the lower enclosure contour; repeated rectangular ribs or slots stiffen the panel and provide patterned openings.",
+                "confidence": 0.84
+              }
+            ],
+            "brep_faces": [
+              {
+                "cadquery_face_id": "138",
+                "geometry_type": "PLANE",
+                "semantic_role": "Left upper perimeter segment.",
+                "feature_assignment_confidence": 0.9
+              },
+              {
+                "cadquery_face_id": "139",
+                "geometry_type": "CYLINDER",
+                "semantic_role": "Central shallow cylindrical perimeter segment.",
+                "feature_assignment_confidence": 0.91
+              },
+              {
+                "cadquery_face_id": "140",
+                "geometry_type": "PLANE",
+                "semantic_role": "Right upper perimeter segment.",
+                "feature_assignment_confidence": 0.9
+              },
+              {
+                "cadquery_face_id": "141",
+                "geometry_type": "BSPLINE",
+                "semantic_role": "Curved lower perimeter surface.",
+                "feature_assignment_confidence": 0.97
+              },
+              {
+                "cadquery_face_id": "142",
+                "geometry_type": "PLANE",
+                "semantic_role": "Front plate face containing repeated openings.",
+                "feature_assignment_confidence": 0.98
+              },
+              {
+                "cadquery_face_id": "78",
+                "geometry_type": "PLANE",
+                "semantic_role": "Left wall of central horizontal slot 1.",
+                "feature_assignment_confidence": 0.86
+              },
+              {
+                "cadquery_face_id": "79",
+                "geometry_type": "PLANE",
+                "semantic_role": "Lower wall of central horizontal slot 1.",
+                "feature_assignment_confidence": 0.86
+              },
+              {
+                "cadquery_face_id": "80",
+                "geometry_type": "PLANE",
+                "semantic_role": "Right wall of central horizontal slot 1.",
+                "feature_assignment_confidence": 0.86
+              },
+              {
+                "cadquery_face_id": "81",
+                "geometry_type": "PLANE",
+                "semantic_role": "Upper wall of central horizontal slot 1.",
+                "feature_assignment_confidence": 0.86
+              },
+              {
+                "cadquery_face_id": "82",
+                "geometry_type": "PLANE",
+                "semantic_role": "First wall of left elongated slot 1.",
+                "feature_assignment_confidence": 0.84
+              },
+              {
+                "cadquery_face_id": "83",
+                "geometry_type": "PLANE",
+                "semantic_role": "Second wall of left elongated slot 1.",
+                "feature_assignment_confidence": 0.84
+              },
+              {
+                "cadquery_face_id": "84",
+                "geometry_type": "PLANE",
+                "semantic_role": "Third wall of left elongated slot 1.",
+                "feature_assignment_confidence": 0.84
+              },
+              {
+                "cadquery_face_id": "85",
+                "geometry_type": "PLANE",
+                "semantic_role": "Fourth wall of left elongated slot 1.",
+                "feature_assignment_confidence": 0.84
+              },
+              {
+                "cadquery_face_id": "86",
+                "geometry_type": "PLANE",
+                "semantic_role": "First wall of right short slot 1.",
+                "feature_assignment_confidence": 0.84
+              },
+              {
+                "cadquery_face_id": "87",
+                "geometry_type": "PLANE",
+                "semantic_role": "Second wall of right short slot 1.",
+                "feature_assignment_confidence": 0.84
+              },
+              {
+                "cadquery_face_id": "88",
+                "geometry_type": "PLANE",
+                "semantic_role": "Third wall of right short slot 1.",
+                "feature_assignment_confidence": 0.84
+              },
+              {
+                "cadquery_face_id": "89",
+                "geometry_type": "PLANE",
+                "semantic_role": "Fourth wall of right short slot 1.",
+                "feature_assignment_confidence": 0.84
+              },
+              {
+                "cadquery_face_id": "90",
+                "geometry_type": "PLANE",
+                "semantic_role": "First wall of right elongated slot 1.",
+                "feature_assignment_confidence": 0.84
+              },
+              {
+                "cadquery_face_id": "91",
+                "geometry_type": "PLANE",
+                "semantic_role": "Second wall of right elongated slot 1.",
+                "feature_assignment_confidence": 0.84
+              },
+              {
+                "cadquery_face_id": "92",
+                "geometry_type": "PLANE",
+                "semantic_role": "Third wall of right elongated slot 1.",
+                "feature_assignment_confidence": 0.84
+              },
+              {
+                "cadquery_face_id": "93",
+                "geometry_type": "PLANE",
+                "semantic_role": "Fourth wall of right elongated slot 1.",
+                "feature_assignment_confidence": 0.84
+              },
+              {
+                "cadquery_face_id": "94",
+                "geometry_type": "PLANE",
+                "semantic_role": "First wall of left elongated slot 2.",
+                "feature_assignment_confidence": 0.84
+              },
+              {
+                "cadquery_face_id": "95",
+                "geometry_type": "PLANE",
+                "semantic_role": "Second wall of left elongated slot 2.",
+                "feature_assignment_confidence": 0.84
+              },
+              {
+                "cadquery_face_id": "96",
+                "geometry_type": "PLANE",
+                "semantic_role": "Third wall of left elongated slot 2.",
+                "feature_assignment_confidence": 0.84
+              },
+              {
+                "cadquery_face_id": "97",
+                "geometry_type": "PLANE",
+                "semantic_role": "Fourth wall of left elongated slot 2.",
+                "feature_assignment_confidence": 0.84
+              },
+              {
+                "cadquery_face_id": "98",
+                "geometry_type": "PLANE",
+                "semantic_role": "First wall of right elongated slot 2.",
+                "feature_assignment_confidence": 0.84
+              },
+              {
+                "cadquery_face_id": "99",
+                "geometry_type": "PLANE",
+                "semantic_role": "Second wall of right elongated slot 2.",
+                "feature_assignment_confidence": 0.84
+              },
+              {
+                "cadquery_face_id": "100",
+                "geometry_type": "PLANE",
+                "semantic_role": "Third wall of right elongated slot 2.",
+                "feature_assignment_confidence": 0.84
+              },
+              {
+                "cadquery_face_id": "101",
+                "geometry_type": "PLANE",
+                "semantic_role": "Fourth wall of right elongated slot 2.",
+                "feature_assignment_confidence": 0.84
+              },
+              {
+                "cadquery_face_id": "102",
+                "geometry_type": "PLANE",
+                "semantic_role": "First wall of right elongated slot 3.",
+                "feature_assignment_confidence": 0.84
+              },
+              {
+                "cadquery_face_id": "103",
+                "geometry_type": "PLANE",
+                "semantic_role": "Second wall of right elongated slot 3.",
+                "feature_assignment_confidence": 0.84
+              },
+              {
+                "cadquery_face_id": "104",
+                "geometry_type": "PLANE",
+                "semantic_role": "Third wall of right elongated slot 3.",
+                "feature_assignment_confidence": 0.84
+              },
+              {
+                "cadquery_face_id": "105",
+                "geometry_type": "PLANE",
+                "semantic_role": "Fourth wall of right elongated slot 3.",
+                "feature_assignment_confidence": 0.84
+              },
+              {
+                "cadquery_face_id": "106",
+                "geometry_type": "PLANE",
+                "semantic_role": "First wall of left elongated slot 3.",
+                "feature_assignment_confidence": 0.84
+              },
+              {
+                "cadquery_face_id": "107",
+                "geometry_type": "PLANE",
+                "semantic_role": "Second wall of left elongated slot 3.",
+                "feature_assignment_confidence": 0.84
+              },
+              {
+                "cadquery_face_id": "108",
+                "geometry_type": "PLANE",
+                "semantic_role": "Third wall of left elongated slot 3.",
+                "feature_assignment_confidence": 0.84
+              },
+              {
+                "cadquery_face_id": "109",
+                "geometry_type": "PLANE",
+                "semantic_role": "Fourth wall of left elongated slot 3.",
+                "feature_assignment_confidence": 0.84
+              },
+              {
+                "cadquery_face_id": "110",
+                "geometry_type": "PLANE",
+                "semantic_role": "Left wall of central horizontal slot 2.",
+                "feature_assignment_confidence": 0.86
+              },
+              {
+                "cadquery_face_id": "111",
+                "geometry_type": "PLANE",
+                "semantic_role": "Lower wall of central horizontal slot 2.",
+                "feature_assignment_confidence": 0.86
+              },
+              {
+                "cadquery_face_id": "112",
+                "geometry_type": "PLANE",
+                "semantic_role": "Right wall of central horizontal slot 2.",
+                "feature_assignment_confidence": 0.86
+              },
+              {
+                "cadquery_face_id": "113",
+                "geometry_type": "PLANE",
+                "semantic_role": "Upper wall of central horizontal slot 2.",
+                "feature_assignment_confidence": 0.86
+              },
+              {
+                "cadquery_face_id": "114",
+                "geometry_type": "PLANE",
+                "semantic_role": "Left wall of central horizontal slot 3.",
+                "feature_assignment_confidence": 0.86
+              },
+              {
+                "cadquery_face_id": "115",
+                "geometry_type": "PLANE",
+                "semantic_role": "Lower wall of central horizontal slot 3.",
+                "feature_assignment_confidence": 0.86
+              },
+              {
+                "cadquery_face_id": "116",
+                "geometry_type": "PLANE",
+                "semantic_role": "Right wall of central horizontal slot 3.",
+                "feature_assignment_confidence": 0.86
+              },
+              {
+                "cadquery_face_id": "117",
+                "geometry_type": "PLANE",
+                "semantic_role": "Upper wall of central horizontal slot 3.",
+                "feature_assignment_confidence": 0.86
+              },
+              {
+                "cadquery_face_id": "118",
+                "geometry_type": "PLANE",
+                "semantic_role": "First wall of left elongated slot 4.",
+                "feature_assignment_confidence": 0.84
+              },
+              {
+                "cadquery_face_id": "119",
+                "geometry_type": "PLANE",
+                "semantic_role": "Second wall of left elongated slot 4.",
+                "feature_assignment_confidence": 0.84
+              },
+              {
+                "cadquery_face_id": "120",
+                "geometry_type": "PLANE",
+                "semantic_role": "Third wall of left elongated slot 4.",
+                "feature_assignment_confidence": 0.84
+              },
+              {
+                "cadquery_face_id": "121",
+                "geometry_type": "PLANE",
+                "semantic_role": "Fourth wall of left elongated slot 4.",
+                "feature_assignment_confidence": 0.84
+              },
+              {
+                "cadquery_face_id": "122",
+                "geometry_type": "PLANE",
+                "semantic_role": "First wall of left elongated slot 5.",
+                "feature_assignment_confidence": 0.84
+              },
+              {
+                "cadquery_face_id": "123",
+                "geometry_type": "PLANE",
+                "semantic_role": "Second wall of left elongated slot 5.",
+                "feature_assignment_confidence": 0.84
+              },
+              {
+                "cadquery_face_id": "124",
+                "geometry_type": "PLANE",
+                "semantic_role": "Third wall of left elongated slot 5.",
+                "feature_assignment_confidence": 0.84
+              },
+              {
+                "cadquery_face_id": "125",
+                "geometry_type": "PLANE",
+                "semantic_role": "Fourth wall of left elongated slot 5.",
+                "feature_assignment_confidence": 0.84
+              },
+              {
+                "cadquery_face_id": "126",
+                "geometry_type": "PLANE",
+                "semantic_role": "First wall of right elongated slot 4.",
+                "feature_assignment_confidence": 0.84
+              },
+              {
+                "cadquery_face_id": "127",
+                "geometry_type": "PLANE",
+                "semantic_role": "Second wall of right elongated slot 4.",
+                "feature_assignment_confidence": 0.84
+              },
+              {
+                "cadquery_face_id": "128",
+                "geometry_type": "PLANE",
+                "semantic_role": "Third wall of right elongated slot 4.",
+                "feature_assignment_confidence": 0.84
+              },
+              {
+                "cadquery_face_id": "129",
+                "geometry_type": "PLANE",
+                "semantic_role": "Fourth wall of right elongated slot 4.",
+                "feature_assignment_confidence": 0.84
+              },
+              {
+                "cadquery_face_id": "130",
+                "geometry_type": "PLANE",
+                "semantic_role": "First wall of right elongated slot 5.",
+                "feature_assignment_confidence": 0.84
+              },
+              {
+                "cadquery_face_id": "131",
+                "geometry_type": "PLANE",
+                "semantic_role": "Second wall of right elongated slot 5.",
+                "feature_assignment_confidence": 0.84
+              },
+              {
+                "cadquery_face_id": "132",
+                "geometry_type": "PLANE",
+                "semantic_role": "Third wall of right elongated slot 5.",
+                "feature_assignment_confidence": 0.84
+              },
+              {
+                "cadquery_face_id": "133",
+                "geometry_type": "PLANE",
+                "semantic_role": "Fourth wall of right elongated slot 5.",
+                "feature_assignment_confidence": 0.84
+              },
+              {
+                "cadquery_face_id": "134",
+                "geometry_type": "PLANE",
+                "semantic_role": "First wall of left short slot 2.",
+                "feature_assignment_confidence": 0.84
+              },
+              {
+                "cadquery_face_id": "135",
+                "geometry_type": "PLANE",
+                "semantic_role": "Second wall of left short slot 2.",
+                "feature_assignment_confidence": 0.84
+              },
+              {
+                "cadquery_face_id": "136",
+                "geometry_type": "PLANE",
+                "semantic_role": "Third wall of left short slot 2.",
+                "feature_assignment_confidence": 0.84
+              },
+              {
+                "cadquery_face_id": "137",
+                "geometry_type": "PLANE",
+                "semantic_role": "Fourth wall of left short slot 2.",
+                "feature_assignment_confidence": 0.84
+              },
+              {
+                "cadquery_face_id": "143",
+                "geometry_type": "PLANE",
+                "semantic_role": "Rear plate face containing repeated openings.",
+                "feature_assignment_confidence": 0.98
+              }
+            ],
+            "confidence": 0.9
+          },
+          {
+            "id": "F-09",
+            "name": "front latch block",
+            "feature_functions": [
+              {
+                "name": "retention",
+                "function": "Small rectangular projection engages or spaces the fascia and adjacent patterned plate.",
+                "confidence": 0.77
+              }
+            ],
+            "brep_faces": [
+              {
+                "cadquery_face_id": "149",
+                "geometry_type": "PLANE",
+                "semantic_role": "Rear attachment face of the latch block.",
+                "feature_assignment_confidence": 0.93
+              },
+              {
+                "cadquery_face_id": "144",
+                "geometry_type": "PLANE",
+                "semantic_role": "Right side of the latch block.",
+                "feature_assignment_confidence": 0.95
+              },
+              {
+                "cadquery_face_id": "145",
+                "geometry_type": "PLANE",
+                "semantic_role": "Upper face of the latch block.",
+                "feature_assignment_confidence": 0.95
+              },
+              {
+                "cadquery_face_id": "146",
+                "geometry_type": "PLANE",
+                "semantic_role": "Left side of the latch block.",
+                "feature_assignment_confidence": 0.95
+              },
+              {
+                "cadquery_face_id": "147",
+                "geometry_type": "PLANE",
+                "semantic_role": "Lower face of the latch block.",
+                "feature_assignment_confidence": 0.95
+              },
+              {
+                "cadquery_face_id": "148",
+                "geometry_type": "PLANE",
+                "semantic_role": "Front engagement face of the latch block.",
+                "feature_assignment_confidence": 0.95
+              }
+            ],
+            "confidence": 0.91
+          },
+          {
+            "id": "F-10",
+            "name": "secondary patterned reinforcement plate",
+            "feature_functions": [
+              {
+                "name": "stiffening and nested retention",
+                "function": "A second, nearly coincident profiled plate reinforces the first plate and adds central rectangular and repeated slot geometry.",
+                "confidence": 0.87
+              }
+            ],
+            "brep_faces": [
+              {
+                "cadquery_face_id": "222",
+                "geometry_type": "PLANE",
+                "semantic_role": "Left upper perimeter segment.",
+                "feature_assignment_confidence": 0.9
+              },
+              {
+                "cadquery_face_id": "223",
+                "geometry_type": "CYLINDER",
+                "semantic_role": "Central shallow cylindrical perimeter segment.",
+                "feature_assignment_confidence": 0.91
+              },
+              {
+                "cadquery_face_id": "224",
+                "geometry_type": "PLANE",
+                "semantic_role": "Right upper perimeter segment.",
+                "feature_assignment_confidence": 0.9
+              },
+              {
+                "cadquery_face_id": "225",
+                "geometry_type": "BSPLINE",
+                "semantic_role": "Curved lower perimeter surface.",
+                "feature_assignment_confidence": 0.97
+              },
+              {
+                "cadquery_face_id": "226",
+                "geometry_type": "PLANE",
+                "semantic_role": "Front face containing nineteen opening loops.",
+                "feature_assignment_confidence": 0.98
+              },
+              {
+                "cadquery_face_id": "150",
+                "geometry_type": "PLANE",
+                "semantic_role": "First wall of left elongated opening 1.",
+                "feature_assignment_confidence": 0.84
+              },
+              {
+                "cadquery_face_id": "151",
+                "geometry_type": "PLANE",
+                "semantic_role": "Second wall of left elongated opening 1.",
+                "feature_assignment_confidence": 0.84
+              },
+              {
+                "cadquery_face_id": "152",
+                "geometry_type": "PLANE",
+                "semantic_role": "Third wall of left elongated opening 1.",
+                "feature_assignment_confidence": 0.84
+              },
+              {
+                "cadquery_face_id": "153",
+                "geometry_type": "PLANE",
+                "semantic_role": "Fourth wall of left elongated opening 1.",
+                "feature_assignment_confidence": 0.84
+              },
+              {
+                "cadquery_face_id": "154",
+                "geometry_type": "PLANE",
+                "semantic_role": "First wall of left elongated opening 2.",
+                "feature_assignment_confidence": 0.84
+              },
+              {
+                "cadquery_face_id": "155",
+                "geometry_type": "PLANE",
+                "semantic_role": "Second wall of left elongated opening 2.",
+                "feature_assignment_confidence": 0.84
+              },
+              {
+                "cadquery_face_id": "156",
+                "geometry_type": "PLANE",
+                "semantic_role": "Third wall of left elongated opening 2.",
+                "feature_assignment_confidence": 0.84
+              },
+              {
+                "cadquery_face_id": "157",
+                "geometry_type": "PLANE",
+                "semantic_role": "Fourth wall of left elongated opening 2.",
+                "feature_assignment_confidence": 0.84
+              },
+              {
+                "cadquery_face_id": "158",
+                "geometry_type": "PLANE",
+                "semantic_role": "Lower wall of central rectangular opening.",
+                "feature_assignment_confidence": 0.9
+              },
+              {
+                "cadquery_face_id": "159",
+                "geometry_type": "PLANE",
+                "semantic_role": "Right wall of central rectangular opening.",
+                "feature_assignment_confidence": 0.9
+              },
+              {
+                "cadquery_face_id": "160",
+                "geometry_type": "PLANE",
+                "semantic_role": "Upper wall of central rectangular opening.",
+                "feature_assignment_confidence": 0.9
+              },
+              {
+                "cadquery_face_id": "161",
+                "geometry_type": "PLANE",
+                "semantic_role": "Left wall of central rectangular opening.",
+                "feature_assignment_confidence": 0.9
+              },
+              {
+                "cadquery_face_id": "162",
+                "geometry_type": "PLANE",
+                "semantic_role": "First wall of left elongated opening 3.",
+                "feature_assignment_confidence": 0.84
+              },
+              {
+                "cadquery_face_id": "163",
+                "geometry_type": "PLANE",
+                "semantic_role": "Second wall of left elongated opening 3.",
+                "feature_assignment_confidence": 0.84
+              },
+              {
+                "cadquery_face_id": "164",
+                "geometry_type": "PLANE",
+                "semantic_role": "Third wall of left elongated opening 3.",
+                "feature_assignment_confidence": 0.84
+              },
+              {
+                "cadquery_face_id": "165",
+                "geometry_type": "PLANE",
+                "semantic_role": "Fourth wall of left elongated opening 3.",
+                "feature_assignment_confidence": 0.84
+              },
+              {
+                "cadquery_face_id": "166",
+                "geometry_type": "PLANE",
+                "semantic_role": "Left wall of central horizontal opening 1.",
+                "feature_assignment_confidence": 0.86
+              },
+              {
+                "cadquery_face_id": "167",
+                "geometry_type": "PLANE",
+                "semantic_role": "Lower wall of central horizontal opening 1.",
+                "feature_assignment_confidence": 0.86
+              },
+              {
+                "cadquery_face_id": "168",
+                "geometry_type": "PLANE",
+                "semantic_role": "Right wall of central horizontal opening 1.",
+                "feature_assignment_confidence": 0.86
+              },
+              {
+                "cadquery_face_id": "169",
+                "geometry_type": "PLANE",
+                "semantic_role": "Upper wall of central horizontal opening 1.",
+                "feature_assignment_confidence": 0.86
+              },
+              {
+                "cadquery_face_id": "170",
+                "geometry_type": "PLANE",
+                "semantic_role": "First wall of left short opening.",
+                "feature_assignment_confidence": 0.84
+              },
+              {
+                "cadquery_face_id": "171",
+                "geometry_type": "PLANE",
+                "semantic_role": "Second wall of left short opening.",
+                "feature_assignment_confidence": 0.84
+              },
+              {
+                "cadquery_face_id": "172",
+                "geometry_type": "PLANE",
+                "semantic_role": "Third wall of left short opening.",
+                "feature_assignment_confidence": 0.84
+              },
+              {
+                "cadquery_face_id": "173",
+                "geometry_type": "PLANE",
+                "semantic_role": "Fourth wall of left short opening.",
+                "feature_assignment_confidence": 0.84
+              },
+              {
+                "cadquery_face_id": "174",
+                "geometry_type": "PLANE",
+                "semantic_role": "Left wall of central horizontal opening 2.",
+                "feature_assignment_confidence": 0.86
+              },
+              {
+                "cadquery_face_id": "175",
+                "geometry_type": "PLANE",
+                "semantic_role": "Lower wall of central horizontal opening 2.",
+                "feature_assignment_confidence": 0.86
+              },
+              {
+                "cadquery_face_id": "176",
+                "geometry_type": "PLANE",
+                "semantic_role": "Right wall of central horizontal opening 2.",
+                "feature_assignment_confidence": 0.86
+              },
+              {
+                "cadquery_face_id": "177",
+                "geometry_type": "PLANE",
+                "semantic_role": "Upper wall of central horizontal opening 2.",
+                "feature_assignment_confidence": 0.86
+              },
+              {
+                "cadquery_face_id": "178",
+                "geometry_type": "PLANE",
+                "semantic_role": "First wall of right elongated opening 1.",
+                "feature_assignment_confidence": 0.84
+              },
+              {
+                "cadquery_face_id": "179",
+                "geometry_type": "PLANE",
+                "semantic_role": "Second wall of right elongated opening 1.",
+                "feature_assignment_confidence": 0.84
+              },
+              {
+                "cadquery_face_id": "180",
+                "geometry_type": "PLANE",
+                "semantic_role": "Third wall of right elongated opening 1.",
+                "feature_assignment_confidence": 0.84
+              },
+              {
+                "cadquery_face_id": "181",
+                "geometry_type": "PLANE",
+                "semantic_role": "Fourth wall of right elongated opening 1.",
+                "feature_assignment_confidence": 0.84
+              },
+              {
+                "cadquery_face_id": "182",
+                "geometry_type": "PLANE",
+                "semantic_role": "Left wall of central horizontal opening 3.",
+                "feature_assignment_confidence": 0.86
+              },
+              {
+                "cadquery_face_id": "183",
+                "geometry_type": "PLANE",
+                "semantic_role": "Lower wall of central horizontal opening 3.",
+                "feature_assignment_confidence": 0.86
+              },
+              {
+                "cadquery_face_id": "184",
+                "geometry_type": "PLANE",
+                "semantic_role": "Right wall of central horizontal opening 3.",
+                "feature_assignment_confidence": 0.86
+              },
+              {
+                "cadquery_face_id": "185",
+                "geometry_type": "PLANE",
+                "semantic_role": "Upper wall of central horizontal opening 3.",
+                "feature_assignment_confidence": 0.86
+              },
+              {
+                "cadquery_face_id": "186",
+                "geometry_type": "PLANE",
+                "semantic_role": "First wall of right elongated opening 2.",
+                "feature_assignment_confidence": 0.84
+              },
+              {
+                "cadquery_face_id": "187",
+                "geometry_type": "PLANE",
+                "semantic_role": "Second wall of right elongated opening 2.",
+                "feature_assignment_confidence": 0.84
+              },
+              {
+                "cadquery_face_id": "188",
+                "geometry_type": "PLANE",
+                "semantic_role": "Third wall of right elongated opening 2.",
+                "feature_assignment_confidence": 0.84
+              },
+              {
+                "cadquery_face_id": "189",
+                "geometry_type": "PLANE",
+                "semantic_role": "Fourth wall of right elongated opening 2.",
+                "feature_assignment_confidence": 0.84
+              },
+              {
+                "cadquery_face_id": "190",
+                "geometry_type": "PLANE",
+                "semantic_role": "First wall of left elongated opening 4.",
+                "feature_assignment_confidence": 0.84
+              },
+              {
+                "cadquery_face_id": "191",
+                "geometry_type": "PLANE",
+                "semantic_role": "Second wall of left elongated opening 4.",
+                "feature_assignment_confidence": 0.84
+              },
+              {
+                "cadquery_face_id": "192",
+                "geometry_type": "PLANE",
+                "semantic_role": "Third wall of left elongated opening 4.",
+                "feature_assignment_confidence": 0.84
+              },
+              {
+                "cadquery_face_id": "193",
+                "geometry_type": "PLANE",
+                "semantic_role": "Fourth wall of left elongated opening 4.",
+                "feature_assignment_confidence": 0.84
+              },
+              {
+                "cadquery_face_id": "194",
+                "geometry_type": "PLANE",
+                "semantic_role": "First wall of left elongated opening 5.",
+                "feature_assignment_confidence": 0.84
+              },
+              {
+                "cadquery_face_id": "195",
+                "geometry_type": "PLANE",
+                "semantic_role": "Second wall of left elongated opening 5.",
+                "feature_assignment_confidence": 0.84
+              },
+              {
+                "cadquery_face_id": "196",
+                "geometry_type": "PLANE",
+                "semantic_role": "Third wall of left elongated opening 5.",
+                "feature_assignment_confidence": 0.84
+              },
+              {
+                "cadquery_face_id": "197",
+                "geometry_type": "PLANE",
+                "semantic_role": "Fourth wall of left elongated opening 5.",
+                "feature_assignment_confidence": 0.84
+              },
+              {
+                "cadquery_face_id": "198",
+                "geometry_type": "PLANE",
+                "semantic_role": "First wall of right elongated opening 3.",
+                "feature_assignment_confidence": 0.84
+              },
+              {
+                "cadquery_face_id": "199",
+                "geometry_type": "PLANE",
+                "semantic_role": "Second wall of right elongated opening 3.",
+                "feature_assignment_confidence": 0.84
+              },
+              {
+                "cadquery_face_id": "200",
+                "geometry_type": "PLANE",
+                "semantic_role": "Third wall of right elongated opening 3.",
+                "feature_assignment_confidence": 0.84
+              },
+              {
+                "cadquery_face_id": "201",
+                "geometry_type": "PLANE",
+                "semantic_role": "Fourth wall of right elongated opening 3.",
+                "feature_assignment_confidence": 0.84
+              },
+              {
+                "cadquery_face_id": "202",
+                "geometry_type": "PLANE",
+                "semantic_role": "Left wall of central horizontal opening 4.",
+                "feature_assignment_confidence": 0.86
+              },
+              {
+                "cadquery_face_id": "203",
+                "geometry_type": "PLANE",
+                "semantic_role": "Lower wall of central horizontal opening 4.",
+                "feature_assignment_confidence": 0.86
+              },
+              {
+                "cadquery_face_id": "204",
+                "geometry_type": "PLANE",
+                "semantic_role": "Right wall of central horizontal opening 4.",
+                "feature_assignment_confidence": 0.86
+              },
+              {
+                "cadquery_face_id": "205",
+                "geometry_type": "PLANE",
+                "semantic_role": "Upper wall of central horizontal opening 4.",
+                "feature_assignment_confidence": 0.86
+              },
+              {
+                "cadquery_face_id": "206",
+                "geometry_type": "PLANE",
+                "semantic_role": "Left wall of central horizontal opening 5.",
+                "feature_assignment_confidence": 0.86
+              },
+              {
+                "cadquery_face_id": "207",
+                "geometry_type": "PLANE",
+                "semantic_role": "Lower wall of central horizontal opening 5.",
+                "feature_assignment_confidence": 0.86
+              },
+              {
+                "cadquery_face_id": "208",
+                "geometry_type": "PLANE",
+                "semantic_role": "Right wall of central horizontal opening 5.",
+                "feature_assignment_confidence": 0.86
+              },
+              {
+                "cadquery_face_id": "209",
+                "geometry_type": "PLANE",
+                "semantic_role": "Upper wall of central horizontal opening 5.",
+                "feature_assignment_confidence": 0.86
+              },
+              {
+                "cadquery_face_id": "210",
+                "geometry_type": "PLANE",
+                "semantic_role": "First wall of right short opening.",
+                "feature_assignment_confidence": 0.84
+              },
+              {
+                "cadquery_face_id": "211",
+                "geometry_type": "PLANE",
+                "semantic_role": "Second wall of right short opening.",
+                "feature_assignment_confidence": 0.84
+              },
+              {
+                "cadquery_face_id": "212",
+                "geometry_type": "PLANE",
+                "semantic_role": "Third wall of right short opening.",
+                "feature_assignment_confidence": 0.84
+              },
+              {
+                "cadquery_face_id": "213",
+                "geometry_type": "PLANE",
+                "semantic_role": "Fourth wall of right short opening.",
+                "feature_assignment_confidence": 0.84
+              },
+              {
+                "cadquery_face_id": "214",
+                "geometry_type": "PLANE",
+                "semantic_role": "First wall of right elongated opening 4.",
+                "feature_assignment_confidence": 0.84
+              },
+              {
+                "cadquery_face_id": "215",
+                "geometry_type": "PLANE",
+                "semantic_role": "Second wall of right elongated opening 4.",
+                "feature_assignment_confidence": 0.84
+              },
+              {
+                "cadquery_face_id": "216",
+                "geometry_type": "PLANE",
+                "semantic_role": "Third wall of right elongated opening 4.",
+                "feature_assignment_confidence": 0.84
+              },
+              {
+                "cadquery_face_id": "217",
+                "geometry_type": "PLANE",
+                "semantic_role": "Fourth wall of right elongated opening 4.",
+                "feature_assignment_confidence": 0.84
+              },
+              {
+                "cadquery_face_id": "218",
+                "geometry_type": "PLANE",
+                "semantic_role": "First wall of right elongated opening 5.",
+                "feature_assignment_confidence": 0.84
+              },
+              {
+                "cadquery_face_id": "219",
+                "geometry_type": "PLANE",
+                "semantic_role": "Second wall of right elongated opening 5.",
+                "feature_assignment_confidence": 0.84
+              },
+              {
+                "cadquery_face_id": "220",
+                "geometry_type": "PLANE",
+                "semantic_role": "Third wall of right elongated opening 5.",
+                "feature_assignment_confidence": 0.84
+              },
+              {
+                "cadquery_face_id": "221",
+                "geometry_type": "PLANE",
+                "semantic_role": "Fourth wall of right elongated opening 5.",
+                "feature_assignment_confidence": 0.84
+              },
+              {
+                "cadquery_face_id": "227",
+                "geometry_type": "PLANE",
+                "semantic_role": "Rear face containing nineteen opening loops.",
+                "feature_assignment_confidence": 0.98
+              }
+            ],
+            "confidence": 0.91
+          },
+          {
+            "id": "F-11",
+            "name": "inner front support plate",
+            "feature_functions": [
+              {
+                "name": "load distribution",
+                "function": "Thicker profiled plate nests behind the fascia, supports the internal basket and aligns paired lower tabs symmetrically.",
+                "confidence": 0.92
+              }
+            ],
+            "brep_faces": [
+              {
+                "cadquery_face_id": "228",
+                "geometry_type": "PLANE",
+                "semantic_role": "Inner wall of the left locating tab.",
+                "feature_assignment_confidence": 0.89
+              },
+              {
+                "cadquery_face_id": "229",
+                "geometry_type": "PLANE",
+                "semantic_role": "Forward face of the left locating tab.",
+                "feature_assignment_confidence": 0.89
+              },
+              {
+                "cadquery_face_id": "230",
+                "geometry_type": "PLANE",
+                "semantic_role": "Outer wall of the left locating tab.",
+                "feature_assignment_confidence": 0.89
+              },
+              {
+                "cadquery_face_id": "231",
+                "geometry_type": "PLANE",
+                "semantic_role": "Rear face of the left locating tab.",
+                "feature_assignment_confidence": 0.89
+              },
+              {
+                "cadquery_face_id": "232",
+                "geometry_type": "PLANE",
+                "semantic_role": "Lower face of the left locating tab.",
+                "feature_assignment_confidence": 0.89
+              },
+              {
+                "cadquery_face_id": "234",
+                "geometry_type": "PLANE",
+                "semantic_role": "Inner wall of the right locating tab.",
+                "feature_assignment_confidence": 0.89
+              },
+              {
+                "cadquery_face_id": "233",
+                "geometry_type": "PLANE",
+                "semantic_role": "Forward face of the right locating tab.",
+                "feature_assignment_confidence": 0.89
+              },
+              {
+                "cadquery_face_id": "235",
+                "geometry_type": "PLANE",
+                "semantic_role": "Outer wall of the right locating tab.",
+                "feature_assignment_confidence": 0.89
+              },
+              {
+                "cadquery_face_id": "236",
+                "geometry_type": "PLANE",
+                "semantic_role": "Lower face of the right locating tab.",
+                "feature_assignment_confidence": 0.89
+              },
+              {
+                "cadquery_face_id": "237",
+                "geometry_type": "PLANE",
+                "semantic_role": "Upper bridge surface adjoining both locating tabs.",
+                "feature_assignment_confidence": 0.91
+              },
+              {
+                "cadquery_face_id": "238",
+                "geometry_type": "BSPLINE",
+                "semantic_role": "Inner curved lower support surface.",
+                "feature_assignment_confidence": 0.96
+              },
+              {
+                "cadquery_face_id": "239",
+                "geometry_type": "BSPLINE",
+                "semantic_role": "Central curved seam of the support plate.",
+                "feature_assignment_confidence": 0.87
+              },
+              {
+                "cadquery_face_id": "240",
+                "geometry_type": "BSPLINE",
+                "semantic_role": "Left lower outer curved wall.",
+                "feature_assignment_confidence": 0.96
+              },
+              {
+                "cadquery_face_id": "241",
+                "geometry_type": "BSPLINE",
+                "semantic_role": "Very narrow left transition seam.",
+                "feature_assignment_confidence": 0.76
+              },
+              {
+                "cadquery_face_id": "242",
+                "geometry_type": "PLANE",
+                "semantic_role": "Left vertical support wall.",
+                "feature_assignment_confidence": 0.95
+              },
+              {
+                "cadquery_face_id": "243",
+                "geometry_type": "CYLINDER",
+                "semantic_role": "Left rounded upper corner.",
+                "feature_assignment_confidence": 0.97
+              },
+              {
+                "cadquery_face_id": "244",
+                "geometry_type": "PLANE",
+                "semantic_role": "Left half of the upper support edge.",
+                "feature_assignment_confidence": 0.93
+              },
+              {
+                "cadquery_face_id": "245",
+                "geometry_type": "BSPLINE",
+                "semantic_role": "Minute central upper transition seam.",
+                "feature_assignment_confidence": 0.72
+              },
+              {
+                "cadquery_face_id": "246",
+                "geometry_type": "PLANE",
+                "semantic_role": "Right half of the upper support edge.",
+                "feature_assignment_confidence": 0.93
+              },
+              {
+                "cadquery_face_id": "247",
+                "geometry_type": "CYLINDER",
+                "semantic_role": "Right rounded upper corner.",
+                "feature_assignment_confidence": 0.97
+              },
+              {
+                "cadquery_face_id": "248",
+                "geometry_type": "PLANE",
+                "semantic_role": "Right vertical support wall.",
+                "feature_assignment_confidence": 0.95
+              },
+              {
+                "cadquery_face_id": "249",
+                "geometry_type": "BSPLINE",
+                "semantic_role": "Right lower outer curved wall.",
+                "feature_assignment_confidence": 0.96
+              },
+              {
+                "cadquery_face_id": "250",
+                "geometry_type": "PLANE",
+                "semantic_role": "Front face of the inner support plate.",
+                "feature_assignment_confidence": 0.98
+              },
+              {
+                "cadquery_face_id": "251",
+                "geometry_type": "PLANE",
+                "semantic_role": "Rear face of the inner support plate.",
+                "feature_assignment_confidence": 0.98
+              }
+            ],
+            "confidence": 0.94
+          }
+        ]
+      },
+      {
+        "id": "SEC-04",
+        "name": "front brewing vessel assembly",
+        "solid_ids": [
+          7,
+          8,
+          9,
+          14
+        ],
+        "section_functions": [
+          {
+            "name": "removable brewing vessel",
+            "function": "Nested cylindrical bodies, a front handle and a central lower stem form the removable vessel or basket presented through the front opening.",
+            "confidence": 0.78
+          }
+        ],
+        "features": [
+          {
+            "id": "F-12",
+            "name": "front pull handle",
+            "feature_functions": [
+              {
+                "name": "manual extraction",
+                "function": "A thick front-mounted handle provides a grasping surface and transfers pull loads into the cylindrical vessel.",
+                "confidence": 0.95
+              }
+            ],
+            "brep_faces": [
+              {
+                "cadquery_face_id": "252",
+                "geometry_type": "PLANE",
+                "semantic_role": "Left side wall of the handle.",
+                "feature_assignment_confidence": 0.96
+              },
+              {
+                "cadquery_face_id": "253",
+                "geometry_type": "PLANE",
+                "semantic_role": "Lower handle edge.",
+                "feature_assignment_confidence": 0.93
+              },
+              {
+                "cadquery_face_id": "254",
+                "geometry_type": "CYLINDER",
+                "semantic_role": "Small rounded lower handle transition.",
+                "feature_assignment_confidence": 0.9
+              },
+              {
+                "cadquery_face_id": "255",
+                "geometry_type": "PLANE",
+                "semantic_role": "Right side wall of the handle.",
+                "feature_assignment_confidence": 0.96
+              },
+              {
+                "cadquery_face_id": "256",
+                "geometry_type": "CYLINDER",
+                "semantic_role": "Main rounded grip surface.",
+                "feature_assignment_confidence": 0.98
+              },
+              {
+                "cadquery_face_id": "257",
+                "geometry_type": "PLANE",
+                "semantic_role": "Front face of the handle.",
+                "feature_assignment_confidence": 0.98
+              },
+              {
+                "cadquery_face_id": "258",
+                "geometry_type": "PLANE",
+                "semantic_role": "Rear attachment face of the handle.",
+                "feature_assignment_confidence": 0.98
+              }
+            ],
+            "confidence": 0.96
+          },
+          {
+            "id": "F-13",
+            "name": "outer cylindrical vessel and rim",
+            "feature_functions": [
+              {
+                "name": "containment and seating",
+                "function": "Concentric cylindrical walls form the main vessel body while the rim and paired upper tabs seat it against the support plate.",
+                "confidence": 0.89
+              }
+            ],
+            "brep_faces": [
+              {
+                "cadquery_face_id": "259",
+                "geometry_type": "CYLINDER",
+                "semantic_role": "Short inner neck wall at the rear of the vessel.",
+                "feature_assignment_confidence": 0.88
+              },
+              {
+                "cadquery_face_id": "262",
+                "geometry_type": "PLANE",
+                "semantic_role": "Rear annular shoulder of the vessel.",
+                "feature_assignment_confidence": 0.92
+              },
+              {
+                "cadquery_face_id": "263",
+                "geometry_type": "CYLINDER",
+                "semantic_role": "Short rear outer shoulder.",
+                "feature_assignment_confidence": 0.92
+              },
+              {
+                "cadquery_face_id": "264",
+                "geometry_type": "CYLINDER",
+                "semantic_role": "Main outer cylindrical vessel wall.",
+                "feature_assignment_confidence": 0.99
+              },
+              {
+                "cadquery_face_id": "265",
+                "geometry_type": "PLANE",
+                "semantic_role": "Rear end face of the outer vessel.",
+                "feature_assignment_confidence": 0.95
+              },
+              {
+                "cadquery_face_id": "266",
+                "geometry_type": "PLANE",
+                "semantic_role": "Lower face of the left upper seating tab.",
+                "feature_assignment_confidence": 0.9
+              },
+              {
+                "cadquery_face_id": "267",
+                "geometry_type": "PLANE",
+                "semantic_role": "Outer wall of the left upper seating tab.",
+                "feature_assignment_confidence": 0.9
+              },
+              {
+                "cadquery_face_id": "268",
+                "geometry_type": "PLANE",
+                "semantic_role": "Upper face of the left upper seating tab.",
+                "feature_assignment_confidence": 0.9
+              },
+              {
+                "cadquery_face_id": "269",
+                "geometry_type": "PLANE",
+                "semantic_role": "Rear face of the left upper seating tab.",
+                "feature_assignment_confidence": 0.9
+              },
+              {
+                "cadquery_face_id": "270",
+                "geometry_type": "PLANE",
+                "semantic_role": "Upper face of the right upper seating tab.",
+                "feature_assignment_confidence": 0.9
+              },
+              {
+                "cadquery_face_id": "271",
+                "geometry_type": "PLANE",
+                "semantic_role": "Outer wall of the right upper seating tab.",
+                "feature_assignment_confidence": 0.9
+              },
+              {
+                "cadquery_face_id": "272",
+                "geometry_type": "PLANE",
+                "semantic_role": "Lower face of the right upper seating tab.",
+                "feature_assignment_confidence": 0.9
+              },
+              {
+                "cadquery_face_id": "274",
+                "geometry_type": "PLANE",
+                "semantic_role": "Rear face of the right upper seating tab.",
+                "feature_assignment_confidence": 0.9
+              },
+              {
+                "cadquery_face_id": "273",
+                "geometry_type": "PLANE",
+                "semantic_role": "Front rim face joining the vessel and seating tabs.",
+                "feature_assignment_confidence": 0.96
+              },
+              {
+                "cadquery_face_id": "260",
+                "geometry_type": "CYLINDER",
+                "semantic_role": "Main inner cylindrical vessel wall.",
+                "feature_assignment_confidence": 0.99
+              },
+              {
+                "cadquery_face_id": "261",
+                "geometry_type": "PLANE",
+                "semantic_role": "Inner annular shoulder at the neck.",
+                "feature_assignment_confidence": 0.94
+              }
+            ],
+            "confidence": 0.95
+          },
+          {
+            "id": "F-14",
+            "name": "inner cylindrical liner",
+            "feature_functions": [
+              {
+                "name": "nested containment",
+                "function": "Thin coaxial liner nests inside the outer vessel and provides a separate wetted or filtered chamber.",
+                "confidence": 0.83
+              }
+            ],
+            "brep_faces": [
+              {
+                "cadquery_face_id": "280",
+                "geometry_type": "PLANE",
+                "semantic_role": "Rear annular face of the inner liner.",
+                "feature_assignment_confidence": 0.96
+              },
+              {
+                "cadquery_face_id": "278",
+                "geometry_type": "CYLINDER",
+                "semantic_role": "Outer cylindrical wall of the inner liner.",
+                "feature_assignment_confidence": 0.98
+              },
+              {
+                "cadquery_face_id": "276",
+                "geometry_type": "CYLINDER",
+                "semantic_role": "Inner cylindrical wall of the inner liner.",
+                "feature_assignment_confidence": 0.98
+              },
+              {
+                "cadquery_face_id": "275",
+                "geometry_type": "PLANE",
+                "semantic_role": "Rear inner closure face.",
+                "feature_assignment_confidence": 0.94
+              },
+              {
+                "cadquery_face_id": "277",
+                "geometry_type": "CYLINDER",
+                "semantic_role": "Local cylindrical overlap or cut surface.",
+                "feature_assignment_confidence": 0.82
+              },
+              {
+                "cadquery_face_id": "279",
+                "geometry_type": "PLANE",
+                "semantic_role": "Front annular lip face.",
+                "feature_assignment_confidence": 0.95
+              }
+            ],
+            "confidence": 0.93
+          },
+          {
+            "id": "F-15",
+            "name": "central lower stem",
+            "feature_functions": [
+              {
+                "name": "valve or axial support",
+                "function": "Stepped coaxial stem projects from the vessel, using cylindrical lands and toroidal shoulders for guidance, sealing or spring-loaded valve action.",
+                "confidence": 0.72
+              }
+            ],
+            "brep_faces": [
+              {
+                "cadquery_face_id": "321",
+                "geometry_type": "PLANE",
+                "semantic_role": "Rear circular end of the large stem section.",
+                "feature_assignment_confidence": 0.94
+              },
+              {
+                "cadquery_face_id": "319",
+                "geometry_type": "TORUS",
+                "semantic_role": "Rear rounded shoulder of the large stem section.",
+                "feature_assignment_confidence": 0.98
+              },
+              {
+                "cadquery_face_id": "320",
+                "geometry_type": "CYLINDER",
+                "semantic_role": "Large cylindrical stem body.",
+                "feature_assignment_confidence": 0.99
+              },
+              {
+                "cadquery_face_id": "322",
+                "geometry_type": "TORUS",
+                "semantic_role": "Front rounded shoulder of the large stem section.",
+                "feature_assignment_confidence": 0.98
+              },
+              {
+                "cadquery_face_id": "316",
+                "geometry_type": "PLANE",
+                "semantic_role": "Annular transition face between large and small stem sections.",
+                "feature_assignment_confidence": 0.94
+              },
+              {
+                "cadquery_face_id": "314",
+                "geometry_type": "TORUS",
+                "semantic_role": "Rear rounded transition into the small stem.",
+                "feature_assignment_confidence": 0.98
+              },
+              {
+                "cadquery_face_id": "315",
+                "geometry_type": "CYLINDER",
+                "semantic_role": "Long small-diameter stem section.",
+                "feature_assignment_confidence": 0.99
+              },
+              {
+                "cadquery_face_id": "317",
+                "geometry_type": "TORUS",
+                "semantic_role": "Rounded terminal shoulder.",
+                "feature_assignment_confidence": 0.98
+              },
+              {
+                "cadquery_face_id": "318",
+                "geometry_type": "PLANE",
+                "semantic_role": "Circular terminal face of the stem.",
+                "feature_assignment_confidence": 0.98
+              }
+            ],
+            "confidence": 0.91
+          }
+        ]
+      },
+      {
+        "id": "SEC-05",
+        "name": "symmetric rear mounting feet",
+        "solid_ids": [
+          15,
+          16
+        ],
+        "section_functions": [
+          {
+            "name": "support and isolation",
+            "function": "A symmetric pair of rounded rectangular feet or sockets supports the enclosure and distributes contact loads.",
+            "confidence": 0.86
+          }
+        ],
+        "features": [
+          {
+            "id": "F-16",
+            "name": "left rounded foot",
+            "feature_functions": [
+              {
+                "name": "left support",
+                "function": "Rounded rectangular projection provides a stable contact or locating interface and mirrors the right foot.",
+                "confidence": 0.88
+              }
+            ],
+            "brep_faces": [
+              {
+                "cadquery_face_id": "335",
+                "geometry_type": "PLANE",
+                "semantic_role": "Upper attachment face of the left foot.",
+                "feature_assignment_confidence": 0.94
+              },
+              {
+                "cadquery_face_id": "333",
+                "geometry_type": "CYLINDER",
+                "semantic_role": "Upper-left longitudinal corner of the left foot.",
+                "feature_assignment_confidence": 0.97
+              },
+              {
+                "cadquery_face_id": "334",
+                "geometry_type": "PLANE",
+                "semantic_role": "Upper side wall of the left foot.",
+                "feature_assignment_confidence": 0.95
+              },
+              {
+                "cadquery_face_id": "336",
+                "geometry_type": "CYLINDER",
+                "semantic_role": "Upper-right longitudinal corner of the left foot.",
+                "feature_assignment_confidence": 0.97
+              },
+              {
+                "cadquery_face_id": "337",
+                "geometry_type": "PLANE",
+                "semantic_role": "Right side wall of the left foot.",
+                "feature_assignment_confidence": 0.95
+              },
+              {
+                "cadquery_face_id": "340",
+                "geometry_type": "CYLINDER",
+                "semantic_role": "Lower-right longitudinal corner of the left foot.",
+                "feature_assignment_confidence": 0.97
+              },
+              {
+                "cadquery_face_id": "341",
+                "geometry_type": "PLANE",
+                "semantic_role": "Lower side wall of the left foot.",
+                "feature_assignment_confidence": 0.95
+              },
+              {
+                "cadquery_face_id": "338",
+                "geometry_type": "CYLINDER",
+                "semantic_role": "Lower-left longitudinal corner of the left foot.",
+                "feature_assignment_confidence": 0.97
+              },
+              {
+                "cadquery_face_id": "339",
+                "geometry_type": "PLANE",
+                "semantic_role": "Left side wall of the left foot.",
+                "feature_assignment_confidence": 0.95
+              },
+              {
+                "cadquery_face_id": "325",
+                "geometry_type": "PLANE",
+                "semantic_role": "Intermediate shoulder face of the left foot.",
+                "feature_assignment_confidence": 0.92
+              },
+              {
+                "cadquery_face_id": "323",
+                "geometry_type": "CYLINDER",
+                "semantic_role": "Upper-left corner of the terminal pad.",
+                "feature_assignment_confidence": 0.96
+              },
+              {
+                "cadquery_face_id": "324",
+                "geometry_type": "PLANE",
+                "semantic_role": "Upper wall of the terminal pad.",
+                "feature_assignment_confidence": 0.94
+              },
+              {
+                "cadquery_face_id": "326",
+                "geometry_type": "CYLINDER",
+                "semantic_role": "Upper-right corner of the terminal pad.",
+                "feature_assignment_confidence": 0.96
+              },
+              {
+                "cadquery_face_id": "327",
+                "geometry_type": "PLANE",
+                "semantic_role": "Right wall of the terminal pad.",
+                "feature_assignment_confidence": 0.94
+              },
+              {
+                "cadquery_face_id": "330",
+                "geometry_type": "CYLINDER",
+                "semantic_role": "Lower-right corner of the terminal pad.",
+                "feature_assignment_confidence": 0.96
+              },
+              {
+                "cadquery_face_id": "329",
+                "geometry_type": "PLANE",
+                "semantic_role": "Lower wall of the terminal pad.",
+                "feature_assignment_confidence": 0.94
+              },
+              {
+                "cadquery_face_id": "328",
+                "geometry_type": "CYLINDER",
+                "semantic_role": "Lower-left corner of the terminal pad.",
+                "feature_assignment_confidence": 0.96
+              },
+              {
+                "cadquery_face_id": "331",
+                "geometry_type": "PLANE",
+                "semantic_role": "Left wall of the terminal pad.",
+                "feature_assignment_confidence": 0.94
+              },
+              {
+                "cadquery_face_id": "332",
+                "geometry_type": "PLANE",
+                "semantic_role": "Outer contact face of the left foot.",
+                "feature_assignment_confidence": 0.98
+              }
+            ],
+            "confidence": 0.94
+          },
+          {
+            "id": "F-17",
+            "name": "right rounded foot",
+            "feature_functions": [
+              {
+                "name": "right support",
+                "function": "Rounded rectangular projection provides the second stable contact or locating interface and is symmetric with the left foot.",
+                "confidence": 0.88
+              }
+            ],
+            "brep_faces": [
+              {
+                "cadquery_face_id": "354",
+                "geometry_type": "PLANE",
+                "semantic_role": "Upper attachment face of the right foot.",
+                "feature_assignment_confidence": 0.94
+              },
+              {
+                "cadquery_face_id": "352",
+                "geometry_type": "CYLINDER",
+                "semantic_role": "Lower-left longitudinal corner of the right foot.",
+                "feature_assignment_confidence": 0.97
+              },
+              {
+                "cadquery_face_id": "353",
+                "geometry_type": "PLANE",
+                "semantic_role": "Left side wall of the right foot.",
+                "feature_assignment_confidence": 0.95
+              },
+              {
+                "cadquery_face_id": "358",
+                "geometry_type": "CYLINDER",
+                "semantic_role": "Upper-left longitudinal corner of the right foot.",
+                "feature_assignment_confidence": 0.97
+              },
+              {
+                "cadquery_face_id": "359",
+                "geometry_type": "PLANE",
+                "semantic_role": "Upper side wall of the right foot.",
+                "feature_assignment_confidence": 0.95
+              },
+              {
+                "cadquery_face_id": "357",
+                "geometry_type": "CYLINDER",
+                "semantic_role": "Upper-right longitudinal corner of the right foot.",
+                "feature_assignment_confidence": 0.97
+              },
+              {
+                "cadquery_face_id": "356",
+                "geometry_type": "PLANE",
+                "semantic_role": "Right side wall of the right foot.",
+                "feature_assignment_confidence": 0.95
+              },
+              {
+                "cadquery_face_id": "355",
+                "geometry_type": "CYLINDER",
+                "semantic_role": "Lower-right longitudinal corner of the right foot.",
+                "feature_assignment_confidence": 0.97
+              },
+              {
+                "cadquery_face_id": "360",
+                "geometry_type": "PLANE",
+                "semantic_role": "Lower side wall of the right foot.",
+                "feature_assignment_confidence": 0.95
+              },
+              {
+                "cadquery_face_id": "343",
+                "geometry_type": "PLANE",
+                "semantic_role": "Intermediate shoulder face of the right foot.",
+                "feature_assignment_confidence": 0.92
+              },
+              {
+                "cadquery_face_id": "342",
+                "geometry_type": "CYLINDER",
+                "semantic_role": "Lower-left corner of the terminal pad.",
+                "feature_assignment_confidence": 0.96
+              },
+              {
+                "cadquery_face_id": "344",
+                "geometry_type": "PLANE",
+                "semantic_role": "Lower wall of the terminal pad.",
+                "feature_assignment_confidence": 0.94
+              },
+              {
+                "cadquery_face_id": "345",
+                "geometry_type": "CYLINDER",
+                "semantic_role": "Lower-right corner of the terminal pad.",
+                "feature_assignment_confidence": 0.96
+              },
+              {
+                "cadquery_face_id": "350",
+                "geometry_type": "PLANE",
+                "semantic_role": "Right wall of the terminal pad.",
+                "feature_assignment_confidence": 0.94
+              },
+              {
+                "cadquery_face_id": "346",
+                "geometry_type": "CYLINDER",
+                "semantic_role": "Upper-right corner of the terminal pad.",
+                "feature_assignment_confidence": 0.96
+              },
+              {
+                "cadquery_face_id": "347",
+                "geometry_type": "PLANE",
+                "semantic_role": "Upper wall of the terminal pad.",
+                "feature_assignment_confidence": 0.94
+              },
+              {
+                "cadquery_face_id": "348",
+                "geometry_type": "CYLINDER",
+                "semantic_role": "Upper-left corner of the terminal pad.",
+                "feature_assignment_confidence": 0.96
+              },
+              {
+                "cadquery_face_id": "349",
+                "geometry_type": "PLANE",
+                "semantic_role": "Left wall of the terminal pad.",
+                "feature_assignment_confidence": 0.94
+              },
+              {
+                "cadquery_face_id": "351",
+                "geometry_type": "PLANE",
+                "semantic_role": "Outer contact face of the right foot.",
+                "feature_assignment_confidence": 0.98
+              }
+            ],
+            "confidence": 0.94
+          }
+        ]
+      },
+      {
+        "id": "SEC-06",
+        "name": "external cradle",
+        "solid_ids": [
+          17
+        ],
+        "section_functions": [
+          {
+            "name": "support and retention",
+            "function": "The U-shaped external cradle wraps around the rounded housing, supports it from below and attaches through symmetric side pivots.",
+            "confidence": 0.97
+          }
+        ],
+        "features": [
+          {
+            "id": "F-18",
+            "name": "U-shaped side cradle",
+            "feature_functions": [
+              {
+                "name": "housing support",
+                "function": "Curved inner and outer surfaces follow the enclosure profile; paired side bosses are symmetric and coaxial with the enclosure mounting recesses.",
+                "confidence": 0.98
+              }
+            ],
+            "brep_faces": [
+              {
+                "cadquery_face_id": "361",
+                "geometry_type": "CYLINDER",
+                "semantic_role": "Right cylindrical pivot boss.",
+                "feature_assignment_confidence": 0.99
+              },
+              {
+                "cadquery_face_id": "363",
+                "geometry_type": "PLANE",
+                "semantic_role": "Outer right boss side face.",
+                "feature_assignment_confidence": 0.96
+              },
+              {
+                "cadquery_face_id": "367",
+                "geometry_type": "PLANE",
+                "semantic_role": "Upper face of the right boss.",
+                "feature_assignment_confidence": 0.95
+              },
+              {
+                "cadquery_face_id": "364",
+                "geometry_type": "PLANE",
+                "semantic_role": "Inner right boss side face.",
+                "feature_assignment_confidence": 0.96
+              },
+              {
+                "cadquery_face_id": "366",
+                "geometry_type": "BSPLINE",
+                "semantic_role": "Inner curved cradle surface contacting the enclosure.",
+                "feature_assignment_confidence": 0.99
+              },
+              {
+                "cadquery_face_id": "372",
+                "geometry_type": "PLANE",
+                "semantic_role": "Inner left boss side face.",
+                "feature_assignment_confidence": 0.96
+              },
+              {
+                "cadquery_face_id": "369",
+                "geometry_type": "PLANE",
+                "semantic_role": "Upper face of the left boss.",
+                "feature_assignment_confidence": 0.95
+              },
+              {
+                "cadquery_face_id": "371",
+                "geometry_type": "PLANE",
+                "semantic_role": "Outer left boss side face.",
+                "feature_assignment_confidence": 0.96
+              },
+              {
+                "cadquery_face_id": "362",
+                "geometry_type": "CYLINDER",
+                "semantic_role": "Left cylindrical pivot boss.",
+                "feature_assignment_confidence": 0.99
+              },
+              {
+                "cadquery_face_id": "365",
+                "geometry_type": "BSPLINE",
+                "semantic_role": "Outer curved surface of the U-shaped cradle.",
+                "feature_assignment_confidence": 0.99
+              },
+              {
+                "cadquery_face_id": "368",
+                "geometry_type": "PLANE",
+                "semantic_role": "Front transverse face of the cradle.",
+                "feature_assignment_confidence": 0.98
+              },
+              {
+                "cadquery_face_id": "370",
+                "geometry_type": "PLANE",
+                "semantic_role": "Rear transverse face of the cradle.",
+                "feature_assignment_confidence": 0.98
+              }
+            ],
+            "confidence": 0.99
+          }
+        ]
+      },
+      {
+        "id": "SEC-07",
+        "name": "power connection",
+        "solid_ids": [
+          18,
+          19
+        ],
+        "section_functions": [
+          {
+            "name": "mains power delivery",
+            "function": "A flexible insulated cable exits the rear enclosure and terminates in a molded two-pin plug.",
+            "confidence": 0.99
+          }
+        ],
+        "features": [
+          {
+            "id": "F-19",
+            "name": "flexible power cable and strain relief",
+            "feature_functions": [
+              {
+                "name": "electrical connection",
+                "function": "Swept curved body routes conductors away from the housing; the rectangular rear section and small cylindrical transitions act as strain relief.",
+                "confidence": 0.99
+              }
+            ],
+            "brep_faces": [
+              {
+                "cadquery_face_id": "393",
+                "geometry_type": "PLANE",
+                "semantic_role": "Cable-entry end face at the appliance.",
+                "feature_assignment_confidence": 0.96
+              },
+              {
+                "cadquery_face_id": "386",
+                "geometry_type": "PLANE",
+                "semantic_role": "Right wall of the rectangular strain-relief section.",
+                "feature_assignment_confidence": 0.94
+              },
+              {
+                "cadquery_face_id": "388",
+                "geometry_type": "CYLINDER",
+                "semantic_role": "Upper rounded edge of the strain-relief section.",
+                "feature_assignment_confidence": 0.93
+              },
+              {
+                "cadquery_face_id": "387",
+                "geometry_type": "PLANE",
+                "semantic_role": "Upper broad face of the cable and strain relief.",
+                "feature_assignment_confidence": 0.9
+              },
+              {
+                "cadquery_face_id": "373",
+                "geometry_type": "BSPLINE",
+                "semantic_role": "Upper transition from strain relief into the flexible cable.",
+                "feature_assignment_confidence": 0.9
+              },
+              {
+                "cadquery_face_id": "375",
+                "geometry_type": "PLANE",
+                "semantic_role": "Short planar transition flank.",
+                "feature_assignment_confidence": 0.83
+              },
+              {
+                "cadquery_face_id": "376",
+                "geometry_type": "BSPLINE",
+                "semantic_role": "First outer swept cable surface.",
+                "feature_assignment_confidence": 0.98
+              },
+              {
+                "cadquery_face_id": "377",
+                "geometry_type": "BSPLINE",
+                "semantic_role": "Lower narrow swept cable surface.",
+                "feature_assignment_confidence": 0.96
+              },
+              {
+                "cadquery_face_id": "384",
+                "geometry_type": "PLANE",
+                "semantic_role": "Angled cable-end transition face near the plug.",
+                "feature_assignment_confidence": 0.88
+              },
+              {
+                "cadquery_face_id": "378",
+                "geometry_type": "BSPLINE",
+                "semantic_role": "Opposing outer swept cable surface.",
+                "feature_assignment_confidence": 0.98
+              },
+              {
+                "cadquery_face_id": "379",
+                "geometry_type": "BSPLINE",
+                "semantic_role": "Upper narrow swept cable surface.",
+                "feature_assignment_confidence": 0.96
+              },
+              {
+                "cadquery_face_id": "380",
+                "geometry_type": "BSPLINE",
+                "semantic_role": "First swept surface of the cable near the appliance.",
+                "feature_assignment_confidence": 0.97
+              },
+              {
+                "cadquery_face_id": "381",
+                "geometry_type": "BSPLINE",
+                "semantic_role": "Lower narrow surface of the near-appliance cable segment.",
+                "feature_assignment_confidence": 0.95
+              },
+              {
+                "cadquery_face_id": "382",
+                "geometry_type": "BSPLINE",
+                "semantic_role": "Opposing swept surface of the near-appliance cable segment.",
+                "feature_assignment_confidence": 0.97
+              },
+              {
+                "cadquery_face_id": "383",
+                "geometry_type": "BSPLINE",
+                "semantic_role": "Upper narrow surface of the near-appliance cable segment.",
+                "feature_assignment_confidence": 0.95
+              },
+              {
+                "cadquery_face_id": "374",
+                "geometry_type": "BSPLINE",
+                "semantic_role": "Lower transition from strain relief into the flexible cable.",
+                "feature_assignment_confidence": 0.9
+              },
+              {
+                "cadquery_face_id": "385",
+                "geometry_type": "PLANE",
+                "semantic_role": "Lower broad face of the cable and strain relief.",
+                "feature_assignment_confidence": 0.9
+              },
+              {
+                "cadquery_face_id": "390",
+                "geometry_type": "PLANE",
+                "semantic_role": "Left wall of the rectangular strain-relief section.",
+                "feature_assignment_confidence": 0.94
+              },
+              {
+                "cadquery_face_id": "392",
+                "geometry_type": "CYLINDER",
+                "semantic_role": "Lower rounded edge of the strain-relief section.",
+                "feature_assignment_confidence": 0.93
+              },
+              {
+                "cadquery_face_id": "391",
+                "geometry_type": "PLANE",
+                "semantic_role": "Lower auxiliary face along the strain-relief and cable path.",
+                "feature_assignment_confidence": 0.88
+              },
+              {
+                "cadquery_face_id": "389",
+                "geometry_type": "PLANE",
+                "semantic_role": "Upper auxiliary face along the strain-relief and cable path.",
+                "feature_assignment_confidence": 0.88
+              }
+            ],
+            "confidence": 0.97
+          },
+          {
+            "id": "F-20",
+            "name": "molded two-pin plug",
+            "feature_functions": [
+              {
+                "name": "mains interface",
+                "function": "Molded plug body retains two parallel conductive pins and provides insulated gripping and cable-termination surfaces.",
+                "confidence": 0.99
+              }
+            ],
+            "brep_faces": [
+              {
+                "cadquery_face_id": "404",
+                "geometry_type": "PLANE",
+                "semantic_role": "Lower broad face of the molded plug body.",
+                "feature_assignment_confidence": 0.97
+              },
+              {
+                "cadquery_face_id": "405",
+                "geometry_type": "PLANE",
+                "semantic_role": "Cable-side end wall of the plug body.",
+                "feature_assignment_confidence": 0.96
+              },
+              {
+                "cadquery_face_id": "406",
+                "geometry_type": "PLANE",
+                "semantic_role": "First bevel adjoining the cable-side wall.",
+                "feature_assignment_confidence": 0.94
+              },
+              {
+                "cadquery_face_id": "407",
+                "geometry_type": "BSPLINE",
+                "semantic_role": "First molded curved transition on the plug body.",
+                "feature_assignment_confidence": 0.93
+              },
+              {
+                "cadquery_face_id": "408",
+                "geometry_type": "PLANE",
+                "semantic_role": "Intermediate angled plug-body face.",
+                "feature_assignment_confidence": 0.93
+              },
+              {
+                "cadquery_face_id": "409",
+                "geometry_type": "BSPLINE",
+                "semantic_role": "Second molded curved transition on the plug body.",
+                "feature_assignment_confidence": 0.93
+              },
+              {
+                "cadquery_face_id": "410",
+                "geometry_type": "PLANE",
+                "semantic_role": "Cable-entry shoulder of the plug body.",
+                "feature_assignment_confidence": 0.95
+              },
+              {
+                "cadquery_face_id": "411",
+                "geometry_type": "PLANE",
+                "semantic_role": "Outer sloped gripping wall of the plug body.",
+                "feature_assignment_confidence": 0.96
+              },
+              {
+                "cadquery_face_id": "412",
+                "geometry_type": "PLANE",
+                "semantic_role": "Pin-side face of the plug body with two openings.",
+                "feature_assignment_confidence": 0.99
+              },
+              {
+                "cadquery_face_id": "413",
+                "geometry_type": "PLANE",
+                "semantic_role": "Upper broad face of the molded plug body.",
+                "feature_assignment_confidence": 0.97
+              },
+              {
+                "cadquery_face_id": "394",
+                "geometry_type": "PLANE",
+                "semantic_role": "Lower face of plug pin 1.",
+                "feature_assignment_confidence": 0.99
+              },
+              {
+                "cadquery_face_id": "395",
+                "geometry_type": "PLANE",
+                "semantic_role": "First side face of plug pin 1.",
+                "feature_assignment_confidence": 0.99
+              },
+              {
+                "cadquery_face_id": "396",
+                "geometry_type": "PLANE",
+                "semantic_role": "Upper face of plug pin 1.",
+                "feature_assignment_confidence": 0.99
+              },
+              {
+                "cadquery_face_id": "397",
+                "geometry_type": "PLANE",
+                "semantic_role": "Second side face of plug pin 1.",
+                "feature_assignment_confidence": 0.99
+              },
+              {
+                "cadquery_face_id": "398",
+                "geometry_type": "PLANE",
+                "semantic_role": "Terminal face of plug pin 1.",
+                "feature_assignment_confidence": 0.99
+              },
+              {
+                "cadquery_face_id": "399",
+                "geometry_type": "PLANE",
+                "semantic_role": "First side face of plug pin 2.",
+                "feature_assignment_confidence": 0.99
+              },
+              {
+                "cadquery_face_id": "400",
+                "geometry_type": "PLANE",
+                "semantic_role": "Upper face of plug pin 2.",
+                "feature_assignment_confidence": 0.99
+              },
+              {
+                "cadquery_face_id": "401",
+                "geometry_type": "PLANE",
+                "semantic_role": "Second side face of plug pin 2.",
+                "feature_assignment_confidence": 0.99
+              },
+              {
+                "cadquery_face_id": "402",
+                "geometry_type": "PLANE",
+                "semantic_role": "Lower face of plug pin 2.",
+                "feature_assignment_confidence": 0.99
+              },
+              {
+                "cadquery_face_id": "403",
+                "geometry_type": "PLANE",
+                "semantic_role": "Terminal face of plug pin 2.",
+                "feature_assignment_confidence": 0.99
+              }
+            ],
+            "confidence": 0.99
+          }
+        ]
+      }
+    ]
+  }
+}
+
+aim.json (desired final state). Check the last-iteration images, CadQuery function, and program output against this:
+
+{
+  "request": {
+    "request_id": "req_001",
+    "raw_text": "Remove the collision between handle and cofeepot.",
+    "word_categories": {
+      "action_words": [
+        "Remove"
+      ],
+      "reference_geometry_words": [
+        "handle",
+        "cofeepot"
+      ],
+      "intention_words": [
+        "collision",
+        "between"
+      ],
+      "grammatical_words": [
+        "the",
+        "and"
+      ]
+    }
+  },
+  "aim": {
+    "areas_to_change": [
+      {
+        "action": "Eliminate geometric interference by repositioning or locally reshaping the handle to provide clearance.",
+        "reference_geometry": "The black handle and the coffee-pot body.",
+        "location": "At the portions of the handle that overlap or penetrate the coffee-pot body, visible near the pot within the enclosure.",
+        "description": "Modify the handle-to-pot interface so the handle remains associated with the coffee pot but does not occupy the same solid volume. Maintain a practical clearance and retain intentional attachment regions.",
+        "confidence": 0.84
+      }
+    ],
+    "areas_to_preserve": [
+      {
+        "reference_geometry": "Coffee-pot body",
+        "preservation_rule": "Preserve the pot's overall profile, capacity, opening, lid region, and placement within the surrounding enclosure unless a minor local relief is required."
+      },
+      {
+        "reference_geometry": "Handle",
+        "preservation_rule": "Preserve the recognizable grip shape, usable grasping space, and intentional mounting connection to the coffee pot while removing only unintended interference."
+      },
+      {
+        "reference_geometry": "Outer appliance enclosure and support structure",
+        "preservation_rule": "Keep the housing, side walls, external support or carrying bracket, and their current placement unchanged."
+      },
+      {
+        "reference_geometry": "Electrical cord, plug, feet, and other accessories",
+        "preservation_rule": "Preserve their geometry, routing, and assembly positions."
+      }
+    ],
+    "predicted_final_outcome": {
+      "geometry": "The handle and coffee-pot body will be separated by a small nonzero clearance everywhere except at deliberate attachment or mounting interfaces.",
+      "function": "The coffee pot will retain a usable handle for gripping and removal without interference from the pot body.",
+      "behavior": "The handle will no longer penetrate or collide with the coffee pot during static assembly or intended handling, while remaining securely connected."
+    },
+    "ambiguities": [
+      {
+        "description": "The model contains more than one black handle-like or bracket-like feature, so the referenced handle is not uniquely identified from the wording alone.",
+        "candidate_interpretations": [
+          "The handle attached directly to the coffee pot inside the enclosure.",
+          "The large external U-shaped carrying handle or support surrounding the appliance."
+        ]
+      },
+      {
+        "description": "The request does not prescribe which component should be edited or the required clearance.",
+        "candidate_interpretations": [
+          "Move or offset the handle away from the coffee-pot surface.",
+          "Reshape the handle locally while retaining its mounts.",
+          "Add a local recess to the coffee-pot body.",
+          "Apply coordinated minor changes to both components with a practical manufacturing clearance."
+        ]
+      }
+    ]
+  }
+}
+
+
+The multiview images generated from the code sent in your last response are attached, followed by the CadQuery function and program output from the last iteration. First, judge whether the current model satisfies the desired final state described in aim.json. Four perspectives should be considered: (1) Geometric consistency: Verify the model matches the predicted geometric outcome and comply with the constraints if any. (2) Functional alignment: Verify that the model can perform intended functions as described in aim.json. (3) Behavioral correctness: Assess whether the model can behave as expected based on the intended behavior described in aim.json. (4) Preservation of geometry: Ensure the model preserves the geometries that are identified as area to preserve in aim.json. Considering the flexible nature of design, do not be too strict on those validations, make sensible judgements.
+
+If all four perspectives are satisfied, report the operation is finished in your response.
+
+If not, analyse errors and update the code accordingly. You would have access to the last iteration's results and the original CAD geometries stored in model.json. Use them to help you identify the errors and update the code accordingly.
+
+Once you have generated the new function, it will be executed in CadQuery on the original CAD model. You will then be provided with the latest rendering of the CAD model created by your function, and any prints, debug or error messages. You will then have the opportunity to refine your function based on this feedback, and it will be re-executed.
+
+Continue this process until the task is complete, or you reach the maximum number of iterations. If the task involves editing an existing model, the path to that model's .step file is passed to your function as args["input_file"], and is also listed as brep_start_path_step in the task information. Load it from args["input_file"] rather than hard-coding a path.
+
+        Return a json object with two fields. Do not include any other text outside of the json object in your response:
+        'complete': true if the task has been completed. IMPORTANT: This should only be judged by looking at the output from the last iteration, not whether a function has been returned this iteration. If there is no valid output that corresponds to the instruction, the task is not complete. The first iteration can never be complete. If this is true, then the current function will NOT be executed, and the function from the last iteration will be used.
+        'my_cad_function': CadQuery python function as a string. Use the same definition and arguments as the example..
+        
+
+Instruction:
+
+Edit the existing model according to the provided instructions.
+
+Task information:
+
+request_text:
+
+Remove the collision between handle and cofeepot.
+
+brep_start_path_step:
+
+/home/adml/Research/Hackathon2026/IDETC26-Hackathon-Autodesk-neuralCAD-Edit/data/edit_192_external/breps/3YH2WFSRM22W7DKT_1769783424.5735083.step
+
+Iterations remaining: 9

@@ -1,0 +1,159 @@
+def my_cad_function(args):
+    import os
+    import math
+
+    input_file = os.path.expanduser(args["input_file"])
+    imported = cq.importers.importStep(input_file)
+    root = imported.val() if hasattr(imported, "val") else imported
+    solids = list(root.Solids())
+    faces = list(root.Faces())
+
+    print("Imported solids:", len(solids), "faces:", len(faces))
+    if len(solids) < 11:
+        raise ValueError("Expected the original 12-solid scissor assembly")
+
+    # Solid and face references are taken from the supplied B-rep analysis.
+    # Each tuple is: arm solid index, three cylindrical bore-face indices.
+    arm_specs = [
+        (0, (26, 25, 27), "front descending"),
+        (2, (157, 155, 156), "front ascending"),
+        (9, (185, 184, 186), "rear descending"),
+        (10, (215, 213, 214), "rear ascending"),
+    ]
+
+    def cylinder_radius(face):
+        try:
+            return float(face._geomAdaptor().Cylinder().Radius())
+        except Exception:
+            try:
+                return float(face.radius())
+            except Exception:
+                return None
+
+    def face_axis_center(face):
+        # The center of each complete bore wall lies on its cylindrical axis.
+        c = face.Center()
+        return (float(c.x), float(c.y), float(c.z))
+
+    def circular_edge_data(solid):
+        data = []
+        for edge in solid.Edges():
+            try:
+                if edge.geomType() != "CIRCLE":
+                    continue
+                c = edge.Center()
+                r = float(edge.radius())
+                data.append((float(c.x), float(c.y), float(c.z), r))
+            except Exception:
+                pass
+        return data
+
+    def terminal_outer_radius(solid, terminal_centers, hole_radii):
+        circles = circular_edge_data(solid)
+        candidates = []
+        for (cx, cy, _cz), hr in zip(terminal_centers, hole_radii):
+            local = []
+            for ex, ey, ez, er in circles:
+                if math.hypot(ex - cx, ey - cy) < 1.0e-3 and er > hr + 0.05:
+                    local.append(er)
+            if local:
+                candidates.append(max(local))
+
+        if candidates:
+            return max(candidates)
+
+        # Conservative fallback if edge topology differs after STEP import.
+        # This preserves a useful radial ligament around the enlarged bore.
+        return max(hole_radii) + max(3.0, 0.45 * max(hole_radii))
+
+    def make_capsule_arm(old_solid, bore_face_ids, name):
+        bore_faces = [faces[i] for i in bore_face_ids]
+        centers = [face_axis_center(f) for f in bore_faces]
+        old_hole_radii = [cylinder_radius(f) for f in bore_faces]
+        if any(r is None for r in old_hole_radii):
+            raise ValueError("Could not measure bore radii for " + name)
+
+        # Select the two most widely separated centers as capsule endpoints.
+        max_pair = None
+        max_dist = -1.0
+        for i in range(3):
+            for j in range(i + 1, 3):
+                d = math.hypot(centers[j][0] - centers[i][0],
+                               centers[j][1] - centers[i][1])
+                if d > max_dist:
+                    max_dist = d
+                    max_pair = (i, j)
+
+        i0, i1 = max_pair
+        p0 = centers[i0]
+        p1 = centers[i1]
+        dx = p1[0] - p0[0]
+        dy = p1[1] - p0[1]
+        length = math.hypot(dx, dy)
+        angle = math.degrees(math.atan2(dy, dx))
+        mx = 0.5 * (p0[0] + p1[0])
+        my = 0.5 * (p0[1] + p1[1])
+
+        bb = old_solid.BoundingBox()
+        z0 = float(bb.zmin)
+        thickness = float(bb.zlen)
+
+        original_outer_r = terminal_outer_radius(
+            old_solid,
+            [(p0[0], p0[1], p0[2]), (p1[0], p1[1], p1[2])],
+            [old_hole_radii[i0], old_hole_radii[i1]],
+        )
+
+        # Every pivot hole is enlarged by 1 mm in diameter. The capsule width
+        # is enlarged by the same diametric amount to preserve radial ligament.
+        new_hole_radii = [r + 0.5 for r in old_hole_radii]
+        capsule_r = original_outer_r + 0.5
+
+        wp = cq.Workplane("XY").workplane(offset=z0)
+        bridge = (wp.center(mx, my)
+                    .box(length, 2.0 * capsule_r, thickness,
+                         centered=(True, True, False))
+                    .rotate((mx, my, z0), (mx, my, z0 + 1.0), angle))
+        end0 = (cq.Workplane("XY").workplane(offset=z0)
+                .center(p0[0], p0[1]).circle(capsule_r).extrude(thickness))
+        end1 = (cq.Workplane("XY").workplane(offset=z0)
+                .center(p1[0], p1[1]).circle(capsule_r).extrude(thickness))
+        arm = bridge.union(end0).union(end1)
+
+        # Recreate all three bores concentrically, through the full arm.
+        for c, nr in zip(centers, new_hole_radii):
+            cutter = (cq.Workplane("XY").workplane(offset=z0 - 0.5)
+                      .center(c[0], c[1]).circle(nr)
+                      .extrude(thickness + 1.0))
+            arm = arm.cut(cutter)
+
+        result = arm.val()
+        if not result.isValid():
+            raise ValueError("Rebuilt arm is invalid: " + name)
+
+        print(
+            "%s: endpoint distance=%.3f, thickness=%.3f, "
+            "old hole diameters=%s, new hole diameters=%s, capsule width=%.3f"
+            % (name, length, thickness,
+               [round(2.0 * r, 3) for r in old_hole_radii],
+               [round(2.0 * r, 3) for r in new_hole_radii],
+               2.0 * capsule_r)
+        )
+        return result
+
+    replacements = {}
+    for solid_index, bore_ids, name in arm_specs:
+        replacements[solid_index] = make_capsule_arm(
+            solids[solid_index], bore_ids, name
+        )
+
+    # Preserve beams, slots, pins, joint axes, and all non-arm solids exactly.
+    output_solids = []
+    for index, solid in enumerate(solids):
+        output_solids.append(replacements.get(index, solid))
+
+    result = cq.Compound.makeCompound(output_solids)
+    print("Replaced four link arms with continuous capsule profiles; "
+          "all twelve arm bores increased by 1.00 mm diameter.")
+    print("Result valid:", result.isValid(), "solids:", len(result.Solids()))
+    return result

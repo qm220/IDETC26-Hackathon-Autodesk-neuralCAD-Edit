@@ -1,0 +1,229 @@
+Thinking text:
+**Examining compound validity**
+
+I'm wondering if there’s an issue with the compound output being invalid, possibly due to the original shape or overlapping source assemblies. The cap and neck intersect, and I'm curious if the overall design can still be valid despite overlaps. Maybe the edited radiator isn't valid anymore, and I need to figure out how to better orient and locate the geometry. Understanding the axes is crucial here, especially considering the filler and how it interacts with the views. Testing prints will help clarify!
+**Addressing design details**
+
+I’m noticing that the component might be hidden behind the radiator when viewed from the back at +X. There are some hose barbs at a negative Y, which is a bit confusing. I need to remove the original service while preserving everything else. The cap should be visibly separate from the neck, with a small gap. Currently, the cap looks like broad disks, which is correct when viewed from the side. I might need to create a funnel design with a flared rim and consider how to offset the cap.
+**Evaluating solid modeling**
+
+I’m considering using solids without fusing any compounds. If I have overlapping parts, that could create three valid solids, but it should be treated as an assembly. I think I can create a neck by revolving a single profile around the Y-axis and then adding an axial bore. Fusing them might work too. For the actual passage, a simple hole cut could be effective, and if that doesn’t work, maybe I could heal it using `fix()`.
+**Designing a funnel cap**
+
+I'm thinking about building a funnel cap using the `makeCone` function. The design features a cylindrical radiator filler neck with a flared lip and a pressure cap. I’m considering adding side handles to make the cap more distinct. The current cap design seems too plain, so I want to create a recognizable cap. I’ll ensure that the cap doesn’t overlap with the neck by calculating the dimensions carefully. I'll need a radial clearance to avoid any intersection.
+**Analyzing the cap design**
+
+I’m figuring out the cap's bottom annulus, which overlaps axially with the neck lip but not radially, as they start with a radius of 16.7, while the neck is 16.2 or less. The actual opening in the neck begins at the tank's top minus 7 and extends to plus 25. If the radiator is uncut, the material can block the interface, but the bore still enters the tank. It might be better to use a larger bore radius and adjust the height accordingly for functionality.
+
+Generated script:
+def my_cad_function(args):
+    import os
+
+    input_file = os.path.expanduser(args["input_file"])
+    imported = cq.importers.importStep(input_file)
+    source_shape = imported.val() if hasattr(imported, "val") else imported
+    solids = list(source_shape.Solids())
+
+    print("Imported solids:", len(solids))
+    print("Imported shape valid:", source_shape.isValid())
+
+    # Select the broad radiator/core body while preserving all accessory solids.
+    broad_candidates = []
+    for i, solid in enumerate(solids):
+        bb = solid.BoundingBox()
+        if bb.ylen > 200.0 and bb.zlen > 300.0:
+            broad_candidates.append((solid.Volume(), i, solid))
+
+    if broad_candidates:
+        broad_candidates.sort(key=lambda item: item[0], reverse=True)
+        _, radiator_index, radiator = broad_candidates[0]
+    else:
+        radiator_index = max(range(len(solids)), key=lambda i: solids[i].Volume())
+        radiator = solids[radiator_index]
+
+    radiator_bb = radiator.BoundingBox()
+    tank_top = radiator_bb.ymax
+    radiator_z_center = radiator_bb.center.z
+
+    print("Selected radiator solid:", radiator_index)
+    print("Radiator valid before edit:", radiator.isValid())
+    print("Upper tank surface y=%.3f" % tank_top)
+
+    # Find the compact existing top-center service feature. Its original X and
+    # Z coordinates define the intended filler location on the upper tank.
+    service_candidates = []
+    for i, solid in enumerate(solids):
+        if i == radiator_index:
+            continue
+        bb = solid.BoundingBox()
+        compact = bb.xlen < 70.0 and bb.ylen < 55.0 and bb.zlen < 70.0
+        near_center = abs(bb.center.z - radiator_z_center) < 45.0
+        on_upper_tank = bb.ymin > tank_top - 5.0 and bb.ymax > tank_top + 2.0
+        if compact and near_center and on_upper_tank:
+            score = abs(bb.center.z - radiator_z_center) + abs(bb.ymin - tank_top)
+            service_candidates.append((score, i, solid))
+
+    removed_indices = set()
+    if service_candidates:
+        service_candidates.sort(key=lambda item: item[0])
+        _, service_index, service_solid = service_candidates[0]
+        service_bb = service_solid.BoundingBox()
+        filler_x = service_bb.center.x
+        filler_z = service_bb.center.z
+        removed_indices.add(service_index)
+        print("Replacing original top service feature:", service_index)
+    else:
+        filler_x = radiator_bb.xmin + 0.18 * radiator_bb.xlen
+        filler_z = radiator_z_center
+        print("Top service feature not detected; using inferred location.")
+
+    print("Filler axis x=%.3f, z=%.3f" % (filler_x, filler_z))
+
+    axis = cq.Vector(0, 1, 0)
+    axis_point = lambda y: cq.Vector(filler_x, y, filler_z)
+
+    # Raised pouring neck. Overlapping stages are fused before the continuous
+    # axial bore is cut. The wide root is embedded into the upper tank, the
+    # middle section guides pouring, and the upper flange supports the cap.
+    bore_r = 9.0
+    root = cq.Solid.makeCylinder(17.0, 7.5, axis_point(tank_top - 3.5), axis)
+    lower_neck = cq.Solid.makeCylinder(13.0, 15.5, axis_point(tank_top - 1.0), axis)
+    upper_neck = cq.Solid.makeCylinder(14.2, 8.0, axis_point(tank_top + 11.5), axis)
+    retaining_lip = cq.Solid.makeCylinder(16.2, 4.0, axis_point(tank_top + 16.0), axis)
+
+    neck_blank = root.fuse(lower_neck).fuse(upper_neck).fuse(retaining_lip)
+    neck_bore = cq.Solid.makeCylinder(
+        bore_r, 33.0, axis_point(tank_top - 8.0), axis
+    )
+    filler_neck = neck_blank.cut(neck_bore)
+    try:
+        filler_neck = filler_neck.clean()
+    except Exception:
+        pass
+
+    print("Filler neck valid:", filler_neck.isValid())
+
+    # Attempt a real coaxial passage through the local upper-tank wall. First
+    # use CadQuery's boolean operation, then retry with OCCT's fuzzy boolean for
+    # imported topology. The original radiator is retained if neither produces
+    # a usable result.
+    passage = cq.Solid.makeCylinder(
+        bore_r, 18.0, axis_point(tank_top - 15.0), axis
+    )
+    edited_radiator = radiator
+    passage_cut = False
+
+    try:
+        candidate = radiator.cut(passage)
+        try:
+            candidate = candidate.clean()
+        except Exception:
+            pass
+        if candidate.isValid() and len(candidate.Solids()) >= 1:
+            edited_radiator = candidate
+            passage_cut = True
+            print("Upper-tank passage cut with CadQuery boolean.")
+    except Exception as exc:
+        print("CadQuery passage cut failed:", exc)
+
+    if not passage_cut:
+        try:
+            from OCP.BRepAlgoAPI import BRepAlgoAPI_Cut
+            cutter = BRepAlgoAPI_Cut()
+            cutter.SetArguments([radiator.wrapped])
+            cutter.SetTools([passage.wrapped])
+            cutter.SetFuzzyValue(1.0e-4)
+            cutter.SetNonDestructive(True)
+            cutter.Build()
+            if cutter.IsDone():
+                candidate = cq.Shape.cast(cutter.Shape())
+                if candidate.isValid() and len(candidate.Solids()) >= 1:
+                    edited_radiator = candidate
+                    passage_cut = True
+                    print("Upper-tank passage cut with fuzzy OCCT boolean.")
+        except Exception as exc:
+            print("Fuzzy passage cut failed:", exc)
+
+    if not passage_cut:
+        print("Imported tank topology rejected the passage cut; hollow neck retained as a representational fluid interface.")
+
+    # Separate removable pressure-cap form. The lower recess clears the neck
+    # retaining lip, while the closed upper web seals the bore. Two opposing
+    # grip ears make the cap visually and mechanically distinct from the neck.
+    cap_base_y = tank_top + 16.35
+    cap_body = cq.Solid.makeCylinder(18.4, 10.5, axis_point(cap_base_y), axis)
+    cap_top = cq.Solid.makeCylinder(20.5, 4.0, axis_point(cap_base_y + 7.0), axis)
+    cap_blank = cap_body.fuse(cap_top)
+
+    cap_recess = cq.Solid.makeCylinder(
+        16.7, 7.7, axis_point(cap_base_y - 0.2), axis
+    )
+    cap = cap_blank.cut(cap_recess)
+
+    # Opposed turning lugs on the closed top of the cap.
+    lug_y = cap_base_y + 8.0
+    lug1 = cq.Solid.makeBox(
+        13.0, 3.0, 8.0,
+        cq.Vector(filler_x + 15.5, lug_y, filler_z - 4.0)
+    )
+    lug2 = cq.Solid.makeBox(
+        13.0, 3.0, 8.0,
+        cq.Vector(filler_x - 28.5, lug_y, filler_z - 4.0)
+    )
+    cap = cap.fuse(lug1).fuse(lug2)
+    try:
+        cap = cap.clean()
+    except Exception:
+        pass
+
+    print("Cap valid:", cap.isValid())
+
+    # Rebuild the assembly, replacing only the original top-center fitting and
+    # the radiator solid if its passage cut succeeded. Fans, guards, hose
+    # connections, mounts, core, and frame remain untouched.
+    output_shapes = []
+    for i, solid in enumerate(solids):
+        if i == radiator_index or i in removed_indices:
+            continue
+        output_shapes.append(solid)
+
+    output_shapes.append(edited_radiator)
+    output_shapes.append(filler_neck)
+    output_shapes.append(cap)
+
+    result = cq.Compound.makeCompound(output_shapes)
+    print("Removed original fitting solids:", sorted(removed_indices))
+    print("Passage created:", passage_cut)
+    print("Output solids:", len(result.Solids()))
+    print("Output valid:", result.isValid())
+    return result
+
+Program output:
+stdout: Loading function from: /home/adml/Research/Hackathon2026/IDETC26-Hackathon-Autodesk-neuralCAD-Edit/output/gpt-5.6-sol-final-full48/gpt-5.6-sol-final_cadquery-script_1787197493.224467/brep_end/1787197493.224467/temp_script.py
+Imported solids: 20
+Imported shape valid: False
+Selected radiator solid: 0
+Radiator valid before edit: False
+Upper tank surface y=174.852
+Replacing original top service feature: 19
+Filler axis x=-88.902, z=0.000
+Filler neck valid: True
+Fuzzy passage cut failed: SetArguments(): incompatible function arguments. The following argument types are supported:
+    1. (self: OCP.OCP.BRepAlgoAPI.BRepAlgoAPI_BuilderAlgo, theLS: OCP.OCP.TopTools.TopTools_ListOfShape) -> None
+
+Invoked with: <OCP.OCP.BRepAlgoAPI.BRepAlgoAPI_Cut object at 0x74a716312af0>, [<OCP.OCP.TopoDS.TopoDS_Solid object at 0x74a6c3899bf0>]
+Imported tank topology rejected the passage cut; hollow neck retained as a representational fluid interface.
+Cap valid: True
+Removed original fitting solids: [19]
+Passage created: False
+Output solids: 21
+Output valid: False
+Exported shape to: /home/adml/Research/Hackathon2026/IDETC26-Hackathon-Autodesk-neuralCAD-Edit/output/gpt-5.6-sol-final-full48/gpt-5.6-sol-final_cadquery-script_1787197493.224467/brep_end/1787197493.224467/tmp.step
+Exported STL to: /home/adml/Research/Hackathon2026/IDETC26-Hackathon-Autodesk-neuralCAD-Edit/output/gpt-5.6-sol-final-full48/gpt-5.6-sol-final_cadquery-script_1787197493.224467/brep_end/1787197493.224467/tmp.stl
+Exported PNG image to: /home/adml/Research/Hackathon2026/IDETC26-Hackathon-Autodesk-neuralCAD-Edit/output/gpt-5.6-sol-final-full48/gpt-5.6-sol-final_cadquery-script_1787197493.224467/brep_end/1787197493.224467/tmp.png
+Script completed.
+
+stderr: 
+
+Exported this iteration:
+tmp.step, tmp.stl, tmp.png, tmp_+Z.png, tmp_-Z.png, tmp_-X.png, tmp_+X.png, tmp_+Y.png, tmp_-Y.png, tmp_iso1.png, tmp_iso2.png

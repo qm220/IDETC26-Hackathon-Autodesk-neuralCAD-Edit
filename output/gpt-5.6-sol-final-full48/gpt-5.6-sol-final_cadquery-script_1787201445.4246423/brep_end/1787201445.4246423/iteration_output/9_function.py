@@ -1,0 +1,196 @@
+def my_cad_function(args):
+    import os
+    import cadquery as cq
+
+    input_file = os.path.expanduser(args["input_file"])
+    imported = cq.importers.importStep(input_file)
+    solids = [s for s in imported.solids().vals() if s is not None and not s.isNull()]
+    if not solids:
+        raise ValueError("The input STEP file contains no solid")
+
+    source = max(solids, key=lambda s: abs(s.Volume()))
+    bb = source.BoundingBox()
+    cx = 0.5 * (bb.xmin + bb.xmax)
+    cy = 0.5 * (bb.ymin + bb.ymax)
+    z0 = bb.zmin
+    depth = bb.zlen
+    outer_w = bb.xlen
+    outer_h = bb.ylen
+
+    if min(outer_w, outer_h, depth) <= 1.0e-6:
+        raise ValueError("Invalid source envelope")
+
+    # Recover the constant-coordinate inner and outer straight walls directly
+    # from vertical planar faces. This avoids the unreliable section-wire
+    # classification used in the previous iteration.
+    plan_tol = max(1.0e-4, 1.0e-6 * max(outer_w, outer_h))
+    x_coords = []
+    y_coords = []
+
+    for face in source.Faces():
+        try:
+            if face is None or face.isNull() or face.geomType() != "PLANE":
+                continue
+            fbb = face.BoundingBox()
+            if fbb.zlen <= plan_tol:
+                continue
+            if fbb.xlen <= plan_tol and fbb.ylen > plan_tol:
+                x_coords.append(0.5 * (fbb.xmin + fbb.xmax))
+            if fbb.ylen <= plan_tol and fbb.xlen > plan_tol:
+                y_coords.append(0.5 * (fbb.ymin + fbb.ymax))
+        except Exception:
+            pass
+
+    def unique_values(values):
+        result = []
+        for value in sorted(values):
+            if not result or abs(value - result[-1]) > plan_tol:
+                result.append(value)
+        return result
+
+    x_coords = unique_values(x_coords)
+    y_coords = unique_values(y_coords)
+
+    # Exclude coordinates lying on the outer envelope. The remaining pair on
+    # each axis defines the clear rounded-rectangular opening.
+    interior_x = [x for x in x_coords
+                  if x > bb.xmin + plan_tol and x < bb.xmax - plan_tol]
+    interior_y = [y for y in y_coords
+                  if y > bb.ymin + plan_tol and y < bb.ymax - plan_tol]
+
+    left_candidates = [x for x in interior_x if x < cx - plan_tol]
+    right_candidates = [x for x in interior_x if x > cx + plan_tol]
+    lower_candidates = [y for y in interior_y if y < cy - plan_tol]
+    upper_candidates = [y for y in interior_y if y > cy + plan_tol]
+
+    if not left_candidates or not right_candidates:
+        raise ValueError("Could not recover the two inner X wall coordinates")
+    if not lower_candidates or not upper_candidates:
+        raise ValueError("Could not recover the two inner Y wall coordinates")
+
+    inner_left = max(left_candidates)
+    inner_right = min(right_candidates)
+    inner_lower = max(lower_candidates)
+    inner_upper = min(upper_candidates)
+    inner_w = inner_right - inner_left
+    inner_h = inner_upper - inner_lower
+    inner_cx = 0.5 * (inner_left + inner_right)
+    inner_cy = 0.5 * (inner_lower + inner_upper)
+
+    if inner_w <= 1.0e-5 or inner_h <= 1.0e-5:
+        raise ValueError("Recovered opening dimensions are invalid")
+
+    # Recover the nominal plan-view corner radii from cylindrical faces. The
+    # two largest cylindrical radii are the R63 outer and R50 inner plan bends;
+    # R10 and R2 belong to the cross-sectional edge treatments.
+    radii = []
+    for face in source.Faces():
+        try:
+            if face.geomType() != "CYLINDER":
+                continue
+            radius = float(face._geomAdaptor().Cylinder().Radius())
+            if radius > 1.0e-5:
+                radii.append(radius)
+        except Exception:
+            pass
+
+    unique_radii = []
+    for radius in sorted(radii):
+        if not unique_radii or abs(radius - unique_radii[-1]) > 1.0e-3:
+            unique_radii.append(radius)
+
+    if len(unique_radii) >= 2:
+        outer_r = unique_radii[-1]
+        inner_r = unique_radii[-2]
+    else:
+        # Nominal values documented by the original model's B-rep analysis.
+        outer_r = 63.0
+        inner_r = 50.0
+
+    outer_r = min(outer_r, 0.499 * outer_w, 0.499 * outer_h)
+    inner_r = min(inner_r, 0.499 * inner_w, 0.499 * inner_h)
+
+    if outer_w <= 2.0 * outer_r or outer_h <= 2.0 * outer_r:
+        raise ValueError("Outer footprint is incompatible with its corner radius")
+    if inner_w <= 2.0 * inner_r or inner_h <= 2.0 * inner_r:
+        raise ValueError("Inner footprint is incompatible with its corner radius")
+
+    def rounded_prism(center_x, center_y, width, height, radius,
+                      base_z, prism_depth):
+        horizontal = (cq.Workplane("XY", origin=(center_x, center_y, base_z))
+                      .box(width, height - 2.0 * radius, prism_depth,
+                           centered=(True, True, False)))
+        vertical = (cq.Workplane("XY", origin=(center_x, center_y, base_z))
+                    .box(width - 2.0 * radius, height, prism_depth,
+                         centered=(True, True, False)))
+        shape = horizontal.union(vertical)
+
+        dx = 0.5 * width - radius
+        dy = 0.5 * height - radius
+        for sx in (-1.0, 1.0):
+            for sy in (-1.0, 1.0):
+                cylinder = (cq.Workplane(
+                    "XY",
+                    origin=(center_x + sx * dx,
+                            center_y + sy * dy,
+                            base_z))
+                    .circle(radius)
+                    .extrude(prism_depth))
+                shape = shape.union(cylinder)
+
+        solid = shape.clean().val()
+        if solid is None or solid.isNull() or not solid.isValid():
+            raise ValueError("Rounded-prism construction failed")
+        return solid
+
+    outer = rounded_prism(cx, cy, outer_w, outer_h, outer_r, z0, depth)
+    cutter_margin = max(2.0, 0.1 * depth)
+    inner_cutter = rounded_prism(
+        inner_cx, inner_cy, inner_w, inner_h, inner_r,
+        z0 - cutter_margin, depth + 2.0 * cutter_margin)
+
+    frame = outer.cut(inner_cutter).clean()
+    if frame is None or frame.isNull() or not frame.isValid():
+        raise ValueError("The reconstructed sharp-edged frame is invalid")
+
+    # Apply the existing small profile radius to the inner and outer boundary
+    # loops at both axial ends. This replaces the former rear-outer R10 with R2
+    # while retaining all other profile radii at R2.
+    target_radius = 2.0
+    if depth <= 2.0 * target_radius:
+        raise ValueError("Insufficient axial depth for opposed R2 fillets")
+
+    ztol = max(1.0e-4, depth * 1.0e-6)
+    end_edges = []
+    for edge in frame.Edges():
+        try:
+            vertices = edge.Vertices()
+            if not vertices:
+                continue
+            zs = [vertex.Center().z for vertex in vertices]
+            on_front = all(abs(z - z0) <= ztol for z in zs)
+            on_back = all(abs(z - (z0 + depth)) <= ztol for z in zs)
+            if on_front or on_back:
+                end_edges.append(edge)
+        except Exception:
+            pass
+
+    if len(end_edges) < 16:
+        raise ValueError("Too few profile end edges were recovered: %d" % len(end_edges))
+
+    result = frame.fillet(target_radius, end_edges).clean()
+    if result is None or result.isNull() or not result.isValid():
+        raise ValueError("Uniform-R2 fillet operation produced an invalid result")
+    if abs(result.Volume()) <= 1.0e-6:
+        raise ValueError("Uniform-R2 result has no volume")
+
+    result_bb = result.BoundingBox()
+    print("Outer footprint:", outer_w, outer_h, "plan radius", outer_r)
+    print("Inner footprint:", inner_w, inner_h, "plan radius", inner_r)
+    print("Axial depth:", depth)
+    print("Profile end edges filleted:", len(end_edges))
+    print("Replaced rear-outer R10 with R2; all cross-sectional radii are R2")
+    print("Result envelope:", result_bb.xlen, result_bb.ylen, result_bb.zlen)
+    print("Result valid:", result.isValid())
+
+    return cq.Workplane("XY").newObject([result])

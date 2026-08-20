@@ -1,0 +1,55 @@
+def my_cad_function(args):
+    import os
+    import cadquery as cq
+
+    input_file = os.path.expanduser(args["input_file"])
+    model = cq.importers.importStep(input_file)
+    root = model.val()
+    solids = list(root.Solids())
+
+    if not solids:
+        raise ValueError("The imported STEP model contains no solids.")
+
+    def find_target_edge(shape):
+        candidates = []
+        for edge in shape.Edges():
+            if edge.geomType() != "LINE":
+                continue
+            bb = edge.BoundingBox()
+            c = edge.Center()
+            if edge.Length() > 300.0 and bb.ylen < 1.0e-5 and abs(c.y) < 1.0e-4:
+                candidates.append(edge)
+        if len(candidates) != 1:
+            raise ValueError("Expected one sharp full-length blade edge, found %d" % len(candidates))
+        return candidates[0]
+
+    original_blade = solids[0]
+    try:
+        blade = original_blade.clean()
+        if blade is None or blade.isNull() or not blade.isValid():
+            blade = original_blade
+    except Exception:
+        blade = original_blade
+
+    target_edge = find_target_edge(blade)
+    edited_blade = None
+
+    for radius in (6.35, 6.3499, 6.349, 6.34):
+        try:
+            candidate = blade.fillet(radius, [target_edge])
+            if (candidate is not None and not candidate.isNull()
+                    and candidate.isValid() and len(candidate.Solids()) == 1
+                    and candidate.Volume() < blade.Volume()):
+                edited_blade = candidate
+                break
+        except Exception:
+            pass
+
+    if edited_blade is None:
+        raise RuntimeError("Unable to apply the requested 6.35 mm blade-edge radius.")
+
+    result = cq.Compound.makeCompound([edited_blade] + solids[1:])
+    if result.isNull() or not result.isValid():
+        raise RuntimeError("The final preserved assembly is invalid.")
+
+    return cq.Workplane("XY").newObject([result])

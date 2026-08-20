@@ -1,0 +1,157 @@
+Thinking text:
+**Evaluating geometry functions**
+
+I need to create a JSON-only function for dynamically inspecting geometry. The goal is to load a shape and determine the bounding box (bbox) and top side. By inferring dimensions from the bbox, I can add support for a designated bottom surface, which involves extending 20 units inward toward the top. I might also derive rounded rectangle dimensions from the BRep. I could inspect planar and cylindrical face data or analyze the bounding box to find dimensions like inner and outer radii. Parsing edges and vertices could be a simpler way to determine outer bbox dimensions.
+**Designing rounded rectangles**
+
+I'm considering how to build rounded rectangles using a 2D sketch with fillets. I’ll incorporate custom lines and arcs on my workplane to support the inner boundary by 20 units. The outer boundary needs a tiny offset of about 0.2 units from the inner wall profile for a proper union. The dimensions for the inner opening will be reduced by 40 units with a radius of 30. I’ll also identify axial positions based on the existing bounding box and outline the bottom face to ensure the design fits correctly with the fillets.
+**Analyzing face geometry**
+
+I’m looking at Face 12, which features a broad front annular shape with outer and inner fillets of 2 units. It seems to be planar at an axial extreme of around z=10. I’m considering that the existing outer wall continues and reasoning about a rectangular ring prism with a thickness of 20 units. The front face sits at z=+10, while the rear face is at z=-10 with specified fillet dimensions. I’ll need to support this by placing a bottom at z=+10 and extruding downward into the opening.
+**Analyzing edge intersections**
+
+I'm thinking about the intersection of the inner wall and top support where it meets the outer support. The top support extends outward, and its boundary will intersect and get trimmed at the inner wall profile. I'm noting that at z=+5, the wall profile is nominal, and I'm considering filleting the concave edge and the convex inner top edge with radius R2. I want to make sure I select the correct edges without accidentally including seams.
+**Evaluating support build and fillet options**
+
+I'm considering building the support on its own and filleting both the top inner and outer edges before unioning them. However, I'm worried that the outer fillet could round the support's outer boundary, which might reduce contact and lead to a rough wall. If the outer extension overlaps by 0.5 and radius2, the fillet could also lessen that overlap. Perhaps I should extend the overlap by 3 mm instead, and see if I can manage the transition without a fillet.
+
+Generated script:
+def my_cad_function(args):
+    import os
+    import math
+
+    input_file = os.path.expanduser(args["input_file"])
+    imported = cq.importers.importStep(input_file)
+    original = imported.val()
+    bbox = original.BoundingBox()
+
+    # The existing 10 mm outer return is on the -Z side, so the opposite
+    # broad +Z annular face is the requested flat bottom datum.
+    bottom_z = bbox.zmax
+    support_top_z = bottom_z - 5.0
+
+    cx = 0.5 * (bbox.xmin + bbox.xmax)
+    cy = 0.5 * (bbox.ymin + bbox.ymax)
+
+    # The source B-rep has concentric rounded rectangles with an outer corner
+    # radius of 63 mm and an inner-wall corner radius of 50 mm. Thus the
+    # nominal inner-wall envelope is inset 13 mm from the outer footprint.
+    frame_radial_width = 13.0
+    inner_wall_w = bbox.xlen - 2.0 * frame_radial_width
+    inner_wall_h = bbox.ylen - 2.0 * frame_radial_width
+    inner_wall_r = 50.0
+
+    # Extend the ledge slightly into the frame to guarantee a robust union.
+    overlap = 2.0
+    support_outer_w = inner_wall_w + 2.0 * overlap
+    support_outer_h = inner_wall_h + 2.0 * overlap
+    support_outer_r = inner_wall_r + overlap
+
+    # Exact 20 mm inward offset from the existing inner wall.
+    support_inner_w = inner_wall_w - 40.0
+    support_inner_h = inner_wall_h - 40.0
+    support_inner_r = inner_wall_r - 20.0
+
+    if support_inner_w <= 2.0 * support_inner_r or support_inner_h <= 2.0 * support_inner_r:
+        raise ValueError("The requested 20 mm inner offset creates an invalid rounded rectangle")
+
+    def rounded_rectangle_wire(width, height, radius, z):
+        x0 = cx - width / 2.0
+        x1 = cx + width / 2.0
+        y0 = cy - height / 2.0
+        y1 = cy + height / 2.0
+        k = radius / math.sqrt(2.0)
+
+        return (
+            cq.Workplane("XY", origin=(0.0, 0.0, z))
+            .moveTo(x0 + radius, y0)
+            .lineTo(x1 - radius, y0)
+            .threePointArc((x1 - radius + k, y0 + radius - k), (x1, y0 + radius))
+            .lineTo(x1, y1 - radius)
+            .threePointArc((x1 - radius + k, y1 - radius + k), (x1 - radius, y1))
+            .lineTo(x0 + radius, y1)
+            .threePointArc((x0 + radius - k, y1 - radius + k), (x0, y1 - radius))
+            .lineTo(x0, y0 + radius)
+            .threePointArc((x0 + radius - k, y0 + radius - k), (x0 + radius, y0))
+            .close()
+            .wire()
+            .val()
+        )
+
+    outer_wire = rounded_rectangle_wire(
+        support_outer_w, support_outer_h, support_outer_r, bottom_z
+    )
+    inner_wire = rounded_rectangle_wire(
+        support_inner_w, support_inner_h, support_inner_r, bottom_z
+    )
+
+    support = cq.Solid.extrudeLinear(
+        outer_wire,
+        [inner_wire],
+        cq.Vector(0.0, 0.0, -5.0)
+    )
+
+    fused = original.fuse(support).clean()
+
+    # Select only the newly generated horizontal edge loops at the upper side
+    # of the support. This includes both the wall junction and reduced-opening
+    # edge, while excluding all edges on the flat bottom datum.
+    tol = 1.0e-4
+    top_edges = []
+    for edge in fused.Edges():
+        vertices = edge.Vertices()
+        if not vertices:
+            continue
+        if all(abs(v.Center().z - support_top_z) < tol for v in vertices):
+            top_edges.append(edge)
+
+    print("Original bbox: %.3f x %.3f x %.3f mm" % (bbox.xlen, bbox.ylen, bbox.zlen))
+    print("Bottom datum Z: %.3f mm" % bottom_z)
+    print("Support top Z: %.3f mm" % support_top_z)
+    print("Nominal inner wall: %.3f x %.3f mm, R%.3f" % (inner_wall_w, inner_wall_h, inner_wall_r))
+    print("Reduced lower opening: %.3f x %.3f mm, R%.3f" % (support_inner_w, support_inner_h, support_inner_r))
+    print("Candidate upper support edges for R2 fillet: %d" % len(top_edges))
+
+    if not top_edges:
+        raise RuntimeError("Could not identify the upper support edge loops")
+
+    base_wp = cq.Workplane(obj=fused)
+    result = base_wp.newObject(top_edges).fillet(2.0)
+    final_shape = result.val().clean()
+
+    if not final_shape.isValid():
+        raise RuntimeError("Final edited frame is not a valid solid")
+
+    print("Final solid count: %d" % len(final_shape.Solids()))
+    print("Final volume: %.6f mm^3" % final_shape.Volume())
+    return cq.Workplane(obj=final_shape)
+
+
+Program output:
+stdout: Loading function from: /home/adml/Research/Hackathon2026/IDETC26-Hackathon-Autodesk-neuralCAD-Edit/output/gpt-5.6-sol-final-full48/gpt-5.6-sol-final_cadquery-script_1787200924.1332514/brep_end/1787200924.1332514/temp_script.py
+Original bbox: 786.000 x 168.290 x 568.512 mm
+Bottom datum Z: 595.312 mm
+Support top Z: 590.312 mm
+Nominal inner wall: 760.000 x 142.290 mm, R50.000
+Reduced lower opening: 720.000 x 102.290 mm, R30.000
+Candidate upper support edges for R2 fillet: 18
+Error executing LLM-provided function: BRep_API: command not done
+No CadQuery result returned; skipped STEP/STL/image export.
+Script completed.
+
+stderr: Traceback (most recent call last):
+  File "/home/adml/Research/Hackathon2026/IDETC26-Hackathon-Autodesk-neuralCAD-Edit/src/harnesses/cadquery_script.py", line 158, in load_and_execute_function
+    return my_cad_function(args)
+           ^^^^^^^^^^^^^^^^^^^^^
+  File "<string>", line 101, in my_cad_function
+  File "/home/adml/Research/Hackathon2026/IDETC26-Hackathon-Autodesk-neuralCAD-Edit/.venv/lib/python3.12/site-packages/cadquery/cq.py", line 1244, in fillet
+    s = solid.fillet(radius, edgeList)
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/adml/Research/Hackathon2026/IDETC26-Hackathon-Autodesk-neuralCAD-Edit/.venv/lib/python3.12/site-packages/cadquery/occ_impl/shapes.py", line 3987, in fillet
+    return self.__class__(fillet_builder.Shape())
+                          ^^^^^^^^^^^^^^^^^^^^^^
+OCP.OCP.StdFail.StdFail_NotDone: BRep_API: command not done
+
+
+Exported this iteration:
+none (CadQuery failed or returned no shape)

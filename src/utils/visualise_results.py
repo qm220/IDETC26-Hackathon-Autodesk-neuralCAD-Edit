@@ -161,6 +161,19 @@ def _bar_models(config, request_type):
     ]
 
 
+def _plot_models(config, request_type, users=None):
+    """Subset of bar models for saved plots, in the requested order."""
+    models = _bar_models(config, request_type)
+    keep = users or (
+        config.get("plot_users", {}).get(request_type)
+        or config.get("cost_plot_users", {}).get(request_type)
+    )
+    if not keep:
+        return models
+    keep_set = set(models)
+    return [m for m in keep if m in keep_set]
+
+
 def _score_or_zero(v):
     """Map missing or failed scores to 0.0 so models are penalized for failures."""
     if v is None or v != v:
@@ -294,7 +307,7 @@ def faceted_bar_plot(config: dict, results: dict, request_type: str = "edit", me
         metrics = [m for m in preferred if m in metric_model_scores]
         metrics += [m for m in metric_model_scores if m not in metrics]
 
-    models = _bar_models(config, request_type)
+    models = _plot_models(config, request_type)
     means_by_metric = {}
     baseline_means = {}
     for metric in metrics:
@@ -323,14 +336,16 @@ def faceted_bar_plot(config: dict, results: dict, request_type: str = "edit", me
     return fig, axes
 
 
-def cost_barplot(config: dict, dbm: DatabaseManager, request_type: str = "edit", save=True):
+def cost_barplot(config: dict, dbm: DatabaseManager, request_type: str = "edit", save=True, users=None):
     """
     Bar plot of the mean per-edit cost estimate for each model, with error bars
     (standard deviation across that model's edits). Cost is read from each
     edit's ``token_counts.cost_estimate``.
 
     Only models present in ``benchmark_eval_users`` that have cost data (i.e.
-    non-human harness runs) are shown.
+    non-human harness runs) are shown. If ``cost_plot_users`` is set in the
+    config (or ``users`` is passed), the plot is limited to that subset, in
+    that order.
 
     Note: this iterates every edit in the database with no request_type,
     difficulty, or latest-edit-per-user filter. Stale or duplicate edits can
@@ -338,8 +353,7 @@ def cost_barplot(config: dict, dbm: DatabaseManager, request_type: str = "edit",
     ``clean_db_single_edit_per_user_per_request()`` in ``run_all_benchmarks.py``
     before plotting to keep cost stats honest.
     """
-    models = _bar_models(config, request_type)
-
+    models = _plot_models(config, request_type, users=users)
     model_costs = {}
     for edit in dbm.edits.find({}):
         user = edit.get("user")

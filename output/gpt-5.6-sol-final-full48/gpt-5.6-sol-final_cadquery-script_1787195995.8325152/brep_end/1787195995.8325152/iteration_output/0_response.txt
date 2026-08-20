@@ -1,0 +1,98 @@
+Thinking text:
+**Analyzing planar faces**
+
+I’m working on scanning planar faces at specified z-values, either -10 or -32. My goal is to find the area range and edge patterns of the capsules. I'll check for vertices at z=-10 and for areas under 2000 while ensuring I track the edges—likely around four (which includes wire edges). I’ll need to calculate using center of mass and ensure the proper geomType methods are applied. It seems I'm keen to determine the best way to select candidates for cutting the object.
+**Evaluating cutter options**
+
+I’m looking at a potential issue with the floor at z=-10 while considering that the front exterior might be at z=0. The existing pocket already removes depth, cutting from -100 to +100 seems effective. I’ll use extrusion techniques with the cq.Solid class to create shapes, but I’m concerned about coplanarity with the wire face at the floor's z-level. If I extrude up and down, it may cut through correctly. Ultimately, I need to focus on keeping material flow optimized towards negative z, especially for the central area and any rear sections.
+**Analyzing floor and extrusion**
+
+I see that the front floor is at -10 and the rear is at -32, creating a central web running negative from -10. That's good because it shouldn't affect the front skin since there's already a cavity. However, I need to ensure there’s no tiny mismatch in profiles. My plan is to extract the outer wire from the floor and extrude it by -100 to cut appropriately. I’ll use the imported Workplane and confirm if the shape is a Compound or a single Solid. The `shape.cut(cutter)` method seems like it will work.
+
+Generated script:
+def my_cad_function(args):
+    import os
+    import cadquery as cq
+
+    input_file = os.path.expanduser(args["input_file"])
+    imported = cq.importers.importStep(input_file)
+    source_shape = imported.val()
+
+    # Locate the planar floor of the existing front rounded-end relief pocket.
+    # The source B-rep identifies this floor at z = -10 mm. Its outer wire is
+    # the exact slot profile that must be preserved.
+    candidates = []
+    for face in source_shape.Faces():
+        try:
+            vertices = face.Vertices()
+            if not vertices or face.geomType() != "PLANE":
+                continue
+
+            z_values = [v.Center().z for v in vertices]
+            z_span = max(z_values) - min(z_values)
+            center = face.Center()
+            area = face.Area()
+            edge_count = len(face.outerWire().Edges())
+
+            if z_span < 1.0e-5 and abs(center.z + 10.0) < 0.1:
+                candidates.append((face, area, edge_count, center))
+                print(
+                    "Pocket-floor candidate: "
+                    f"center=({center.x:.4f}, {center.y:.4f}, {center.z:.4f}), "
+                    f"area={area:.4f}, edges={edge_count}"
+                )
+        except Exception:
+            continue
+
+    if not candidates:
+        raise ValueError("Could not locate the existing slot pocket floor at z=-10 mm")
+
+    # A capsule/rounded slot boundary consists of two straight and two curved
+    # edges. Prefer that exact topology, then the smaller candidate if needed.
+    capsule_candidates = [item for item in candidates if item[2] == 4]
+    if capsule_candidates:
+        pocket_face = min(capsule_candidates, key=lambda item: item[1])[0]
+    else:
+        pocket_face = min(candidates, key=lambda item: item[1])[0]
+
+    slot_wire = pocket_face.outerWire()
+
+    # Extrude the preserved profile in both thickness directions. This spans
+    # the complete part regardless of which side of the pocket floor contains
+    # the remaining central web.
+    cutter_front = cq.Solid.extrudeLinear(
+        slot_wire, [], cq.Vector(0.0, 0.0, 100.0)
+    )
+    cutter_rear = cq.Solid.extrudeLinear(
+        slot_wire, [], cq.Vector(0.0, 0.0, -100.0)
+    )
+    cutter = cutter_front.fuse(cutter_rear)
+
+    result_shape = source_shape.cut(cutter)
+
+    if not result_shape.isValid():
+        raise ValueError("The through-slot boolean operation produced an invalid shape")
+
+    print(f"Original volume: {source_shape.Volume():.6f} mm^3")
+    print(f"Modified volume: {result_shape.Volume():.6f} mm^3")
+    print(f"Removed volume: {source_shape.Volume() - result_shape.Volume():.6f} mm^3")
+    print(f"Result solids: {len(result_shape.Solids())}")
+
+    return cq.Workplane("XY").newObject([result_shape])
+
+Program output:
+stdout: Loading function from: /home/adml/Research/Hackathon2026/IDETC26-Hackathon-Autodesk-neuralCAD-Edit/output/gpt-5.6-sol-final-full48/gpt-5.6-sol-final_cadquery-script_1787195995.8325152/brep_end/1787195995.8325152/temp_script.py
+Pocket-floor candidate: center=(113.0000, 55.0000, -10.0000), area=794.4690, edges=4
+Original volume: 426801.535841 mm^3
+Modified volume: 409323.218075 mm^3
+Removed volume: 17478.317765 mm^3
+Result solids: 1
+Exported shape to: /home/adml/Research/Hackathon2026/IDETC26-Hackathon-Autodesk-neuralCAD-Edit/output/gpt-5.6-sol-final-full48/gpt-5.6-sol-final_cadquery-script_1787195995.8325152/brep_end/1787195995.8325152/tmp.step
+Exported STL to: /home/adml/Research/Hackathon2026/IDETC26-Hackathon-Autodesk-neuralCAD-Edit/output/gpt-5.6-sol-final-full48/gpt-5.6-sol-final_cadquery-script_1787195995.8325152/brep_end/1787195995.8325152/tmp.stl
+Exported PNG image to: /home/adml/Research/Hackathon2026/IDETC26-Hackathon-Autodesk-neuralCAD-Edit/output/gpt-5.6-sol-final-full48/gpt-5.6-sol-final_cadquery-script_1787195995.8325152/brep_end/1787195995.8325152/tmp.png
+Script completed.
+
+stderr: 
+
+Exported this iteration:
+tmp.step, tmp.stl, tmp.png, tmp_+Z.png, tmp_-Z.png, tmp_-X.png, tmp_+X.png, tmp_+Y.png, tmp_-Y.png, tmp_iso1.png, tmp_iso2.png

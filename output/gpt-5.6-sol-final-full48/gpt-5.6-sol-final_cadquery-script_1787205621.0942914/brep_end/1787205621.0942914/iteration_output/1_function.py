@@ -1,0 +1,71 @@
+def my_cad_function(args):
+    import os
+    import cadquery as cq
+
+    input_file = os.path.expanduser(args["input_file"])
+    imported = cq.importers.importStep(input_file)
+    root = imported.val()
+    solids = list(root.Solids())
+
+    if len(solids) < 20:
+        raise ValueError("Expected at least 20 solids in the source assembly")
+
+    cordholder_index = 12
+    stand_index = 17
+    shell_index = 0
+
+    shell = solids[shell_index]
+    stand = solids[stand_index]
+    shell_bb = shell.BoundingBox()
+    stand_bb = stand.BoundingBox()
+
+    longitudinal_center = 0.5 * (shell_bb.ymin + shell_bb.ymax)
+    mirrored_stand = (
+        cq.Workplane("XY")
+        .newObject([stand])
+        .mirror(
+            mirrorPlane="XZ",
+            basePointVector=(0, longitudinal_center, 0),
+            union=False,
+        )
+        .val()
+    )
+
+    stand_height = stand_bb.zmax - stand_bb.zmin
+    cut_rise = max(2.0, min(8.0, 0.055 * stand_height))
+    support_z = stand_bb.zmin + cut_rise
+
+    all_bb = root.BoundingBox()
+    margin_xy = max(all_bb.xlen, all_bb.ylen, 100.0) * 2.0
+    keep_height = max(all_bb.zmax - support_z + 50.0, 100.0)
+    keep_box = (
+        cq.Workplane("XY")
+        .box(
+            2.0 * margin_xy,
+            2.0 * margin_xy,
+            keep_height,
+            centered=(True, True, False),
+        )
+        .translate((0, 0, support_z))
+        .val()
+    )
+
+    trimmed_original = stand.intersect(keep_box)
+    trimmed_mirrored = mirrored_stand.intersect(keep_box)
+
+    if trimmed_original.isNull() or trimmed_mirrored.isNull():
+        raise ValueError("Stand trimming produced a null shape")
+
+    result_shapes = []
+    for i, solid in enumerate(solids):
+        if i in (cordholder_index, stand_index):
+            continue
+        result_shapes.append(solid)
+
+    result_shapes.extend([trimmed_original, trimmed_mirrored])
+    result = cq.Compound.makeCompound(result_shapes)
+
+    if not result.isValid():
+        raise ValueError("Generated assembly is invalid")
+
+    return result

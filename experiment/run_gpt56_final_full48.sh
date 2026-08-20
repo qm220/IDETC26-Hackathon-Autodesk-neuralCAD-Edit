@@ -17,7 +17,7 @@ export PYTHONUNBUFFERED=1
 CONFIG="src/config/edit_192_external.json"
 USER_ID="gpt-5.6-sol-final_cadquery-script"
 OUTPUT_DIR="output/gpt-5.6-sol-final-full48"
-SUBMISSION_DIR="add-ons/submission outputs"
+SUBMISSION_DIR="submission_folder/submission outputs"
 LOG="$OUTPUT_DIR/run_full48.log"
 
 mkdir -p "$OUTPUT_DIR"

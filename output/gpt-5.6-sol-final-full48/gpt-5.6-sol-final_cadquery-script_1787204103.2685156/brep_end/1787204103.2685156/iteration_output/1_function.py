@@ -1,0 +1,123 @@
+def my_cad_function(args):
+    input_file = os.path.expanduser(args["input_file"])
+    imported = cq.importers.importStep(input_file)
+    original = imported.val()
+
+    solids = list(original.Solids())
+    if len(solids) < 3:
+        raise ValueError("Expected the source model to contain at least three solids")
+
+    # The hub is the compact body; the other solids are elongated crossed arms.
+    def maximum_span(shape):
+        bb = shape.BoundingBox()
+        return max(bb.xlen, bb.ylen, bb.zlen)
+
+    hub = min(solids, key=maximum_span)
+    hub_bb = hub.BoundingBox()
+
+    # Determine the actual cover axis from the hub geometry. The broad hub faces
+    # are normal to Y in this STEP model, despite the nominal view-axis wording.
+    # Selecting the largest projected outer wire also avoids the narrow arm-facing
+    # contours that were incorrectly selected along Z in the previous iteration.
+    axes = {
+        "X": cq.Vector(1, 0, 0),
+        "Y": cq.Vector(0, 1, 0),
+        "Z": cq.Vector(0, 0, 1),
+    }
+
+    candidates = []
+    for face in hub.Faces():
+        if face.geomType() != "PLANE":
+            continue
+        try:
+            normal = face.normalAt().normalized()
+            outer_wire = face.outerWire()
+            wire_bb = outer_wire.BoundingBox()
+        except Exception:
+            continue
+
+        for axis_name, axis_vector in axes.items():
+            alignment = abs(normal.dot(axis_vector))
+            if alignment < 0.95:
+                continue
+
+            if axis_name == "X":
+                projected_bbox_area = wire_bb.ylen * wire_bb.zlen
+            elif axis_name == "Y":
+                projected_bbox_area = wire_bb.xlen * wire_bb.zlen
+            else:
+                projected_bbox_area = wire_bb.xlen * wire_bb.ylen
+
+            candidates.append({
+                "axis_name": axis_name,
+                "axis": axis_vector,
+                "projected_area": projected_bbox_area,
+                "face_area": face.Area(),
+                "wire": outer_wire,
+                "wire_bb": wire_bb,
+            })
+
+    if not candidates:
+        raise ValueError("Could not find a planar hub contour for the covers")
+
+    # The complete rounded-square hub outline has by far the largest projected
+    # bounding area among the planar hub contours.
+    selected = max(
+        candidates,
+        key=lambda item: (item["projected_area"], item["face_area"]),
+    )
+
+    axis_name = selected["axis_name"]
+    axis = selected["axis"]
+    reference_wire = selected["wire"]
+    wire_bb = selected["wire_bb"]
+
+    if axis_name == "X":
+        reference_coordinate = 0.5 * (wire_bb.xmin + wire_bb.xmax)
+        negative_seat = hub_bb.xmin
+        positive_seat = hub_bb.xmax
+    elif axis_name == "Y":
+        reference_coordinate = 0.5 * (wire_bb.ymin + wire_bb.ymax)
+        negative_seat = hub_bb.ymin
+        positive_seat = hub_bb.ymax
+    else:
+        reference_coordinate = 0.5 * (wire_bb.zmin + wire_bb.zmax)
+        negative_seat = hub_bb.zmin
+        positive_seat = hub_bb.zmax
+
+    thickness = 2.54  # 0.254 cm
+
+    positive_shift = axis.multiply(positive_seat - reference_coordinate)
+    negative_shift = axis.multiply(negative_seat - reference_coordinate)
+
+    positive_wire = reference_wire.translate(positive_shift)
+    negative_wire = reference_wire.translate(negative_shift)
+
+    # Each inner cover face is coincident with the corresponding outermost hub
+    # plane, and each plate extrudes away from the assembly.
+    positive_cover = cq.Solid.extrudeLinear(
+        positive_wire, [], axis.multiply(thickness)
+    )
+    negative_cover = cq.Solid.extrudeLinear(
+        negative_wire, [], axis.multiply(-thickness)
+    )
+
+    if not positive_cover.isValid() or not negative_cover.isValid():
+        raise ValueError("One or both generated cover solids are invalid")
+
+    # Keep the original three bodies and both covers as independent solids.
+    result = cq.Compound.makeCompound([
+        original,
+        positive_cover,
+        negative_cover,
+    ])
+
+    print("Original solid count:", len(solids))
+    print("Selected hub bounds:", hub_bb.xlen, hub_bb.ylen, hub_bb.zlen)
+    print("Detected cover-normal axis:", axis_name)
+    print("Cover contour bounds:", wire_bb.xlen, wire_bb.ylen, wire_bb.zlen)
+    print("Cover seating coordinates:", negative_seat, positive_seat)
+    print("Created two separate covers, each 2.54 mm thick")
+    print("Result solid count:", len(result.Solids()))
+
+    return cq.Workplane(obj=result)
