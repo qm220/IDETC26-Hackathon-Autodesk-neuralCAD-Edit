@@ -1,0 +1,104 @@
+def my_cad_function(args):
+    import os
+    import cadquery as cq
+
+    input_file = os.path.expanduser(args["input_file"])
+    imported = cq.importers.importStep(input_file)
+    model = imported.val() if hasattr(imported, "val") else imported
+
+    bbox = model.BoundingBox()
+    faces = model.Faces()
+    print("Imported valid:", model.isValid())
+    print("Face count:", len(faces))
+    print("Bounds: X[%.6f, %.6f] Y[%.6f, %.6f] Z[%.6f, %.6f]" %
+          (bbox.xmin, bbox.xmax, bbox.ymin, bbox.ymax, bbox.zmin, bbox.zmax))
+
+    # Inspect and bind the planned STEP faces to their actual geometry.
+    for index in (44, 46, 77):
+        if index < len(faces):
+            face = faces[index]
+            fb = face.BoundingBox()
+            center = face.Center()
+            print("FACE %d: type=%s area=%.6f center=(%.6f, %.6f, %.6f) "
+                  "bbox=(%.6f, %.6f; %.6f, %.6f; %.6f, %.6f)" %
+                  (index, face.geomType(), face.Area(),
+                   center.x, center.y, center.z,
+                   fb.xmin, fb.xmax, fb.ymin, fb.ymax,
+                   fb.zmin, fb.zmax))
+
+    # Geometrically confirm the two coaxial clevis-bore walls rather than
+    # depending exclusively on FACE 44 and FACE 46 indices.
+    pin_y = 3.510000
+    pin_z = 2.943179
+    bore_faces = []
+    for index, face in enumerate(faces):
+        if face.geomType() != "CYLINDER":
+            continue
+        fb = face.BoundingBox()
+        center = face.Center()
+        if (abs(center.y - pin_y) < 0.15 and
+                abs(center.z - pin_z) < 0.15 and
+                fb.xmax - fb.xmin < 1.0):
+            bore_faces.append(index)
+    print("Bound clevis bore faces:", bore_faces)
+
+    # Create a continuous diameter-1.7 mm connecting hole on the common axis
+    # of the two existing clevis bores. The tool crosses both ears and the gap.
+    hole_radius = 1.7 / 2.0
+    cutter_start_x = bbox.xmin - 1.0
+    cutter_length = bbox.xmax - bbox.xmin + 2.0
+    hole_tool = cq.Solid.makeCylinder(
+        hole_radius,
+        cutter_length,
+        cq.Vector(cutter_start_x, pin_y, pin_z),
+        cq.Vector(1, 0, 0)
+    )
+    edited = model.cut(hole_tool)
+    print("After connecting hole: valid=%s volume=%.6f" %
+          (edited.isValid(), edited.Volume()))
+
+    # Apply parallel traction grooves to the broad underside mounting surface
+    # corresponding geometrically to FACE 77. Since the request does not state
+    # the dimension type, 0.1 mm is used for both groove width and depth.
+    # Disconnected cutters are assembled as one compound to avoid the costly
+    # repeated fuse operation that caused the previous timeout.
+    groove_width = 0.10
+    groove_depth = 0.10
+    groove_pitch = 0.60
+    underside_y = bbox.ymin
+
+    x_margin = 0.35
+    x_min = bbox.xmin + x_margin
+    x_max = bbox.xmax - x_margin
+    z_center = 0.5 * (bbox.zmin + bbox.zmax)
+    z_length = bbox.zmax - bbox.zmin + 0.40
+
+    # Extend each tool 0.02 mm outside the part while preserving exactly
+    # 0.10 mm of penetration into the mounting face.
+    tool_y_min = underside_y - 0.02
+    tool_y_max = underside_y + groove_depth
+    tool_y_size = tool_y_max - tool_y_min
+    tool_y_center = 0.5 * (tool_y_min + tool_y_max)
+
+    groove_solids = []
+    x = x_min
+    while x <= x_max + 1.0e-7:
+        groove = (cq.Workplane("XY")
+                  .box(groove_width, tool_y_size, z_length,
+                       centered=(True, True, True))
+                  .translate((x, tool_y_center, z_center))
+                  .val())
+        groove_solids.append(groove)
+        x += groove_pitch
+
+    groove_tool = cq.Compound.makeCompound(groove_solids)
+    result = edited.cut(groove_tool)
+
+    print("Groove count:", len(groove_solids))
+    print("Grooves: width=%.3f depth=%.3f pitch=%.3f mm" %
+          (groove_width, groove_depth, groove_pitch))
+    print("Final valid:", result.isValid())
+    print("Final solids:", len(result.Solids()))
+    print("Final volume: %.6f mm^3" % result.Volume())
+
+    return cq.Workplane(obj=result)

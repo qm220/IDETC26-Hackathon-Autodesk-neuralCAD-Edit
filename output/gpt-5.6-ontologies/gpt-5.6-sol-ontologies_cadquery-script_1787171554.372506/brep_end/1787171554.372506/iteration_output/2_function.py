@@ -1,0 +1,38 @@
+def my_cad_function(args):
+    import os
+    import cadquery as cq
+
+    input_file = os.path.expanduser(args["input_file"])
+    model = cq.importers.importStep(input_file)
+    original = model.val()
+
+    axis_x = 67.5
+    axis_z = -21.0
+    mounting_y = 180.0
+    arm_length = 200.0
+    distal_y = mounting_y + arm_length
+    axis = cq.Vector(0, 1, 0)
+
+    stem = cq.Solid.makeCylinder(
+        6.5, 23.0, cq.Vector(axis_x, 165.0, axis_z), axis
+    )
+    collar = cq.Solid.makeCylinder(
+        10.0, 11.0, cq.Vector(axis_x, 177.0, axis_z), axis
+    )
+    shoulder = cq.Solid.makeCone(
+        10.0, 6.5, 8.0, cq.Vector(axis_x, 185.0, axis_z), axis
+    )
+    arm = cq.Solid.makeCylinder(
+        6.5, 192.0, cq.Vector(axis_x, mounting_y, axis_z), axis
+    )
+    contact_pad = cq.Solid.makeCylinder(
+        18.0, 8.0, cq.Vector(axis_x, distal_y - 8.0, axis_z), axis
+    )
+
+    fixation_feature = stem.fuse(collar)
+    fixation_feature = fixation_feature.fuse(shoulder)
+    fixation_feature = fixation_feature.fuse(arm)
+    fixation_feature = fixation_feature.fuse(contact_pad)
+
+    edited = original.fuse(fixation_feature).clean()
+    return cq.Workplane("XY").newObject([edited])

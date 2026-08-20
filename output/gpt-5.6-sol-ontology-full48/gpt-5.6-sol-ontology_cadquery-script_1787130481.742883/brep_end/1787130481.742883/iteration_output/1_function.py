@@ -1,0 +1,56 @@
+def my_cad_function(args):
+    input_file = os.path.expanduser(args["input_file"])
+    imported = cq.importers.importStep(input_file)
+    model = imported.val() if hasattr(imported, "val") else imported
+
+    solids = list(model.Solids())
+    pin_axes = [
+        (42.743402, 1.752975),
+        (-37.303780, 1.752975),
+        (42.743402, 44.605773),
+        (-37.303780, 44.605773),
+    ]
+
+    used_indices = set()
+    replacements = {}
+    head_radius = 3.5
+    head_thickness = 2.0
+    overlap = 0.05
+
+    for axis_x, axis_y in pin_axes:
+        candidates = []
+        for index, solid in enumerate(solids):
+            if index in used_indices:
+                continue
+            bb = solid.BoundingBox()
+            center = bb.center
+            xy_error = ((center.x-axis_x)**2 + (center.y-axis_y)**2)**0.5
+            if bb.zlen > 50.0 and bb.xlen < 8.0 and bb.ylen < 8.0:
+                candidates.append((xy_error, index, solid, bb))
+
+        if not candidates:
+            raise ValueError("Could not localize a long corner pivot pin")
+
+        candidates.sort(key=lambda item: item[0])
+        xy_error, index, pin, bb = candidates[0]
+        if xy_error > 1.0:
+            raise ValueError("Localized long pin is not coaxial with its grounded axis")
+
+        used_indices.add(index)
+        negative_head = cq.Solid.makeCylinder(
+            head_radius,
+            head_thickness + overlap,
+            cq.Vector(axis_x, axis_y, bb.zmin + overlap),
+            cq.Vector(0, 0, -1),
+        )
+        positive_head = cq.Solid.makeCylinder(
+            head_radius,
+            head_thickness + overlap,
+            cq.Vector(axis_x, axis_y, bb.zmax - overlap),
+            cq.Vector(0, 0, 1),
+        )
+        replacements[index] = pin.fuse(negative_head, positive_head)
+
+    return cq.Compound.makeCompound([
+        replacements.get(index, solid) for index, solid in enumerate(solids)
+    ])

@@ -1,0 +1,96 @@
+Thinking text:
+
+
+Generated script:
+def my_cad_function(args):
+    input_file = os.path.expanduser(args["input_file"])
+    model = cq.importers.importStep(input_file)
+    shape = model.val() if hasattr(model, "val") else model
+
+    print(f"Model valid: {shape.isValid()}")
+    print(f"Solids: {len(shape.Solids())}, Faces: {len(shape.Faces())}, Edges: {len(shape.Edges())}")
+    bb = shape.BoundingBox()
+    print(
+        f"Model bbox: xmin={bb.xmin:.6f}, xmax={bb.xmax:.6f}, "
+        f"ymin={bb.ymin:.6f}, ymax={bb.ymax:.6f}, "
+        f"zmin={bb.zmin:.6f}, zmax={bb.zmax:.6f}"
+    )
+
+    faces_by_id = {}
+    for index, face in enumerate(shape.Faces()):
+        face_id = f"FACE {index}"
+        faces_by_id[face_id] = face
+        center = face.Center()
+        fbb = face.BoundingBox()
+        geom_type = face.geomType()
+        try:
+            normal = face.normalAt(center)
+            normal_text = f"({normal.x:.6f}, {normal.y:.6f}, {normal.z:.6f})"
+        except Exception as exc:
+            normal_text = f"unavailable: {exc}"
+
+        vertices = []
+        for vertex in face.Vertices():
+            point = vertex.Center()
+            vertices.append((round(point.x, 6), round(point.y, 6), round(point.z, 6)))
+
+        print(
+            f"{face_id}: type={geom_type}, area={face.Area():.6f}, "
+            f"center=({center.x:.6f}, {center.y:.6f}, {center.z:.6f}), "
+            f"normal={normal_text}, "
+            f"bbox=({fbb.xmin:.6f},{fbb.xmax:.6f}; "
+            f"{fbb.ymin:.6f},{fbb.ymax:.6f}; "
+            f"{fbb.zmin:.6f},{fbb.zmax:.6f}), vertices={vertices}"
+        )
+
+    target = faces_by_id.get("FACE 11")
+    if target is not None:
+        print(f"FACE 11 outer wire edges: {len(target.outerWire().Edges())}")
+        for index, edge in enumerate(target.outerWire().Edges()):
+            center = edge.Center()
+            ebb = edge.BoundingBox()
+            print(
+                f"FACE 11 EDGE {index}: type={edge.geomType()}, "
+                f"length={edge.Length():.6f}, "
+                f"center=({center.x:.6f}, {center.y:.6f}, {center.z:.6f}), "
+                f"bbox=({ebb.xmin:.6f},{ebb.xmax:.6f}; "
+                f"{ebb.ymin:.6f},{ebb.ymax:.6f}; "
+                f"{ebb.zmin:.6f},{ebb.zmax:.6f})"
+            )
+
+    return model
+
+Program output:
+stdout: Loading function from: /home/adml/Research/Hackathon2026/IDETC26-Hackathon-Autodesk-neuralCAD-Edit/output/gpt-5.6-ontologies/gpt-5.6-sol-ontologies_cadquery-script_1787174804.4252813/brep_end/1787174804.4252813/temp_script.py
+Model valid: True
+Solids: 1, Faces: 15, Edges: 36
+Model bbox: xmin=-1.000000, xmax=1.000000, ymin=-3.000000, ymax=3.000000, zmin=-0.750000, zmax=0.750000
+FACE 0: type=CYLINDER, area=8.356221, center=(0.000000, 0.000000, 0.052952), normal=(-0.000000, 0.000000, -1.000000), bbox=(-0.800000,0.800000; -2.461707,2.461707; -0.200000,0.550000), vertices=[(-0.8, -2.461707, 0.55), (-0.8, 2.461707, 0.55), (0.8, 2.461707, 0.55), (0.8, -2.461707, 0.55)]
+FACE 1: type=PLANE, area=0.541269, center=(0.000000, -2.630853, 0.550000), normal=(0.000000, 0.000000, -1.000000), bbox=(-0.800000,0.800000; -2.800000,-2.461707; 0.550000,0.550000), vertices=[(0.8, -2.461707, 0.55), (-0.8, -2.461707, 0.55), (0.8, -2.8, 0.55), (-0.8, -2.8, 0.55)]
+FACE 2: type=PLANE, area=0.541269, center=(-0.000000, 2.630853, 0.550000), normal=(0.000000, 0.000000, -1.000000), bbox=(-0.800000,0.800000; 2.461707,2.800000; 0.550000,0.550000), vertices=[(-0.8, 2.461707, 0.55), (0.8, 2.461707, 0.55), (-0.8, 2.8, 0.55), (0.8, 2.8, 0.55)]
+FACE 3: type=PLANE, area=4.773181, center=(0.800000, 0.000000, -0.282609), normal=(-1.000000, -0.000000, 0.000000), bbox=(0.800000,0.800000; -2.800000,2.800000; -0.750000,0.550000), vertices=[(0.8, 2.461707, 0.55), (0.8, -2.461707, 0.55), (0.8, 2.8, 0.55), (0.8, 2.8, -0.75), (0.8, -2.8, -0.75), (0.8, -2.8, 0.55)]
+FACE 4: type=PLANE, area=4.773181, center=(-0.800000, 0.000000, -0.282609), normal=(1.000000, 0.000000, 0.000000), bbox=(-0.800000,-0.800000; -2.800000,2.800000; -0.750000,0.550000), vertices=[(-0.8, -2.461707, 0.55), (-0.8, 2.461707, 0.55), (-0.8, -2.8, 0.55), (-0.8, -2.8, -0.75), (-0.8, 2.8, -0.75), (-0.8, 2.8, 0.55)]
+FACE 5: type=PLANE, area=2.080000, center=(-0.000000, 2.800000, -0.100000), normal=(0.000000, -1.000000, 0.000000), bbox=(-0.800000,0.800000; 2.800000,2.800000; -0.750000,0.550000), vertices=[(-0.8, 2.8, -0.75), (-0.8, 2.8, 0.55), (0.8, 2.8, -0.75), (0.8, 2.8, 0.55)]
+FACE 6: type=PLANE, area=2.080000, center=(0.000000, -2.800000, -0.100000), normal=(0.000000, 1.000000, 0.000000), bbox=(-0.800000,0.800000; -2.800000,-2.800000; -0.750000,0.550000), vertices=[(0.8, -2.8, -0.75), (0.8, -2.8, 0.55), (-0.8, -2.8, -0.75), (-0.8, -2.8, 0.55)]
+FACE 7: type=CYLINDER, area=10.213278, center=(0.000000, -0.000000, 0.253099), normal=(0.000000, 0.000000, 1.000000), bbox=(-1.000000,1.000000; -2.400000,2.400000; 0.000000,0.750000), vertices=[(-1.0, 2.4, 0.75), (1.0, 2.4, 0.75), (1.0, -2.4, 0.75), (-1.0, -2.4, 0.75)]
+FACE 8: type=PLANE, area=1.200000, center=(0.000000, -2.700000, 0.750000), normal=(0.000000, 0.000000, 1.000000), bbox=(-1.000000,1.000000; -3.000000,-2.400000; 0.750000,0.750000), vertices=[(1.0, -2.4, 0.75), (-1.0, -2.4, 0.75), (-1.0, -3.0, 0.75), (1.0, -3.0, 0.75)]
+FACE 9: type=PLANE, area=1.200000, center=(0.000000, 2.700000, 0.750000), normal=(0.000000, 0.000000, 1.000000), bbox=(-1.000000,1.000000; 2.400000,3.000000; 0.750000,0.750000), vertices=[(-1.0, 2.4, 0.75), (1.0, 2.4, 0.75), (1.0, 3.0, 0.75), (-1.0, 3.0, 0.75)]
+FACE 10: type=PLANE, area=6.553759, center=(1.000000, -0.000000, -0.167066), normal=(1.000000, 0.000000, 0.000000), bbox=(1.000000,1.000000; -3.000000,3.000000; -0.750000,0.750000), vertices=[(1.0, 2.4, 0.75), (1.0, -2.4, 0.75), (1.0, -3.0, 0.75), (1.0, -3.0, -0.75), (1.0, 3.0, -0.75), (1.0, 3.0, 0.75)]
+FACE 11: type=PLANE, area=3.040000, center=(0.000000, -0.000000, -0.750000), normal=(0.000000, 0.000000, -1.000000), bbox=(-1.000000,1.000000; -3.000000,3.000000; -0.750000,-0.750000), vertices=[(1.0, -3.0, -0.75), (-1.0, -3.0, -0.75), (-1.0, 3.0, -0.75), (1.0, 3.0, -0.75), (-0.8, 2.8, -0.75), (-0.8, -2.8, -0.75), (0.8, -2.8, -0.75), (0.8, 2.8, -0.75)]
+FACE 12: type=PLANE, area=6.553759, center=(-1.000000, 0.000000, -0.167066), normal=(-1.000000, -0.000000, 0.000000), bbox=(-1.000000,-1.000000; -3.000000,3.000000; -0.750000,0.750000), vertices=[(-1.0, -2.4, 0.75), (-1.0, 2.4, 0.75), (-1.0, 3.0, 0.75), (-1.0, 3.0, -0.75), (-1.0, -3.0, -0.75), (-1.0, -3.0, 0.75)]
+FACE 13: type=PLANE, area=3.000000, center=(-0.000000, 3.000000, 0.000000), normal=(0.000000, 1.000000, 0.000000), bbox=(-1.000000,1.000000; 3.000000,3.000000; -0.750000,0.750000), vertices=[(-1.0, 3.0, -0.75), (-1.0, 3.0, 0.75), (1.0, 3.0, 0.75), (1.0, 3.0, -0.75)]
+FACE 14: type=PLANE, area=3.000000, center=(0.000000, -3.000000, 0.000000), normal=(0.000000, -1.000000, 0.000000), bbox=(-1.000000,1.000000; -3.000000,-3.000000; -0.750000,0.750000), vertices=[(1.0, -3.0, -0.75), (1.0, -3.0, 0.75), (-1.0, -3.0, 0.75), (-1.0, -3.0, -0.75)]
+FACE 11 outer wire edges: 4
+FACE 11 EDGE 0: type=LINE, length=2.000000, center=(0.000000, -3.000000, -0.750000), bbox=(-1.000000,1.000000; -3.000000,-3.000000; -0.750000,-0.750000)
+FACE 11 EDGE 1: type=LINE, length=6.000000, center=(-1.000000, -0.000000, -0.750000), bbox=(-1.000000,-1.000000; -3.000000,3.000000; -0.750000,-0.750000)
+FACE 11 EDGE 2: type=LINE, length=2.000000, center=(0.000000, 3.000000, -0.750000), bbox=(-1.000000,1.000000; 3.000000,3.000000; -0.750000,-0.750000)
+FACE 11 EDGE 3: type=LINE, length=6.000000, center=(1.000000, 0.000000, -0.750000), bbox=(1.000000,1.000000; -3.000000,3.000000; -0.750000,-0.750000)
+Exported shape to: /home/adml/Research/Hackathon2026/IDETC26-Hackathon-Autodesk-neuralCAD-Edit/output/gpt-5.6-ontologies/gpt-5.6-sol-ontologies_cadquery-script_1787174804.4252813/brep_end/1787174804.4252813/tmp.step
+Exported STL to: /home/adml/Research/Hackathon2026/IDETC26-Hackathon-Autodesk-neuralCAD-Edit/output/gpt-5.6-ontologies/gpt-5.6-sol-ontologies_cadquery-script_1787174804.4252813/brep_end/1787174804.4252813/tmp.stl
+Exported PNG image to: /home/adml/Research/Hackathon2026/IDETC26-Hackathon-Autodesk-neuralCAD-Edit/output/gpt-5.6-ontologies/gpt-5.6-sol-ontologies_cadquery-script_1787174804.4252813/brep_end/1787174804.4252813/tmp.png
+Script completed.
+
+stderr: 
+
+Exported this iteration:
+tmp.step, tmp.stl, tmp.png, tmp_+Z.png, tmp_-Z.png, tmp_-X.png, tmp_+X.png, tmp_+Y.png, tmp_-Y.png, tmp_iso1.png, tmp_iso2.png

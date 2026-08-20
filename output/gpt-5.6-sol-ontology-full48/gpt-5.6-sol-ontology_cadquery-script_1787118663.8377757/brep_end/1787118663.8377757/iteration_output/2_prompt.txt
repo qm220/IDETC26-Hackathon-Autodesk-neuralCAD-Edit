@@ -1,0 +1,1454 @@
+The planning stage produced model.json (hierarchical part → sections → features
+→ B-rep faces), aim.json (desired final state from the edit request), and
+operation.json (grounded edit operations, parameters, constraints, targets,
+and modeling plans). Use those artifacts when writing my_cad_function.
+
+Section ids look like R01. Feature ids look like F001. FACE N values are
+CadQuery Faces() indices from the STEP analysis. Bind them to actual STEP
+geometry by inspecting the loaded model (print faces and coordinates) before
+editing. If an operation needs boundary topology such as a chamfer or fillet
+edge, derive it in CadQuery from the grounded face(s).
+
+Implement each operation's modeling_plan steps. Load the start model from
+args["input_file"].
+
+model.json from the planning stage:
+
+{
+  "part": {
+    "id": "P001",
+    "name": "Curved support cradle",
+    "description": "Single-solid saddle or cradle bracket with a concave cylindrical seating surface, a concentric offset underside, paired longitudinal side rails, paired end rails, and a planar base interface. The reported overall bounding box is 2.0 mm by 6.0 mm by 1.5 mm.",
+    "source_views": [
+      "+Z",
+      "-Z",
+      "-X",
+      "+X",
+      "+Y",
+      "-Y",
+      "iso1"
+    ],
+    "solid_ids": [
+      "SOLID 0"
+    ],
+    "symmetry_note": "The geometry is mirror-symmetric about the CAD planes x=0 and y=0. The two side rails and two end rails form paired mirrored structures. Both cylindrical faces share an axis parallel to CAD X and are concentric, with radii 4.215 mm and 4.415 mm.",
+    "semantic_orientation": {
+      "status": "partially inferred",
+      "description": "The concave cylindrical seating surface is interpreted as the functional top of the cradle and the planar annular face at z=-0.75 mm as the bottom. CAD X spans the cradle width and CAD Y follows its length. Because both ends and both sides are symmetric, front/back and left/right assignments are conventional rather than functionally distinguished.",
+      "confidence": 0.84,
+      "view_sides": {
+        "+X": "right",
+        "-X": "left",
+        "+Y": "unknown",
+        "-Y": "unknown",
+        "+Z": "top",
+        "-Z": "bottom"
+      }
+    },
+    "sections": [
+      {
+        "id": "R01",
+        "name": "Central curved cradle",
+        "ontology_class": "cad:CentralSection",
+        "description": "Central curved shell region comprising the upward-facing concave seating surface and its concentric cavity-facing underside.",
+        "location": "Centered between the paired longitudinal rails and between the two end rails; cylindrical axis parallel to CAD X.",
+        "solid_ids": [
+          "SOLID 0"
+        ],
+        "colour": {
+          "R": 70,
+          "G": 145,
+          "B": 220
+        },
+        "section_functions": [
+          {
+            "ontology_class": "cad:SupportFunction",
+            "name": "Support a cylindrical object",
+            "description": "Provides a broad concave seat for supporting an external cylindrical member.",
+            "primary": true,
+            "confidence": 0.94
+          },
+          {
+            "ontology_class": "cad:LocateFunction",
+            "name": "Locate supported object",
+            "description": "The concave profile laterally locates an external cylindrical member relative to the cradle.",
+            "primary": false,
+            "confidence": 0.86
+          },
+          {
+            "ontology_class": "cad:TransferLoadFunction",
+            "name": "Transfer seating load",
+            "description": "Transfers contact load from the seating surface into the surrounding support frame.",
+            "primary": false,
+            "confidence": 0.9
+          }
+        ],
+        "section_behaviors": [
+          {
+            "ontology_class": "cad:ReactContactLoadBehavior",
+            "name": "React distributed contact load",
+            "description": "The cylindrical seat reacts contact pressure distributed over its curved surface.",
+            "confidence": 0.92
+          },
+          {
+            "ontology_class": "cad:SpreadLoadBehavior",
+            "name": "Spread load",
+            "description": "The broad curved shell spreads load toward the side and end rails.",
+            "confidence": 0.87
+          },
+          {
+            "ontology_class": "cad:ResistBendingBehavior",
+            "name": "Resist shell bending",
+            "description": "The curved shell resists bending between its perimeter supports.",
+            "confidence": 0.82
+          }
+        ],
+        "feature_groups": [],
+        "features": [
+          {
+            "id": "F001",
+            "name": "Concave cylindrical seating interface",
+            "ontology_class": "cad:SeatingInterface",
+            "parent_feature_id": null,
+            "description": "Primary upward-facing cradle surface. It is a cylindrical patch of radius 4.215 mm with axis parallel to CAD X and spans x=-1.0 to 1.0 mm.",
+            "interface_type": "cad:SeatingInterface",
+            "feature_functions": [
+              {
+                "ontology_class": "cad:SupportFunction",
+                "name": "Support",
+                "description": "Supports an external cylindrical member over a curved contact area.",
+                "primary": true,
+                "confidence": 0.95
+              },
+              {
+                "ontology_class": "cad:LocateFunction",
+                "name": "Locate",
+                "description": "Locates the supported member transverse to the cylindrical axis.",
+                "primary": false,
+                "confidence": 0.88
+              }
+            ],
+            "feature_behaviors": [
+              {
+                "ontology_class": "cad:ReactContactLoadBehavior",
+                "name": "React contact load",
+                "description": "Provides the principal external contact surface and reacts normal bearing pressure.",
+                "confidence": 0.95
+              },
+              {
+                "ontology_class": "cad:ConstrainTranslationBehavior",
+                "name": "Constrain transverse translation",
+                "description": "The concave profile constrains translation transverse to the seat axis while remaining open above.",
+                "confidence": 0.85
+              }
+            ],
+            "relationships": [
+              {
+                "target_feature_id": "F002",
+                "category": "geometric",
+                "relation": "cad:coaxialWith",
+                "description": "The seating surface and underside shell surface have the same reported cylinder origin and axis.",
+                "confidence": 1.0
+              },
+              {
+                "target_feature_id": "F003",
+                "category": "structural",
+                "relation": "cad:sharesBoundaryWith",
+                "description": "The seating surface terminates at the positive-X longitudinal rail.",
+                "confidence": 0.93
+              },
+              {
+                "target_feature_id": "F004",
+                "category": "structural",
+                "relation": "cad:sharesBoundaryWith",
+                "description": "The seating surface terminates at the negative-X longitudinal rail.",
+                "confidence": 0.93
+              },
+              {
+                "target_feature_id": "F005",
+                "category": "structural",
+                "relation": "cad:sharesBoundaryWith",
+                "description": "The positive-Y end of the seating surface meets the positive-Y end rail.",
+                "confidence": 0.91
+              },
+              {
+                "target_feature_id": "F006",
+                "category": "structural",
+                "relation": "cad:sharesBoundaryWith",
+                "description": "The negative-Y end of the seating surface meets the negative-Y end rail.",
+                "confidence": 0.91
+              }
+            ],
+            "brep_faces": [
+              {
+                "brep_id": "FACE 7",
+                "face_code": "",
+                "entity_type": "cad:Face",
+                "geometry_type": "cad:CylindricalSurface",
+                "semantic_role": "cad:SeatingFaceRole",
+                "name": "Primary cylindrical seating face",
+                "description": "Concave cylindrical contact face forming the functional saddle seat.",
+                "salience": "cad:PrimarySalience",
+                "confidence": 0.98,
+                "evidence": [
+                  "CadQuery reports CYLINDER geometry with radius 4.215000 mm.",
+                  "Cylinder origin is (0.000000,0.000000,4.215000) and axis is (-1.000000,0.000000,0.000000).",
+                  "Bounding box is x=(-1.000000,1.000000), y=(-2.400000,2.400000), z=(0.000000,0.750000).",
+                  "The multi-view images show this face as the broad upward-facing concave cradle surface."
+                ]
+              }
+            ],
+            "confidence": 0.96
+          },
+          {
+            "id": "F002",
+            "name": "Offset curved shell underside",
+            "ontology_class": "cad:ShellFeature",
+            "parent_feature_id": null,
+            "description": "Concentric underside of the curved cradle shell. Its 4.415 mm radius is 0.200 mm larger than the seating radius, indicating an approximately 0.200 mm radial shell thickness.",
+            "interface_type": null,
+            "feature_functions": [
+              {
+                "ontology_class": "cad:TransferLoadFunction",
+                "name": "Transfer shell load",
+                "description": "Forms the underside of the load-bearing curved shell and transfers load to the perimeter frame.",
+                "primary": true,
+                "confidence": 0.9
+              },
+              {
+                "ontology_class": "cad:ReduceMassFunction",
+                "name": "Reduce mass",
+                "description": "Bounds the open underside cavity rather than filling the entire cradle volume.",
+                "primary": false,
+                "confidence": 0.89
+              }
+            ],
+            "feature_behaviors": [
+              {
+                "ontology_class": "cad:ResistBendingBehavior",
+                "name": "Resist bending",
+                "description": "Works with the seating face as a curved shell resisting transverse bending.",
+                "confidence": 0.87
+              },
+              {
+                "ontology_class": "cad:DistributeStressBehavior",
+                "name": "Distribute shell stress",
+                "description": "The continuous concentric underside supports relatively uniform shell thickness and stress distribution.",
+                "confidence": 0.84
+              }
+            ],
+            "relationships": [
+              {
+                "target_feature_id": "F001",
+                "category": "geometric",
+                "relation": "cad:concentricWith",
+                "description": "Both cylindrical faces have the same reported cylinder origin and parallel, identical axes; their radii differ by 0.200 mm.",
+                "confidence": 1.0
+              },
+              {
+                "target_feature_id": "F003",
+                "category": "structural",
+                "relation": "cad:attachedTo",
+                "description": "The positive-X edge of the curved underside joins the inner face of the positive-X rail.",
+                "confidence": 0.93
+              },
+              {
+                "target_feature_id": "F004",
+                "category": "structural",
+                "relation": "cad:attachedTo",
+                "description": "The negative-X edge of the curved underside joins the inner face of the negative-X rail.",
+                "confidence": 0.93
+              }
+            ],
+            "brep_faces": [
+              {
+                "brep_id": "FACE 0",
+                "face_code": "",
+                "entity_type": "cad:Face",
+                "geometry_type": "cad:CylindricalSurface",
+                "semantic_role": "cad:CavityWallRole",
+                "name": "Curved cavity-facing underside",
+                "description": "Cylindrical underside face bounding the open cavity beneath the seating shell.",
+                "salience": "cad:PrimarySalience",
+                "confidence": 0.98,
+                "evidence": [
+                  "CadQuery reports CYLINDER geometry with radius 4.415000 mm.",
+                  "Cylinder origin is (-0.000000,0.000000,4.215000) and axis is (-1.000000,0.000000,0.000000).",
+                  "Bounding box is x=(-0.800000,0.800000), y=(-2.461707,2.461707), z=(-0.200000,0.550000).",
+                  "Its radius exceeds that of FACE 7 by exactly 0.200000 mm while sharing the same cylinder origin and axis.",
+                  "The -Y and isometric views indicate an open underside bounded by this curved surface."
+                ]
+              }
+            ],
+            "confidence": 0.95
+          }
+        ],
+        "unclassified_brep_faces": [],
+        "relationships": [],
+        "confidence": 0.95
+      },
+      {
+        "id": "R02",
+        "name": "Perimeter support frame",
+        "ontology_class": "cad:OuterSection",
+        "description": "Rectangular perimeter frame surrounding and supporting the curved shell. It consists of two longitudinal side rails, two end rails, and a continuous planar bottom frame face around the underside opening.",
+        "location": "Around the perimeter of the central curved cradle, extending to x=±1.0 mm and y=±3.0 mm and down to z=-0.75 mm.",
+        "solid_ids": [
+          "SOLID 0"
+        ],
+        "colour": {
+          "R": 230,
+          "G": 145,
+          "B": 55
+        },
+        "section_functions": [
+          {
+            "ontology_class": "cad:SupportFunction",
+            "name": "Support cradle shell",
+            "description": "Supports the perimeter of the curved seating shell.",
+            "primary": true,
+            "confidence": 0.94
+          },
+          {
+            "ontology_class": "cad:TransferLoadFunction",
+            "name": "Transfer load to base",
+            "description": "Transfers seating loads from the curved shell to the planar bottom interface.",
+            "primary": false,
+            "confidence": 0.92
+          },
+          {
+            "ontology_class": "cad:MountFunction",
+            "name": "Provide base mounting region",
+            "description": "Provides a planar lower interface suitable for seating or mounting the cradle on another structure.",
+            "primary": false,
+            "confidence": 0.79
+          }
+        ],
+        "section_behaviors": [
+          {
+            "ontology_class": "cad:CarryCompressionBehavior",
+            "name": "Carry compression",
+            "description": "The rails carry compressive reaction from the supported cradle shell toward the base.",
+            "confidence": 0.88
+          },
+          {
+            "ontology_class": "cad:ResistBendingBehavior",
+            "name": "Resist frame bending",
+            "description": "The perimeter rails stiffen the shell and resist bending along the cradle length and width.",
+            "confidence": 0.88
+          },
+          {
+            "ontology_class": "cad:SpreadLoadBehavior",
+            "name": "Spread base load",
+            "description": "The perimeter base spreads load around the open underside cavity.",
+            "confidence": 0.84
+          }
+        ],
+        "feature_groups": [
+          {
+            "id": "G001",
+            "name": "Paired longitudinal side rails",
+            "ontology_class": "cad:RepeatedFeatureGroup",
+            "feature_class": "cad:SupportFeature",
+            "pattern_type": "cad:PairedPattern",
+            "member_count": 2,
+            "member_feature_ids": [
+              "F003",
+              "F004"
+            ],
+            "representative_feature_ids": [
+              "F003"
+            ],
+            "pattern_description": "Two geometrically mirrored support rails located on opposite sides of the cradle across the CAD plane x=0.",
+            "confidence": 0.98
+          },
+          {
+            "id": "G002",
+            "name": "Paired end rails",
+            "ontology_class": "cad:RepeatedFeatureGroup",
+            "feature_class": "cad:SupportFeature",
+            "pattern_type": "cad:PairedPattern",
+            "member_count": 2,
+            "member_feature_ids": [
+              "F005",
+              "F006"
+            ],
+            "representative_feature_ids": [
+              "F005"
+            ],
+            "pattern_description": "Two mirrored end rails located at opposite ends of the cradle across the CAD plane y=0.",
+            "confidence": 0.98
+          }
+        ],
+        "features": [
+          {
+            "id": "F003",
+            "name": "Positive-X longitudinal support rail",
+            "ontology_class": "cad:SupportFeature",
+            "parent_feature_id": null,
+            "description": "Longitudinal rail between the outer side plane at x=1.0 mm and inner side plane at x=0.8 mm.",
+            "interface_type": null,
+            "feature_functions": [
+              {
+                "ontology_class": "cad:SupportFunction",
+                "name": "Support shell edge",
+                "description": "Supports one longitudinal edge of the curved cradle shell.",
+                "primary": true,
+                "confidence": 0.94
+              },
+              {
+                "ontology_class": "cad:TransferLoadFunction",
+                "name": "Transfer side load",
+                "description": "Transfers shell load toward the bottom frame.",
+                "primary": false,
+                "confidence": 0.9
+              }
+            ],
+            "feature_behaviors": [
+              {
+                "ontology_class": "cad:CarryCompressionBehavior",
+                "name": "Carry compression",
+                "description": "Carries compressive load between the curved shell and base.",
+                "confidence": 0.87
+              },
+              {
+                "ontology_class": "cad:ResistBendingBehavior",
+                "name": "Resist longitudinal bending",
+                "description": "Its full-length wall geometry stiffens the cradle along CAD Y.",
+                "confidence": 0.88
+              }
+            ],
+            "relationships": [
+              {
+                "target_feature_id": "F004",
+                "category": "geometric",
+                "relation": "cad:parallelTo",
+                "description": "The paired longitudinal rails occupy opposite sides of the symmetric cradle and have parallel side faces.",
+                "confidence": 0.99
+              },
+              {
+                "target_feature_id": "F001",
+                "category": "functional",
+                "relation": "cad:supportsFeature",
+                "description": "Supports the positive-X edge of the seating interface.",
+                "confidence": 0.93
+              },
+              {
+                "target_feature_id": "F007",
+                "category": "structural",
+                "relation": "cad:attachedTo",
+                "description": "Extends down to and joins the planar bottom frame.",
+                "confidence": 0.96
+              }
+            ],
+            "brep_faces": [
+              {
+                "brep_id": "FACE 10",
+                "face_code": "",
+                "entity_type": "cad:Face",
+                "geometry_type": "cad:PlanarSurface",
+                "semantic_role": "cad:OuterWallRole",
+                "name": "Positive-X outer rail wall",
+                "description": "Outer planar wall of the positive-X longitudinal rail.",
+                "salience": "cad:SecondarySalience",
+                "confidence": 0.99,
+                "evidence": [
+                  "Planar face at x=1.000000 mm.",
+                  "Bounding box spans y=(-3.000000,3.000000) and z=(-0.750000,0.750000).",
+                  "The face is visible as a full-length exterior side wall in the isometric view."
+                ]
+              },
+              {
+                "brep_id": "FACE 3",
+                "face_code": "",
+                "entity_type": "cad:Face",
+                "geometry_type": "cad:PlanarSurface",
+                "semantic_role": "cad:InnerWallRole",
+                "name": "Positive-X inner rail wall",
+                "description": "Cavity-facing planar wall on the inner side of the positive-X rail.",
+                "salience": "cad:SecondarySalience",
+                "confidence": 0.97,
+                "evidence": [
+                  "Planar face at x=0.800000 mm.",
+                  "Bounding box spans y=(-2.800000,2.800000) and z=(-0.750000,0.550000).",
+                  "Its 0.200000 mm offset from FACE 10 is consistent with the side-rail thickness."
+                ]
+              }
+            ],
+            "confidence": 0.96
+          },
+          {
+            "id": "F004",
+            "name": "Negative-X longitudinal support rail",
+            "ontology_class": "cad:SupportFeature",
+            "parent_feature_id": null,
+            "description": "Longitudinal rail between the outer side plane at x=-1.0 mm and inner side plane at x=-0.8 mm.",
+            "interface_type": null,
+            "feature_functions": [
+              {
+                "ontology_class": "cad:SupportFunction",
+                "name": "Support shell edge",
+                "description": "Supports the opposite longitudinal edge of the curved cradle shell.",
+                "primary": true,
+                "confidence": 0.94
+              },
+              {
+                "ontology_class": "cad:TransferLoadFunction",
+                "name": "Transfer side load",
+                "description": "Transfers shell load toward the bottom frame.",
+                "primary": false,
+                "confidence": 0.9
+              }
+            ],
+            "feature_behaviors": [
+              {
+                "ontology_class": "cad:CarryCompressionBehavior",
+                "name": "Carry compression",
+                "description": "Carries compressive load between the curved shell and base.",
+                "confidence": 0.87
+              },
+              {
+                "ontology_class": "cad:ResistBendingBehavior",
+                "name": "Resist longitudinal bending",
+                "description": "Its full-length wall geometry stiffens the cradle along CAD Y.",
+                "confidence": 0.88
+              }
+            ],
+            "relationships": [
+              {
+                "target_feature_id": "F003",
+                "category": "geometric",
+                "relation": "cad:offsetFrom",
+                "description": "Mirrored counterpart of the positive-X rail across x=0.",
+                "confidence": 0.99
+              },
+              {
+                "target_feature_id": "F001",
+                "category": "functional",
+                "relation": "cad:supportsFeature",
+                "description": "Supports the negative-X edge of the seating interface.",
+                "confidence": 0.93
+              },
+              {
+                "target_feature_id": "F007",
+                "category": "structural",
+                "relation": "cad:attachedTo",
+                "description": "Extends down to and joins the planar bottom frame.",
+                "confidence": 0.96
+              }
+            ],
+            "brep_faces": [
+              {
+                "brep_id": "FACE 12",
+                "face_code": "",
+                "entity_type": "cad:Face",
+                "geometry_type": "cad:PlanarSurface",
+                "semantic_role": "cad:OuterWallRole",
+                "name": "Negative-X outer rail wall",
+                "description": "Outer planar wall of the negative-X longitudinal rail.",
+                "salience": "cad:SecondarySalience",
+                "confidence": 0.99,
+                "evidence": [
+                  "Planar face at x=-1.000000 mm.",
+                  "Bounding box spans y=(-3.000000,3.000000) and z=(-0.750000,0.750000).",
+                  "Geometry mirrors FACE 10 across x=0."
+                ]
+              },
+              {
+                "brep_id": "FACE 4",
+                "face_code": "",
+                "entity_type": "cad:Face",
+                "geometry_type": "cad:PlanarSurface",
+                "semantic_role": "cad:InnerWallRole",
+                "name": "Negative-X inner rail wall",
+                "description": "Cavity-facing planar wall on the inner side of the negative-X rail.",
+                "salience": "cad:SecondarySalience",
+                "confidence": 0.97,
+                "evidence": [
+                  "Planar face at x=-0.800000 mm.",
+                  "Bounding box spans y=(-2.800000,2.800000) and z=(-0.750000,0.550000).",
+                  "Geometry mirrors FACE 3 across x=0."
+                ]
+              }
+            ],
+            "confidence": 0.96
+          },
+          {
+            "id": "F005",
+            "name": "Positive-Y end support rail",
+            "ontology_class": "cad:SupportFeature",
+            "parent_feature_id": null,
+            "description": "End rail joining the two longitudinal rails at the positive-Y end. It includes an outer end wall, an inner cavity wall, an upper land, and an underside transition land.",
+            "interface_type": null,
+            "feature_functions": [
+              {
+                "ontology_class": "cad:SupportFunction",
+                "name": "Support shell end",
+                "description": "Supports and closes the positive-Y end of the curved shell.",
+                "primary": true,
+                "confidence": 0.92
+              },
+              {
+                "ontology_class": "cad:ConnectFunction",
+                "name": "Connect side rails",
+                "description": "Structurally connects the two longitudinal rails.",
+                "primary": false,
+                "confidence": 0.91
+              }
+            ],
+            "feature_behaviors": [
+              {
+                "ontology_class": "cad:SpreadLoadBehavior",
+                "name": "Spread end load",
+                "description": "Spreads shell-end load across the cradle width.",
+                "confidence": 0.86
+              },
+              {
+                "ontology_class": "cad:ResistBendingBehavior",
+                "name": "Resist transverse bending",
+                "description": "Acts as a cross-member between the two side rails.",
+                "confidence": 0.86
+              }
+            ],
+            "relationships": [
+              {
+                "target_feature_id": "F006",
+                "category": "geometric",
+                "relation": "cad:parallelTo",
+                "description": "The two end rails are mirrored across y=0 and have parallel end walls and lands.",
+                "confidence": 0.99
+              },
+              {
+                "target_feature_id": "F003",
+                "category": "structural",
+                "relation": "cad:attachedTo",
+                "description": "Joins the positive-X longitudinal rail.",
+                "confidence": 0.96
+              },
+              {
+                "target_feature_id": "F004",
+                "category": "structural",
+                "relation": "cad:attachedTo",
+                "description": "Joins the negative-X longitudinal rail.",
+                "confidence": 0.96
+              },
+              {
+                "target_feature_id": "F007",
+                "category": "structural",
+                "relation": "cad:attachedTo",
+                "description": "Extends down to and joins the bottom frame.",
+                "confidence": 0.96
+              }
+            ],
+            "brep_faces": [
+              {
+                "brep_id": "FACE 13",
+                "face_code": "",
+                "entity_type": "cad:Face",
+                "geometry_type": "cad:PlanarSurface",
+                "semantic_role": "cad:OuterWallRole",
+                "name": "Positive-Y outer end wall",
+                "description": "Exterior end wall of the positive-Y end rail.",
+                "salience": "cad:SecondarySalience",
+                "confidence": 0.99,
+                "evidence": [
+                  "Planar face at y=3.000000 mm.",
+                  "Bounding box spans x=(-1.000000,1.000000) and z=(-0.750000,0.750000)."
+                ]
+              },
+              {
+                "brep_id": "FACE 5",
+                "face_code": "",
+                "entity_type": "cad:Face",
+                "geometry_type": "cad:PlanarSurface",
+                "semantic_role": "cad:InnerWallRole",
+                "name": "Positive-Y inner end wall",
+                "description": "Cavity-facing end wall of the positive-Y rail.",
+                "salience": "cad:SecondarySalience",
+                "confidence": 0.97,
+                "evidence": [
+                  "Planar face at y=2.800000 mm.",
+                  "Bounding box spans x=(-0.800000,0.800000) and z=(-0.750000,0.550000).",
+                  "The face is offset 0.200000 mm inward from FACE 13."
+                ]
+              },
+              {
+                "brep_id": "FACE 9",
+                "face_code": "",
+                "entity_type": "cad:Face",
+                "geometry_type": "cad:PlanarSurface",
+                "semantic_role": "cad:SupportFaceRole",
+                "name": "Positive-Y upper land",
+                "description": "Planar upper land between the outer end and the cylindrical seating surface.",
+                "salience": "cad:SecondarySalience",
+                "confidence": 0.98,
+                "evidence": [
+                  "Planar face at z=0.750000 mm.",
+                  "Bounding box is x=(-1.000000,1.000000), y=(2.400000,3.000000)."
+                ]
+              },
+              {
+                "brep_id": "FACE 2",
+                "face_code": "",
+                "entity_type": "cad:Face",
+                "geometry_type": "cad:PlanarSurface",
+                "semantic_role": "cad:CavityWallRole",
+                "name": "Positive-Y underside land",
+                "description": "Planar cavity-facing land connecting the curved underside to the inner end wall.",
+                "salience": "cad:SecondarySalience",
+                "confidence": 0.97,
+                "evidence": [
+                  "Planar face at z=0.550000 mm.",
+                  "Bounding box is x=(-0.800000,0.800000), y=(2.461707,2.800000).",
+                  "It borders the positive-Y limit of the radius-4.415 mm underside surface."
+                ]
+              }
+            ],
+            "confidence": 0.95
+          },
+          {
+            "id": "F006",
+            "name": "Negative-Y end support rail",
+            "ontology_class": "cad:SupportFeature",
+            "parent_feature_id": null,
+            "description": "End rail joining the two longitudinal rails at the negative-Y end. It mirrors the positive-Y end rail.",
+            "interface_type": null,
+            "feature_functions": [
+              {
+                "ontology_class": "cad:SupportFunction",
+                "name": "Support shell end",
+                "description": "Supports and closes the negative-Y end of the curved shell.",
+                "primary": true,
+                "confidence": 0.92
+              },
+              {
+                "ontology_class": "cad:ConnectFunction",
+                "name": "Connect side rails",
+                "description": "Structurally connects the two longitudinal rails.",
+                "primary": false,
+                "confidence": 0.91
+              }
+            ],
+            "feature_behaviors": [
+              {
+                "ontology_class": "cad:SpreadLoadBehavior",
+                "name": "Spread end load",
+                "description": "Spreads shell-end load across the cradle width.",
+                "confidence": 0.86
+              },
+              {
+                "ontology_class": "cad:ResistBendingBehavior",
+                "name": "Resist transverse bending",
+                "description": "Acts as a cross-member between the two side rails.",
+                "confidence": 0.86
+              }
+            ],
+            "relationships": [
+              {
+                "target_feature_id": "F005",
+                "category": "geometric",
+                "relation": "cad:offsetFrom",
+                "description": "Mirrored counterpart of the positive-Y end rail across y=0.",
+                "confidence": 0.99
+              },
+              {
+                "target_feature_id": "F003",
+                "category": "structural",
+                "relation": "cad:attachedTo",
+                "description": "Joins the positive-X longitudinal rail.",
+                "confidence": 0.96
+              },
+              {
+                "target_feature_id": "F004",
+                "category": "structural",
+                "relation": "cad:attachedTo",
+                "description": "Joins the negative-X longitudinal rail.",
+                "confidence": 0.96
+              },
+              {
+                "target_feature_id": "F007",
+                "category": "structural",
+                "relation": "cad:attachedTo",
+                "description": "Extends down to and joins the bottom frame.",
+                "confidence": 0.96
+              }
+            ],
+            "brep_faces": [
+              {
+                "brep_id": "FACE 14",
+                "face_code": "",
+                "entity_type": "cad:Face",
+                "geometry_type": "cad:PlanarSurface",
+                "semantic_role": "cad:OuterWallRole",
+                "name": "Negative-Y outer end wall",
+                "description": "Exterior end wall of the negative-Y end rail.",
+                "salience": "cad:SecondarySalience",
+                "confidence": 0.99,
+                "evidence": [
+                  "Planar face at y=-3.000000 mm.",
+                  "Bounding box spans x=(-1.000000,1.000000) and z=(-0.750000,0.750000).",
+                  "Geometry mirrors FACE 13 across y=0."
+                ]
+              },
+              {
+                "brep_id": "FACE 6",
+                "face_code": "",
+                "entity_type": "cad:Face",
+                "geometry_type": "cad:PlanarSurface",
+                "semantic_role": "cad:InnerWallRole",
+                "name": "Negative-Y inner end wall",
+                "description": "Cavity-facing end wall of the negative-Y rail.",
+                "salience": "cad:SecondarySalience",
+                "confidence": 0.97,
+                "evidence": [
+                  "Planar face at y=-2.800000 mm.",
+                  "Bounding box spans x=(-0.800000,0.800000) and z=(-0.750000,0.550000).",
+                  "Geometry mirrors FACE 5 across y=0."
+                ]
+              },
+              {
+                "brep_id": "FACE 8",
+                "face_code": "",
+                "entity_type": "cad:Face",
+                "geometry_type": "cad:PlanarSurface",
+                "semantic_role": "cad:SupportFaceRole",
+                "name": "Negative-Y upper land",
+                "description": "Planar upper land between the outer end and the cylindrical seating surface.",
+                "salience": "cad:SecondarySalience",
+                "confidence": 0.98,
+                "evidence": [
+                  "Planar face at z=0.750000 mm.",
+                  "Bounding box is x=(-1.000000,1.000000), y=(-3.000000,-2.400000).",
+                  "Geometry mirrors FACE 9 across y=0."
+                ]
+              },
+              {
+                "brep_id": "FACE 1",
+                "face_code": "",
+                "entity_type": "cad:Face",
+                "geometry_type": "cad:PlanarSurface",
+                "semantic_role": "cad:CavityWallRole",
+                "name": "Negative-Y underside land",
+                "description": "Planar cavity-facing land connecting the curved underside to the inner end wall.",
+                "salience": "cad:SecondarySalience",
+                "confidence": 0.97,
+                "evidence": [
+                  "Planar face at z=0.550000 mm.",
+                  "Bounding box is x=(-0.800000,0.800000), y=(-2.800000,-2.461707).",
+                  "Geometry mirrors FACE 2 across y=0."
+                ]
+              }
+            ],
+            "confidence": 0.95
+          },
+          {
+            "id": "F007",
+            "name": "Planar perimeter base interface",
+            "ontology_class": "cad:MountingInterface",
+            "parent_feature_id": null,
+            "description": "Planar annular or frame-shaped bottom face surrounding the rectangular underside opening. It lies at z=-0.75 mm and has two boundary wires.",
+            "interface_type": "cad:MountingInterface",
+            "feature_functions": [
+              {
+                "ontology_class": "cad:MountFunction",
+                "name": "Mount or seat cradle",
+                "description": "Provides the planar lower interface by which the cradle can rest on or be mounted to another structure.",
+                "primary": true,
+                "confidence": 0.82
+              },
+              {
+                "ontology_class": "cad:TransferLoadFunction",
+                "name": "Transfer frame load",
+                "description": "Transfers reaction load from the perimeter rails into an external supporting surface.",
+                "primary": false,
+                "confidence": 0.91
+              }
+            ],
+            "feature_behaviors": [
+              {
+                "ontology_class": "cad:ReactContactLoadBehavior",
+                "name": "React base contact load",
+                "description": "Provides planar contact around the open underside cavity.",
+                "confidence": 0.88
+              },
+              {
+                "ontology_class": "cad:SpreadLoadBehavior",
+                "name": "Spread load around opening",
+                "description": "Distributes load through a continuous perimeter footprint.",
+                "confidence": 0.87
+              }
+            ],
+            "relationships": [
+              {
+                "target_feature_id": "F003",
+                "category": "functional",
+                "relation": "cad:supportsFeature",
+                "description": "Supports the positive-X longitudinal rail.",
+                "confidence": 0.94
+              },
+              {
+                "target_feature_id": "F004",
+                "category": "functional",
+                "relation": "cad:supportsFeature",
+                "description": "Supports the negative-X longitudinal rail.",
+                "confidence": 0.94
+              },
+              {
+                "target_feature_id": "F005",
+                "category": "functional",
+                "relation": "cad:supportsFeature",
+                "description": "Supports the positive-Y end rail.",
+                "confidence": 0.94
+              },
+              {
+                "target_feature_id": "F006",
+                "category": "functional",
+                "relation": "cad:supportsFeature",
+                "description": "Supports the negative-Y end rail.",
+                "confidence": 0.94
+              }
+            ],
+            "brep_faces": [
+              {
+                "brep_id": "FACE 11",
+                "face_code": "",
+                "entity_type": "cad:Face",
+                "geometry_type": "cad:PlanarSurface",
+                "semantic_role": "cad:MountingFaceRole",
+                "name": "Bottom perimeter mounting face",
+                "description": "Planar bottom face forming the frame-shaped support footprint around the underside opening.",
+                "salience": "cad:PrimarySalience",
+                "confidence": 0.96,
+                "evidence": [
+                  "Planar face at z=-0.750000 mm.",
+                  "Bounding box spans x=(-1.000000,1.000000) and y=(-3.000000,3.000000).",
+                  "CadQuery reports two wires and area 3.040000 mm^2, consistent with an outer rectangular footprint containing an inner opening.",
+                  "The -Z view shows the perimeter form of the lower interface."
+                ]
+              }
+            ],
+            "confidence": 0.91
+          }
+        ],
+        "unclassified_brep_faces": [],
+        "relationships": [],
+        "confidence": 0.94
+      }
+    ]
+  }
+}
+
+
+The multiview images generated from the code sent in your last response are attached. The CadQuery function and program output from the last iteration are also provided. First, judge whether the required actions identified have been done correctly and whether the current model satisfies the desired final state in aim.json. aim.json is attached immediately after the last-iteration images and code so you can check the current output against it.
+
+The required actions are:
+1. Uniformly scale the part
+   Target: the part
+   Parameters: scale_factor = 10x
+   Constraints: Apply the same scale factor to the complete part
+2. Apply draft
+   Target: all vertical surfaces
+   Parameters: draft_angle = 2 degrees
+   Constraints: Use the flat bottom surface as the draft hinge
+3. Add rounds to inner edges
+   Target: all inner edges except inner edges on the flat bottom surface
+   Parameters: radius = 1 mm
+   Constraints: Exclude any qualifying inner edge on the flat bottom surface
+4. Add rounds to outer edges
+   Target: all outer edges except outer edges on the flat bottom surface
+   Parameters: radius = 3 mm
+   Constraints: Exclude any qualifying outer edge on the flat bottom surface
+5. Create cylindrical features
+   Target: the main part
+   Parameters: feature_count = 2; outer_diameter = 6 mm; spacing = 30 mm
+   Constraints: The two cylinders must be spaced 30 mm apart, centered with respect to the main part, start at the level of the flat bottom surface, and extend to the part wall on the top side
+6. Create an inner hole in each cylindrical feature
+   Target: the two newly created cylindrical features
+   Parameters: hole_count = 2; hole_diameter = 3 mm
+   Constraints: Place one inner hole within each cylinder
+
+If yes, report the operation is finished in your response.
+
+If not, analyse errors and update the code accordingly.
+
+Once you have generated the new function, it will be executed in CadQuery on the original CAD model. You will then be provided with the latest rendering of the CAD model created by your function, and any prints, debug or error messages. You will then have the opportunity to refine your function based on this feedback, and it will be re-executed.
+
+Continue this process until the task is complete, or you reach the maximum number of iterations. If the task involves editing an existing model, the path to that model's .step file is passed to your function as args["input_file"], and is also listed as brep_start_path_step in the task information. Load it from args["input_file"] rather than hard-coding a path. For these cases, you might need to print out debug information once the model is loaded in your first iteration.
+
+Return a json object with three fields. Do not include any other text outside of the json object in your response:
+'complete': true if the task has been completed. IMPORTANT: This should only be judged by looking at the output from the last iteration, not whether a function has been returned this iteration. If there is no valid output that corresponds to the instruction, the task is not complete. The first iteration can never be complete. If this is true, then the current function will NOT be executed, and the function from the last iteration will be used.
+'my_cad_function': CadQuery python function as a string. Use the same definition and arguments as the example.
+'error': a description of errors and misalignments within the current model compared to the desired target.
+        
+
+Instruction:
+
+Edit the existing model according to the provided instructions.
+
+Task information:
+
+request_text:
+
+Scale the part 10x. Add drafts of 2 degrees to all vertical surfaces, with flat bottom surface as a hinge. Add rounds R=1mm to all inner edges and R=3mm to all outer edges. Exclude edges, inner or outer, on the flat bottom surface. Add two cylinder features with D=6mm and inner hole D=3mm. Cylinders should be spaced 30mm apart and shall be placed centered with respect to the main part. They should start on the flat bottom surface level and reach all the way to the part wall on the top side
+
+brep_start_path_step:
+
+/home/adml/Research/Hackathon2026/IDETC26-Hackathon-Autodesk-neuralCAD-Edit/data/edit_192_external/breps/F332D3FXML85WLR2_1770206316.138211.step
+
+Program output from last iteration:
+
+stdout: Loading function from: /home/adml/Research/Hackathon2026/IDETC26-Hackathon-Autodesk-neuralCAD-Edit/output/gpt-5.6-sol-ontology-full48/gpt-5.6-sol-ontology_cadquery-script_1787118663.8377757/brep_end/1787118663.8377757/temp_script.py
+SOURCE MODEL INSPECTION
+valid= True solids= 1 faces= 15
+FACE 0 CYLINDER center (2.1736459398399242e-16, 4.8470215745614e-15, 0.052952112226017034) normal (-2.1926652705726664e-17, 1.1064510324690097e-15, -1.0) bbox (-0.8000000000000007, 0.8, -2.46170672501824, 2.461706725018241, -0.20000000000000018, 0.5500000000000016)
+FACE 1 PLANE center (5.182486384480711e-16, -2.63085336250912, 0.55) normal (0.0, 0.0, -1.0) bbox (-0.7999999999999992, 0.8000000000000002, -2.8000000000000003, -2.46170672501823, 0.55, 0.55)
+FACE 2 PLANE center (-2.0014372104082414e-16, 2.63085336250912, 0.55) normal (0.0, 0.0, -1.0) bbox (-0.8000000000000009, 0.8, 2.46170672501824, 2.8000000000000003, 0.55, 0.55)
+FACE 3 PLANE center (0.8, 6.554275100327257e-17, -0.2826093742125431) normal (-1.0, -1.98254111540207e-16, 0.0) bbox (0.8, 0.8, -2.8000000000000003, 2.8000000000000003, -0.75, 0.5500000000000016)
+FACE 4 PLANE center (-0.8, 1.7251002097567358e-16, -0.28260937421254306) normal (1.0, 3.71726459137887e-16, 0.0) bbox (-0.8000000000000009, -0.7999999999999988, -2.8000000000000003, 2.8000000000000003, -0.75, 0.5500000000000016)
+FACE 5 PLANE center (-5.390986802266385e-16, 2.8000000000000003, -0.09999999999999999) normal (0.0, -1.0, 0.0) bbox (-0.8000000000000002, 0.8, 2.8000000000000003, 2.8000000000000003, -0.75, 0.55)
+FACE 6 PLANE center (5.551115123125783e-16, -2.8000000000000003, -0.09999999999999999) normal (0.0, 1.0, 0.0) bbox (-0.799999999999999, 0.8000000000000002, -2.8000000000000003, -2.8000000000000003, -0.75, 0.55)
+FACE 7 CYLINDER center (5.155451085299715e-16, -7.202046080670485e-16, 0.2530985473516615) normal (1.7856274352604813e-17, 4.741165941459744e-16, 1.0) bbox (-1.0, 1.0, -2.400000000000001, 2.400000000000002, 0.0, 0.7500000000000018)
+FACE 8 PLANE center (5.490399801466594e-16, -2.6999999999999997, 0.75) normal (0.0, 0.0, 1.0) bbox (-0.9999999999999989, 1.0, -3.0, -2.4, 0.75, 0.75)
+FACE 9 PLANE center (1.6046192152785466e-17, 2.7, 0.75) normal (0.0, 0.0, 1.0) bbox (-1.0, 1.0, 2.4, 3.0, 0.75, 0.75)
+FACE 10 PLANE center (1.0, -8.582639812107484e-16, -0.16706561055462077) normal (1.0, 0.0, 0.0) bbox (1.0, 1.0, -3.0, 3.0, -0.75, 0.7500000000000018)
+FACE 11 PLANE center (1.0152697396243216e-15, -2.3840578634056028e-15, -0.7500000000000001) normal (0.0, 0.0, -1.0) bbox (-1.0, 1.0, -3.0, 3.0, -0.75, -0.75)
+FACE 12 PLANE center (-1.0, 7.823783941292982e-16, -0.16706561055462066) normal (-1.0, -1.61907524424502e-16, 0.0) bbox (-1.0, -0.9999999999999989, -3.0, 3.0, -0.75, 0.7500000000000018)
+FACE 13 PLANE center (-1.3877787807814457e-17, 3.0, 1.951563910473908e-17) normal (0.0, 1.0, 0.0) bbox (-1.0, 1.0, 3.0, 3.0, -0.75, 0.75)
+FACE 14 PLANE center (5.273559366969494e-16, -3.0, 1.5178830414797062e-17) normal (0.0, -1.0, 0.0) bbox (-0.9999999999999989, 1.0, -3.0, -3.0, -0.75, 0.75)
+SCALED BBOX (-10.0, 10.0, -30.0, 30.0, -7.5, 7.500000000000014)
+VERTICAL FACES SELECTED FOR DRAFT 8
+DRAFT SUCCEEDED
+INNER INITIAL EDGE COUNT 24 RADIUS 1.0
+INNER BATCH FILLET SUCCEEDED
+OUTER INITIAL EDGE COUNT 4 RADIUS 3.0
+OUTER BATCH FILLET FAILED StdFail_NotDone('BRep_API: command not done')
+OUTER INDIVIDUAL FILLET SUCCESSES 0
+BOSS CENTER (0.0, -15.0) START -7.5
+BOSS CENTER (0.0, 15.0) START -7.5
+FINAL MODEL
+valid= True solids= 1 faces= 59 edges= 118
+bbox= (-10.000000100000005, 10.000000100000001, -30.0000001, 30.00000010000001, -7.5000001, 7.500000100000001)
+boss spacing=30.0, OD=6.0, hole diameter=3.0
+Exported shape to: /home/adml/Research/Hackathon2026/IDETC26-Hackathon-Autodesk-neuralCAD-Edit/output/gpt-5.6-sol-ontology-full48/gpt-5.6-sol-ontology_cadquery-script_1787118663.8377757/brep_end/1787118663.8377757/tmp.step
+Exported STL to: /home/adml/Research/Hackathon2026/IDETC26-Hackathon-Autodesk-neuralCAD-Edit/output/gpt-5.6-sol-ontology-full48/gpt-5.6-sol-ontology_cadquery-script_1787118663.8377757/brep_end/1787118663.8377757/tmp.stl
+Exported PNG image to: /home/adml/Research/Hackathon2026/IDETC26-Hackathon-Autodesk-neuralCAD-Edit/output/gpt-5.6-sol-ontology-full48/gpt-5.6-sol-ontology_cadquery-script_1787118663.8377757/brep_end/1787118663.8377757/tmp.png
+Script completed.
+
+stderr: 
+
+Multi-view images from last iteration:
+
+View: +Z
+
+[IMAGE 0: /home/adml/Research/Hackathon2026/IDETC26-Hackathon-Autodesk-neuralCAD-Edit/output/gpt-5.6-sol-ontology-full48/gpt-5.6-sol-ontology_cadquery-script_1787118663.8377757/brep_end/1787118663.8377757/tmp_+Z.png]
+
+View: -Z
+
+[IMAGE 1: /home/adml/Research/Hackathon2026/IDETC26-Hackathon-Autodesk-neuralCAD-Edit/output/gpt-5.6-sol-ontology-full48/gpt-5.6-sol-ontology_cadquery-script_1787118663.8377757/brep_end/1787118663.8377757/tmp_-Z.png]
+
+View: -X
+
+[IMAGE 2: /home/adml/Research/Hackathon2026/IDETC26-Hackathon-Autodesk-neuralCAD-Edit/output/gpt-5.6-sol-ontology-full48/gpt-5.6-sol-ontology_cadquery-script_1787118663.8377757/brep_end/1787118663.8377757/tmp_-X.png]
+
+View: +X
+
+[IMAGE 3: /home/adml/Research/Hackathon2026/IDETC26-Hackathon-Autodesk-neuralCAD-Edit/output/gpt-5.6-sol-ontology-full48/gpt-5.6-sol-ontology_cadquery-script_1787118663.8377757/brep_end/1787118663.8377757/tmp_+X.png]
+
+View: +Y
+
+[IMAGE 4: /home/adml/Research/Hackathon2026/IDETC26-Hackathon-Autodesk-neuralCAD-Edit/output/gpt-5.6-sol-ontology-full48/gpt-5.6-sol-ontology_cadquery-script_1787118663.8377757/brep_end/1787118663.8377757/tmp_+Y.png]
+
+View: -Y
+
+[IMAGE 5: /home/adml/Research/Hackathon2026/IDETC26-Hackathon-Autodesk-neuralCAD-Edit/output/gpt-5.6-sol-ontology-full48/gpt-5.6-sol-ontology_cadquery-script_1787118663.8377757/brep_end/1787118663.8377757/tmp_-Y.png]
+
+View: iso1
+
+[IMAGE 6: /home/adml/Research/Hackathon2026/IDETC26-Hackathon-Autodesk-neuralCAD-Edit/output/gpt-5.6-sol-ontology-full48/gpt-5.6-sol-ontology_cadquery-script_1787118663.8377757/brep_end/1787118663.8377757/tmp_iso1.png]
+
+View: iso2
+
+[IMAGE 7: /home/adml/Research/Hackathon2026/IDETC26-Hackathon-Autodesk-neuralCAD-Edit/output/gpt-5.6-sol-ontology-full48/gpt-5.6-sol-ontology_cadquery-script_1787118663.8377757/brep_end/1787118663.8377757/tmp_iso2.png]
+
+CadQuery function from last iteration:
+
+def my_cad_function(args):
+    import os
+    import math
+    import cadquery as cq
+
+    input_file = os.path.expanduser(args["input_file"])
+    imported = cq.importers.importStep(input_file)
+    source = imported.val() if hasattr(imported, "val") else imported
+
+    print("SOURCE MODEL INSPECTION")
+    print("valid=", source.isValid(), "solids=", len(source.Solids()), "faces=", len(source.Faces()))
+    for i, face in enumerate(source.Faces()):
+        bb = face.BoundingBox()
+        c = face.Center()
+        try:
+            gt = face.geomType()
+        except Exception:
+            gt = "UNKNOWN"
+        try:
+            n = face.normalAt(c)
+            nt = (n.x, n.y, n.z)
+        except Exception:
+            nt = None
+        print("FACE", i, gt, "center", (c.x, c.y, c.z), "normal", nt,
+              "bbox", (bb.xmin, bb.xmax, bb.ymin, bb.ymax, bb.zmin, bb.zmax))
+
+    # 1. Uniformly scale the complete source solid about its symmetry origin.
+    shape = source.scale(10.0)
+    bb = shape.BoundingBox()
+    bottom_z = bb.zmin
+    print("SCALED BBOX", (bb.xmin, bb.xmax, bb.ymin, bb.ymax, bb.zmin, bb.zmax))
+
+    # 2. Draft every planar vertical face by two degrees, using the bottom
+    # plane as the neutral/hinge plane and +Z as the pull direction.
+    try:
+        from OCP.BRepOffsetAPI import BRepOffsetAPI_DraftAngle
+        from OCP.gp import gp_Dir, gp_Pln, gp_Pnt
+
+        draft_builder = BRepOffsetAPI_DraftAngle(shape.wrapped)
+        pull = gp_Dir(0.0, 0.0, 1.0)
+        neutral = gp_Pln(gp_Pnt(0.0, 0.0, bottom_z), pull)
+        draft_faces = []
+
+        for face in shape.Faces():
+            if face.geomType() != "PLANE":
+                continue
+            c = face.Center()
+            n = face.normalAt(c)
+            # A vertical face has a substantially horizontal normal.
+            if abs(n.z) < 1.0e-5:
+                draft_faces.append(face)
+
+        print("VERTICAL FACES SELECTED FOR DRAFT", len(draft_faces))
+        for face in draft_faces:
+            draft_builder.Add(face.wrapped, pull, math.radians(2.0), neutral, True)
+
+        draft_builder.Build()
+        if draft_builder.IsDone():
+            drafted = cq.Shape.cast(draft_builder.Shape())
+            if drafted.isValid() and len(drafted.Solids()) == 1:
+                shape = drafted
+                print("DRAFT SUCCEEDED")
+            else:
+                print("DRAFT RESULT INVALID; retaining scaled body")
+        else:
+            print("DRAFT BUILDER DID NOT COMPLETE; retaining scaled body")
+    except Exception as exc:
+        print("DRAFT FAILED", repr(exc))
+
+    def is_bottom_edge(edge, z0, tol=1.0e-5):
+        ebb = edge.BoundingBox()
+        return abs(ebb.zmin - z0) < tol and abs(ebb.zmax - z0) < tol
+
+    def edge_signature(edge):
+        c = edge.Center()
+        return (c.x, c.y, c.z, edge.Length())
+
+    def closest_edge(current_shape, signature, predicate):
+        sx, sy, sz, sl = signature
+        choices = []
+        for edge in current_shape.Edges():
+            if not predicate(edge, current_shape):
+                continue
+            c = edge.Center()
+            score = ((c.x-sx)**2 + (c.y-sy)**2 + (c.z-sz)**2) + 0.05*(edge.Length()-sl)**2
+            choices.append((score, edge))
+        return min(choices, key=lambda item: item[0])[1] if choices else None
+
+    def inner_predicate(edge, body):
+        b = body.BoundingBox()
+        if is_bottom_edge(edge, bottom_z):
+            return False
+        eb = edge.BoundingBox()
+        tol = 1.0e-4
+        touches_outer = (
+            abs(eb.xmin-b.xmin) < tol or abs(eb.xmax-b.xmax) < tol or
+            abs(eb.ymin-b.ymin) < tol or abs(eb.ymax-b.ymax) < tol
+        )
+        return not touches_outer
+
+    def outer_predicate(edge, body):
+        b = body.BoundingBox()
+        if is_bottom_edge(edge, bottom_z):
+            return False
+        eb = edge.BoundingBox()
+        tol = 1.0e-4
+        return (
+            abs(eb.xmin-b.xmin) < tol or abs(eb.xmax-b.xmax) < tol or
+            abs(eb.ymin-b.ymin) < tol or abs(eb.ymax-b.ymax) < tol
+        )
+
+    def apply_fillet_group(body, radius, predicate, label):
+        initial = [e for e in body.Edges() if predicate(e, body)]
+        print(label, "INITIAL EDGE COUNT", len(initial), "RADIUS", radius)
+        if not initial:
+            return body
+
+        # Prefer one coherent fillet operation so intersecting corners are
+        # solved together by OpenCascade.
+        try:
+            result = body.fillet(radius, initial)
+            if result.isValid():
+                print(label, "BATCH FILLET SUCCEEDED")
+                return result
+        except Exception as exc:
+            print(label, "BATCH FILLET FAILED", repr(exc))
+
+        # Fall back to independent operations. Rebind each original edge to
+        # current topology after every successful round.
+        result = body
+        successes = 0
+        for sig in [edge_signature(e) for e in initial]:
+            edge = closest_edge(result, sig, predicate)
+            if edge is None:
+                continue
+            try:
+                candidate = result.fillet(radius, [edge])
+                if candidate.isValid():
+                    result = candidate
+                    successes += 1
+            except Exception:
+                pass
+        print(label, "INDIVIDUAL FILLET SUCCESSES", successes)
+        return result
+
+    # 3. Inner rounds first. Bottom-plane edges are explicitly excluded.
+    shape = apply_fillet_group(shape, 1.0, inner_predicate, "INNER")
+
+    # 4. Outer rounds second. Bottom-plane edges are explicitly excluded.
+    shape = apply_fillet_group(shape, 3.0, outer_predicate, "OUTER")
+
+    # 5. Add two vertical cylindrical bosses. Their axes are centered on
+    # x=0 and symmetrically placed at y=+/-15, giving 30 mm center spacing.
+    # Each starts at the original flat-bottom level. Its upper end is trimmed
+    # by the original concave top seating cylinder so it reaches the top-side
+    # wall without protruding through that wall.
+    boss_radius = 3.0
+    hole_radius = 1.5
+    boss_centers = [(0.0, -15.0), (0.0, 15.0)]
+    top_z = shape.BoundingBox().zmax
+    boss_height = top_z - bottom_z + 2.0
+
+    # The scaled seating surface is a radius-42.15 cylinder about the X axis,
+    # centered at z=42.15. Its solid interior is the material above the lower
+    # concave branch and therefore serves as the upper trimming cutter.
+    seat_radius = 42.15
+    seat_axis_length = 40.0
+    seat_trim = cq.Solid.makeCylinder(
+        seat_radius,
+        seat_axis_length,
+        cq.Vector(-seat_axis_length/2.0, 0.0, seat_radius),
+        cq.Vector(1.0, 0.0, 0.0)
+    )
+
+    bosses = []
+    for x, y in boss_centers:
+        outer = cq.Solid.makeCylinder(
+            boss_radius, boss_height,
+            cq.Vector(x, y, bottom_z), cq.Vector(0.0, 0.0, 1.0)
+        )
+        trimmed = outer.cut(seat_trim)
+        bosses.append(trimmed)
+        print("BOSS CENTER", (x, y), "START", bottom_z)
+
+    for boss in bosses:
+        shape = shape.fuse(boss)
+
+    # 6. Cut one coaxial through-hole in each boss. Extending cutters beyond
+    # both ends guarantees that the holes remain open through the top wall.
+    hole_depth = shape.BoundingBox().zmax - bottom_z + 4.0
+    for x, y in boss_centers:
+        hole = cq.Solid.makeCylinder(
+            hole_radius, hole_depth,
+            cq.Vector(x, y, bottom_z-2.0), cq.Vector(0.0, 0.0, 1.0)
+        )
+        shape = shape.cut(hole)
+
+    try:
+        shape = shape.clean()
+    except Exception:
+        pass
+
+    final_bb = shape.BoundingBox()
+    print("FINAL MODEL")
+    print("valid=", shape.isValid(), "solids=", len(shape.Solids()),
+          "faces=", len(shape.Faces()), "edges=", len(shape.Edges()))
+    print("bbox=", (final_bb.xmin, final_bb.xmax, final_bb.ymin,
+                     final_bb.ymax, final_bb.zmin, final_bb.zmax))
+    print("boss spacing=30.0, OD=6.0, hole diameter=3.0")
+
+    return cq.Workplane("XY").newObject([shape])
+
+aim.json (desired final state). Check the last-iteration images, CadQuery function, and program output against this:
+
+{
+  "request": "Scale the part 10x. Add drafts of 2 degrees to all vertical surfaces, with flat bottom surface as a hinge. Add rounds R=1mm to all inner edges and R=3mm to all outer edges. Exclude edges, inner or outer, on the flat bottom surface. Add two cylinder features with D=6mm and inner hole D=3mm. Cylinders should be spaced 30mm apart and shall be placed centered with respect to the main part. They should start on the flat bottom surface level and reach all the way to the part wall on the top side",
+  "request_wording": {
+    "action_words": [
+      "Scale",
+      "10x",
+      "Add",
+      "drafts",
+      "2",
+      "degrees",
+      "to",
+      "all",
+      "with",
+      "as",
+      "hinge",
+      "Add",
+      "rounds",
+      "R=1mm",
+      "to",
+      "all",
+      "R=3mm",
+      "to",
+      "all",
+      "Exclude",
+      "on",
+      "Add",
+      "two",
+      "cylinder",
+      "features",
+      "with",
+      "D=6mm",
+      "inner",
+      "hole",
+      "D=3mm",
+      "spaced",
+      "30mm",
+      "apart",
+      "placed",
+      "centered",
+      "with",
+      "respect",
+      "to",
+      "start",
+      "on",
+      "level",
+      "reach",
+      "all",
+      "way",
+      "to",
+      "on"
+    ],
+    "referenced_feature_words": [
+      "part",
+      "vertical",
+      "surfaces",
+      "flat",
+      "bottom",
+      "surface",
+      "inner",
+      "edges",
+      "outer",
+      "edges",
+      "edges",
+      "inner",
+      "outer",
+      "flat",
+      "bottom",
+      "surface",
+      "Cylinders",
+      "main",
+      "part",
+      "They",
+      "flat",
+      "bottom",
+      "surface",
+      "part",
+      "wall",
+      "top",
+      "side"
+    ],
+    "intention_words": [],
+    "grammatical_words": [
+      "the",
+      "of",
+      "a",
+      "and",
+      "or",
+      "the",
+      "and",
+      "should",
+      "be",
+      "and",
+      "shall",
+      "be",
+      "the",
+      "should",
+      "the",
+      "and",
+      "the",
+      "the",
+      "the"
+    ]
+  },
+  "actions": [
+    {
+      "operation": "Uniformly scale the part",
+      "parameters": {
+        "scale_factor": "10x"
+      },
+      "target": "the part",
+      "relational_constraint": "Apply the same scale factor to the complete part",
+      "unresolved_reference": "The complete solid or body representing the part must be identified in the CAD model"
+    },
+    {
+      "operation": "Apply draft",
+      "parameters": {
+        "draft_angle": "2 degrees"
+      },
+      "target": "all vertical surfaces",
+      "relational_constraint": "Use the flat bottom surface as the draft hinge",
+      "unresolved_reference": "The vertical surfaces, the flat bottom surface, the model direction defining vertical, and the required draft direction or sign must be resolved from the CAD model"
+    },
+    {
+      "operation": "Add rounds to inner edges",
+      "parameters": {
+        "radius": "1 mm"
+      },
+      "target": "all inner edges except inner edges on the flat bottom surface",
+      "relational_constraint": "Exclude any qualifying inner edge on the flat bottom surface",
+      "unresolved_reference": "The inner-edge classification and which edges are considered to be on the flat bottom surface must be determined from the CAD model"
+    },
+    {
+      "operation": "Add rounds to outer edges",
+      "parameters": {
+        "radius": "3 mm"
+      },
+      "target": "all outer edges except outer edges on the flat bottom surface",
+      "relational_constraint": "Exclude any qualifying outer edge on the flat bottom surface",
+      "unresolved_reference": "The outer-edge classification and which edges are considered to be on the flat bottom surface must be determined from the CAD model"
+    },
+    {
+      "operation": "Create cylindrical features",
+      "parameters": {
+        "feature_count": "2",
+        "outer_diameter": "6 mm",
+        "spacing": "30 mm"
+      },
+      "target": "the main part",
+      "relational_constraint": "The two cylinders must be spaced 30 mm apart, centered with respect to the main part, start at the level of the flat bottom surface, and extend to the part wall on the top side",
+      "unresolved_reference": "The main-part center reference, cylinder axes and orientation, exact interpretation of the 30 mm spacing, flat bottom level, and top-side part wall that terminates each cylinder must be identified from the CAD model"
+    },
+    {
+      "operation": "Create an inner hole in each cylindrical feature",
+      "parameters": {
+        "hole_count": "2",
+        "hole_diameter": "3 mm"
+      },
+      "target": "the two newly created cylindrical features",
+      "relational_constraint": "Place one inner hole within each cylinder",
+      "unresolved_reference": "The hole-axis alignment and the depth or end condition of each hole are not explicitly stated and must be resolved before modeling"
+    }
+  ],
+  "intention": []
+}
+
+Iterations remaining: 8

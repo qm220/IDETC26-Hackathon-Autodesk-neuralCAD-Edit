@@ -1,0 +1,45 @@
+def my_cad_function(args):
+    input_file = os.path.expanduser(args["input_file"])
+    model = cq.importers.importStep(input_file).val()
+
+    bore_faces = []
+    for index, face in enumerate(model.Faces()):
+        if face.geomType() != "CYLINDER":
+            continue
+        cylinder = face._geomAdaptor().Cylinder()
+        radius = cylinder.Radius()
+        axis = cylinder.Axis()
+        location = axis.Location()
+        direction = axis.Direction()
+        bb = face.BoundingBox()
+        if abs(radius - 3.0) < 0.15 and abs(direction.Y()) > 0.99 and bb.xmax < -40.0:
+            bore_faces.append((index, radius, location.X(), location.Z(), bb.ymin, bb.ymax))
+
+    if len(bore_faces) < 2:
+        raise ValueError("Unable to identify both coaxial clevis bearing faces")
+
+    bore_faces.sort(key=lambda item: 0.5 * (item[4] + item[5]))
+    negative_bore = bore_faces[0]
+    positive_bore = bore_faces[-1]
+
+    axis_x = 0.5 * (negative_bore[2] + positive_bore[2])
+    axis_z = 0.5 * (negative_bore[3] + positive_bore[3])
+    pin_ymin = min(negative_bore[4], positive_bore[4])
+    pin_ymax = max(negative_bore[5], positive_bore[5])
+    pin_radius = 0.5 * (negative_bore[1] + positive_bore[1]) - 0.05
+
+    pin = cq.Solid.makeCylinder(
+        pin_radius,
+        pin_ymax - pin_ymin,
+        cq.Vector(axis_x, pin_ymin, axis_z),
+        cq.Vector(0, 1, 0),
+    )
+    try:
+        pin = cq.Workplane(obj=pin).edges("%Circle").chamfer(0.30).val()
+    except Exception:
+        pass
+
+    result = cq.Assembly(name="lever_with_pivot_pin")
+    result.add(model, name="hook_ended_clevis_lever", color=cq.Color(0.72, 0.72, 0.76))
+    result.add(pin, name="clearance_fit_pivot_pin", color=cq.Color(0.82, 0.58, 0.18))
+    return result

@@ -1,0 +1,2004 @@
+The planning stage produced model.json (hierarchical part → sections → features
+→ B-rep faces), aim.json (desired final state from the edit request), and
+operation.json (grounded edit operations, parameters, constraints, targets,
+and modeling plans). Use those artifacts when writing my_cad_function.
+
+Section ids look like R01. Feature ids look like F001. FACE N values are
+CadQuery Faces() indices from the STEP analysis. Bind them to actual STEP
+geometry by inspecting the loaded model (print faces and coordinates) before
+editing. If an operation needs boundary topology such as a chamfer or fillet
+edge, derive it in CadQuery from the grounded face(s).
+
+Implement each operation's modeling_plan steps. Load the start model from
+args["input_file"].
+
+model.json from the planning stage:
+
+{
+  "part": {
+    "id": "P001",
+    "name": "Cross-arm support and clamp",
+    "ontology_class": "cad:Part",
+    "source_views": [
+      "+Z",
+      "-Z",
+      "-X",
+      "+X",
+      "+Y",
+      "-Y",
+      "iso1"
+    ],
+    "solid_ids": [
+      "SOLID 0",
+      "SOLID 1",
+      "SOLID 2"
+    ],
+    "semantic_orientation": {
+      "status": "partial",
+      "confidence": 0.62,
+      "view_sides": {
+        "+X": "right",
+        "-X": "left",
+        "+Y": "front",
+        "-Y": "back",
+        "+Z": "top",
+        "-Z": "bottom"
+      }
+    },
+    "part_functions": [
+      {
+        "ontology_class": "cad:ConnectFunction",
+        "name": "Connect crossed structural arms through a central clamp",
+        "primary": true,
+        "confidence": 0.84
+      },
+      {
+        "ontology_class": "cad:SupportFunction",
+        "name": "Support attached equipment or structural loads",
+        "primary": false,
+        "confidence": 0.72
+      }
+    ],
+    "sections": [
+      {
+        "id": "R01",
+        "name": "Diagonal cross arm",
+        "ontology_class": "cad:OuterSection",
+        "solid_ids": [
+          "SOLID 0"
+        ],
+        "section_functions": [
+          {
+            "ontology_class": "cad:TransferLoadFunction",
+            "name": "Transfer load along the diagonal arm",
+            "primary": true,
+            "confidence": 0.82
+          }
+        ],
+        "features": [
+          {
+            "id": "F001",
+            "name": "Diagonal structural shaft",
+            "ontology_class": "cad:ShaftFeature",
+            "feature_functions": [
+              {
+                "ontology_class": "cad:SupportFunction",
+                "name": "Support attachments along the diagonal span",
+                "primary": true,
+                "confidence": 0.82
+              }
+            ],
+            "brep_faces": [
+              {
+                "cadquery_face_id": "FACE 2",
+                "geometry_type": "cad:PlanarSurface",
+                "semantic_role": "cad:SupportFaceRole",
+                "feature_assignment_confidence": 0.89
+              },
+              {
+                "cadquery_face_id": "FACE 13",
+                "geometry_type": "cad:PlanarSurface",
+                "semantic_role": "cad:InterfaceFaceRole",
+                "feature_assignment_confidence": 0.95
+              },
+              {
+                "cadquery_face_id": "FACE 14",
+                "geometry_type": "cad:PlanarSurface",
+                "semantic_role": "cad:OuterWallRole",
+                "feature_assignment_confidence": 0.96
+              },
+              {
+                "cadquery_face_id": "FACE 16",
+                "geometry_type": "cad:CylindricalSurface",
+                "semantic_role": "cad:OuterWallRole",
+                "feature_assignment_confidence": 0.96
+              },
+              {
+                "cadquery_face_id": "FACE 17",
+                "geometry_type": "cad:PlanarSurface",
+                "semantic_role": "cad:OuterWallRole",
+                "feature_assignment_confidence": 0.97
+              },
+              {
+                "cadquery_face_id": "FACE 18",
+                "geometry_type": "cad:CylindricalSurface",
+                "semantic_role": "cad:OuterWallRole",
+                "feature_assignment_confidence": 0.96
+              },
+              {
+                "cadquery_face_id": "FACE 19",
+                "geometry_type": "cad:PlanarSurface",
+                "semantic_role": "cad:OuterWallRole",
+                "feature_assignment_confidence": 0.97
+              },
+              {
+                "cadquery_face_id": "FACE 20",
+                "geometry_type": "cad:CylindricalSurface",
+                "semantic_role": "cad:OuterWallRole",
+                "feature_assignment_confidence": 0.97
+              },
+              {
+                "cadquery_face_id": "FACE 21",
+                "geometry_type": "cad:PlanarSurface",
+                "semantic_role": "cad:OuterWallRole",
+                "feature_assignment_confidence": 0.97
+              },
+              {
+                "cadquery_face_id": "FACE 22",
+                "geometry_type": "cad:PlanarSurface",
+                "semantic_role": "cad:InterfaceFaceRole",
+                "feature_assignment_confidence": 0.94
+              }
+            ],
+            "confidence": 0.91
+          },
+          {
+            "id": "F002",
+            "name": "Diagonal arm bores",
+            "ontology_class": "cad:ThroughHoleFeature",
+            "feature_functions": [
+              {
+                "ontology_class": "cad:ProvideClearanceFunction",
+                "name": "Provide clearance for pins or routed attachments",
+                "primary": true,
+                "confidence": 0.76
+              }
+            ],
+            "brep_faces": [
+              {
+                "cadquery_face_id": "FACE 0",
+                "geometry_type": "cad:CylindricalSurface",
+                "semantic_role": "cad:BoreWallRole",
+                "feature_assignment_confidence": 0.89
+              },
+              {
+                "cadquery_face_id": "FACE 1",
+                "geometry_type": "cad:CylindricalSurface",
+                "semantic_role": "cad:BoreWallRole",
+                "feature_assignment_confidence": 0.89
+              },
+              {
+                "cadquery_face_id": "FACE 3",
+                "geometry_type": "cad:CylindricalSurface",
+                "semantic_role": "cad:BoreWallRole",
+                "feature_assignment_confidence": 0.92
+              },
+              {
+                "cadquery_face_id": "FACE 15",
+                "geometry_type": "cad:CylindricalSurface",
+                "semantic_role": "cad:BoreWallRole",
+                "feature_assignment_confidence": 0.78
+              }
+            ],
+            "confidence": 0.83
+          },
+          {
+            "id": "F003",
+            "name": "Diagonal arm root transitions",
+            "ontology_class": "cad:FilletFeature",
+            "feature_functions": [
+              {
+                "ontology_class": "cad:DistributeStressFunction",
+                "name": "Distribute stress at the arm-to-center transitions",
+                "primary": true,
+                "confidence": 0.83
+              }
+            ],
+            "brep_faces": [
+              {
+                "cadquery_face_id": "FACE 4",
+                "geometry_type": "cad:PlanarSurface",
+                "semantic_role": "cad:TransitionSurfaceRole",
+                "feature_assignment_confidence": 0.82
+              },
+              {
+                "cadquery_face_id": "FACE 5",
+                "geometry_type": "cad:BSplineSurface",
+                "semantic_role": "cad:FilletSurfaceRole",
+                "feature_assignment_confidence": 0.96
+              },
+              {
+                "cadquery_face_id": "FACE 6",
+                "geometry_type": "cad:CylindricalSurface",
+                "semantic_role": "cad:FilletSurfaceRole",
+                "feature_assignment_confidence": 0.92
+              },
+              {
+                "cadquery_face_id": "FACE 7",
+                "geometry_type": "cad:BSplineSurface",
+                "semantic_role": "cad:FilletSurfaceRole",
+                "feature_assignment_confidence": 0.96
+              },
+              {
+                "cadquery_face_id": "FACE 8",
+                "geometry_type": "cad:PlanarSurface",
+                "semantic_role": "cad:TransitionSurfaceRole",
+                "feature_assignment_confidence": 0.82
+              },
+              {
+                "cadquery_face_id": "FACE 9",
+                "geometry_type": "cad:BSplineSurface",
+                "semantic_role": "cad:FilletSurfaceRole",
+                "feature_assignment_confidence": 0.96
+              },
+              {
+                "cadquery_face_id": "FACE 10",
+                "geometry_type": "cad:CylindricalSurface",
+                "semantic_role": "cad:FilletSurfaceRole",
+                "feature_assignment_confidence": 0.92
+              },
+              {
+                "cadquery_face_id": "FACE 11",
+                "geometry_type": "cad:BSplineSurface",
+                "semantic_role": "cad:FilletSurfaceRole",
+                "feature_assignment_confidence": 0.96
+              },
+              {
+                "cadquery_face_id": "FACE 12",
+                "geometry_type": "cad:PlanarSurface",
+                "semantic_role": "cad:TransitionSurfaceRole",
+                "feature_assignment_confidence": 0.84
+              }
+            ],
+            "confidence": 0.9
+          }
+        ]
+      },
+      {
+        "id": "R02",
+        "name": "Vertical cross arm",
+        "ontology_class": "cad:OuterSection",
+        "solid_ids": [
+          "SOLID 1"
+        ],
+        "section_functions": [
+          {
+            "ontology_class": "cad:TransferLoadFunction",
+            "name": "Transfer load along the vertical arm",
+            "primary": true,
+            "confidence": 0.84
+          }
+        ],
+        "features": [
+          {
+            "id": "F004",
+            "name": "Vertical structural shaft",
+            "ontology_class": "cad:ShaftFeature",
+            "feature_functions": [
+              {
+                "ontology_class": "cad:SupportFunction",
+                "name": "Support attachments along the vertical span",
+                "primary": true,
+                "confidence": 0.84
+              }
+            ],
+            "brep_faces": [
+              {
+                "cadquery_face_id": "FACE 33",
+                "geometry_type": "cad:CylindricalSurface",
+                "semantic_role": "cad:OuterWallRole",
+                "feature_assignment_confidence": 0.97
+              },
+              {
+                "cadquery_face_id": "FACE 38",
+                "geometry_type": "cad:PlanarSurface",
+                "semantic_role": "cad:SupportFaceRole",
+                "feature_assignment_confidence": 0.9
+              },
+              {
+                "cadquery_face_id": "FACE 39",
+                "geometry_type": "cad:PlanarSurface",
+                "semantic_role": "cad:OuterWallRole",
+                "feature_assignment_confidence": 0.97
+              },
+              {
+                "cadquery_face_id": "FACE 40",
+                "geometry_type": "cad:PlanarSurface",
+                "semantic_role": "cad:InterfaceFaceRole",
+                "feature_assignment_confidence": 0.95
+              },
+              {
+                "cadquery_face_id": "FACE 41",
+                "geometry_type": "cad:CylindricalSurface",
+                "semantic_role": "cad:OuterWallRole",
+                "feature_assignment_confidence": 0.97
+              },
+              {
+                "cadquery_face_id": "FACE 42",
+                "geometry_type": "cad:PlanarSurface",
+                "semantic_role": "cad:OuterWallRole",
+                "feature_assignment_confidence": 0.97
+              },
+              {
+                "cadquery_face_id": "FACE 43",
+                "geometry_type": "cad:PlanarSurface",
+                "semantic_role": "cad:OuterWallRole",
+                "feature_assignment_confidence": 0.97
+              },
+              {
+                "cadquery_face_id": "FACE 44",
+                "geometry_type": "cad:PlanarSurface",
+                "semantic_role": "cad:InterfaceFaceRole",
+                "feature_assignment_confidence": 0.95
+              },
+              {
+                "cadquery_face_id": "FACE 46",
+                "geometry_type": "cad:PlanarSurface",
+                "semantic_role": "cad:OuterWallRole",
+                "feature_assignment_confidence": 0.97
+              }
+            ],
+            "confidence": 0.93
+          },
+          {
+            "id": "F005",
+            "name": "Vertical arm bores",
+            "ontology_class": "cad:ThroughHoleFeature",
+            "feature_functions": [
+              {
+                "ontology_class": "cad:ProvideClearanceFunction",
+                "name": "Provide clearance for pins or routed attachments",
+                "primary": true,
+                "confidence": 0.77
+              }
+            ],
+            "brep_faces": [
+              {
+                "cadquery_face_id": "FACE 23",
+                "geometry_type": "cad:CylindricalSurface",
+                "semantic_role": "cad:BoreWallRole",
+                "feature_assignment_confidence": 0.92
+              },
+              {
+                "cadquery_face_id": "FACE 24",
+                "geometry_type": "cad:CylindricalSurface",
+                "semantic_role": "cad:BoreWallRole",
+                "feature_assignment_confidence": 0.88
+              },
+              {
+                "cadquery_face_id": "FACE 36",
+                "geometry_type": "cad:CylindricalSurface",
+                "semantic_role": "cad:BoreWallRole",
+                "feature_assignment_confidence": 0.92
+              },
+              {
+                "cadquery_face_id": "FACE 37",
+                "geometry_type": "cad:CylindricalSurface",
+                "semantic_role": "cad:BoreWallRole",
+                "feature_assignment_confidence": 0.88
+              },
+              {
+                "cadquery_face_id": "FACE 45",
+                "geometry_type": "cad:CylindricalSurface",
+                "semantic_role": "cad:BoreWallRole",
+                "feature_assignment_confidence": 0.78
+              }
+            ],
+            "confidence": 0.84
+          },
+          {
+            "id": "F006",
+            "name": "Vertical arm root transitions",
+            "ontology_class": "cad:FilletFeature",
+            "feature_functions": [
+              {
+                "ontology_class": "cad:DistributeStressFunction",
+                "name": "Distribute stress at the arm-to-center transitions",
+                "primary": true,
+                "confidence": 0.84
+              }
+            ],
+            "brep_faces": [
+              {
+                "cadquery_face_id": "FACE 25",
+                "geometry_type": "cad:PlanarSurface",
+                "semantic_role": "cad:TransitionSurfaceRole",
+                "feature_assignment_confidence": 0.83
+              },
+              {
+                "cadquery_face_id": "FACE 26",
+                "geometry_type": "cad:BSplineSurface",
+                "semantic_role": "cad:FilletSurfaceRole",
+                "feature_assignment_confidence": 0.96
+              },
+              {
+                "cadquery_face_id": "FACE 27",
+                "geometry_type": "cad:CylindricalSurface",
+                "semantic_role": "cad:FilletSurfaceRole",
+                "feature_assignment_confidence": 0.93
+              },
+              {
+                "cadquery_face_id": "FACE 28",
+                "geometry_type": "cad:BSplineSurface",
+                "semantic_role": "cad:FilletSurfaceRole",
+                "feature_assignment_confidence": 0.96
+              },
+              {
+                "cadquery_face_id": "FACE 29",
+                "geometry_type": "cad:PlanarSurface",
+                "semantic_role": "cad:TransitionSurfaceRole",
+                "feature_assignment_confidence": 0.83
+              },
+              {
+                "cadquery_face_id": "FACE 30",
+                "geometry_type": "cad:BSplineSurface",
+                "semantic_role": "cad:FilletSurfaceRole",
+                "feature_assignment_confidence": 0.96
+              },
+              {
+                "cadquery_face_id": "FACE 31",
+                "geometry_type": "cad:CylindricalSurface",
+                "semantic_role": "cad:FilletSurfaceRole",
+                "feature_assignment_confidence": 0.93
+              },
+              {
+                "cadquery_face_id": "FACE 32",
+                "geometry_type": "cad:BSplineSurface",
+                "semantic_role": "cad:FilletSurfaceRole",
+                "feature_assignment_confidence": 0.96
+              },
+              {
+                "cadquery_face_id": "FACE 34",
+                "geometry_type": "cad:PlanarSurface",
+                "semantic_role": "cad:TransitionSurfaceRole",
+                "feature_assignment_confidence": 0.83
+              },
+              {
+                "cadquery_face_id": "FACE 35",
+                "geometry_type": "cad:PlanarSurface",
+                "semantic_role": "cad:TransitionSurfaceRole",
+                "feature_assignment_confidence": 0.83
+              }
+            ],
+            "confidence": 0.91
+          }
+        ]
+      },
+      {
+        "id": "R03",
+        "name": "Central clamp assembly",
+        "ontology_class": "cad:CentralSection",
+        "solid_ids": [
+          "SOLID 2"
+        ],
+        "section_functions": [
+          {
+            "ontology_class": "cad:ConnectFunction",
+            "name": "Clamp and connect the crossed arms at their intersection",
+            "primary": true,
+            "confidence": 0.9
+          }
+        ],
+        "features": [
+          {
+            "id": "F007",
+            "name": "Front clamp housing",
+            "ontology_class": "cad:HousingFeature",
+            "feature_functions": [
+              {
+                "ontology_class": "cad:MountFunction",
+                "name": "Provide the front mounting and clamping interface",
+                "primary": true,
+                "confidence": 0.86
+              }
+            ],
+            "brep_faces": [
+              {
+                "cadquery_face_id": "FACE 47",
+                "geometry_type": "cad:CylindricalSurface",
+                "semantic_role": "cad:FilletSurfaceRole",
+                "feature_assignment_confidence": 0.94
+              },
+              {
+                "cadquery_face_id": "FACE 48",
+                "geometry_type": "cad:PlanarSurface",
+                "semantic_role": "cad:SideWallRole",
+                "feature_assignment_confidence": 0.95
+              },
+              {
+                "cadquery_face_id": "FACE 49",
+                "geometry_type": "cad:CylindricalSurface",
+                "semantic_role": "cad:FilletSurfaceRole",
+                "feature_assignment_confidence": 0.94
+              },
+              {
+                "cadquery_face_id": "FACE 50",
+                "geometry_type": "cad:PlanarSurface",
+                "semantic_role": "cad:SideWallRole",
+                "feature_assignment_confidence": 0.95
+              },
+              {
+                "cadquery_face_id": "FACE 51",
+                "geometry_type": "cad:CylindricalSurface",
+                "semantic_role": "cad:FilletSurfaceRole",
+                "feature_assignment_confidence": 0.94
+              },
+              {
+                "cadquery_face_id": "FACE 52",
+                "geometry_type": "cad:PlanarSurface",
+                "semantic_role": "cad:OuterWallRole",
+                "feature_assignment_confidence": 0.95
+              },
+              {
+                "cadquery_face_id": "FACE 53",
+                "geometry_type": "cad:PlanarSurface",
+                "semantic_role": "cad:MountingFaceRole",
+                "feature_assignment_confidence": 0.93
+              },
+              {
+                "cadquery_face_id": "FACE 54",
+                "geometry_type": "cad:CylindricalSurface",
+                "semantic_role": "cad:FilletSurfaceRole",
+                "feature_assignment_confidence": 0.94
+              },
+              {
+                "cadquery_face_id": "FACE 55",
+                "geometry_type": "cad:PlanarSurface",
+                "semantic_role": "cad:SideWallRole",
+                "feature_assignment_confidence": 0.95
+              },
+              {
+                "cadquery_face_id": "FACE 56",
+                "geometry_type": "cad:CylindricalSurface",
+                "semantic_role": "cad:FilletSurfaceRole",
+                "feature_assignment_confidence": 0.94
+              },
+              {
+                "cadquery_face_id": "FACE 57",
+                "geometry_type": "cad:PlanarSurface",
+                "semantic_role": "cad:OuterWallRole",
+                "feature_assignment_confidence": 0.95
+              },
+              {
+                "cadquery_face_id": "FACE 58",
+                "geometry_type": "cad:PlanarSurface",
+                "semantic_role": "cad:MountingSeatRole",
+                "feature_assignment_confidence": 0.91
+              },
+              {
+                "cadquery_face_id": "FACE 59",
+                "geometry_type": "cad:CylindricalSurface",
+                "semantic_role": "cad:FilletSurfaceRole",
+                "feature_assignment_confidence": 0.94
+              },
+              {
+                "cadquery_face_id": "FACE 60",
+                "geometry_type": "cad:PlanarSurface",
+                "semantic_role": "cad:OuterWallRole",
+                "feature_assignment_confidence": 0.95
+              },
+              {
+                "cadquery_face_id": "FACE 61",
+                "geometry_type": "cad:CylindricalSurface",
+                "semantic_role": "cad:FilletSurfaceRole",
+                "feature_assignment_confidence": 0.94
+              },
+              {
+                "cadquery_face_id": "FACE 62",
+                "geometry_type": "cad:CylindricalSurface",
+                "semantic_role": "cad:FilletSurfaceRole",
+                "feature_assignment_confidence": 0.94
+              },
+              {
+                "cadquery_face_id": "FACE 63",
+                "geometry_type": "cad:PlanarSurface",
+                "semantic_role": "cad:SupportFaceRole",
+                "feature_assignment_confidence": 0.9
+              },
+              {
+                "cadquery_face_id": "FACE 64",
+                "geometry_type": "cad:PlanarSurface",
+                "semantic_role": "cad:SideWallRole",
+                "feature_assignment_confidence": 0.95
+              },
+              {
+                "cadquery_face_id": "FACE 65",
+                "geometry_type": "cad:PlanarSurface",
+                "semantic_role": "cad:OuterWallRole",
+                "feature_assignment_confidence": 0.95
+              }
+            ],
+            "confidence": 0.92
+          },
+          {
+            "id": "F008",
+            "name": "Back clamp housing",
+            "ontology_class": "cad:HousingFeature",
+            "feature_functions": [
+              {
+                "ontology_class": "cad:MountFunction",
+                "name": "Provide the back mounting and clamping interface",
+                "primary": true,
+                "confidence": 0.86
+              }
+            ],
+            "brep_faces": [
+              {
+                "cadquery_face_id": "FACE 66",
+                "geometry_type": "cad:CylindricalSurface",
+                "semantic_role": "cad:FilletSurfaceRole",
+                "feature_assignment_confidence": 0.94
+              },
+              {
+                "cadquery_face_id": "FACE 67",
+                "geometry_type": "cad:PlanarSurface",
+                "semantic_role": "cad:SideWallRole",
+                "feature_assignment_confidence": 0.95
+              },
+              {
+                "cadquery_face_id": "FACE 68",
+                "geometry_type": "cad:CylindricalSurface",
+                "semantic_role": "cad:FilletSurfaceRole",
+                "feature_assignment_confidence": 0.94
+              },
+              {
+                "cadquery_face_id": "FACE 69",
+                "geometry_type": "cad:PlanarSurface",
+                "semantic_role": "cad:SideWallRole",
+                "feature_assignment_confidence": 0.95
+              },
+              {
+                "cadquery_face_id": "FACE 70",
+                "geometry_type": "cad:CylindricalSurface",
+                "semantic_role": "cad:FilletSurfaceRole",
+                "feature_assignment_confidence": 0.94
+              },
+              {
+                "cadquery_face_id": "FACE 71",
+                "geometry_type": "cad:PlanarSurface",
+                "semantic_role": "cad:OuterWallRole",
+                "feature_assignment_confidence": 0.95
+              },
+              {
+                "cadquery_face_id": "FACE 72",
+                "geometry_type": "cad:PlanarSurface",
+                "semantic_role": "cad:MountingFaceRole",
+                "feature_assignment_confidence": 0.93
+              },
+              {
+                "cadquery_face_id": "FACE 73",
+                "geometry_type": "cad:CylindricalSurface",
+                "semantic_role": "cad:FilletSurfaceRole",
+                "feature_assignment_confidence": 0.94
+              },
+              {
+                "cadquery_face_id": "FACE 74",
+                "geometry_type": "cad:PlanarSurface",
+                "semantic_role": "cad:SideWallRole",
+                "feature_assignment_confidence": 0.95
+              },
+              {
+                "cadquery_face_id": "FACE 75",
+                "geometry_type": "cad:CylindricalSurface",
+                "semantic_role": "cad:FilletSurfaceRole",
+                "feature_assignment_confidence": 0.94
+              },
+              {
+                "cadquery_face_id": "FACE 76",
+                "geometry_type": "cad:PlanarSurface",
+                "semantic_role": "cad:OuterWallRole",
+                "feature_assignment_confidence": 0.95
+              },
+              {
+                "cadquery_face_id": "FACE 77",
+                "geometry_type": "cad:PlanarSurface",
+                "semantic_role": "cad:MountingSeatRole",
+                "feature_assignment_confidence": 0.91
+              },
+              {
+                "cadquery_face_id": "FACE 78",
+                "geometry_type": "cad:CylindricalSurface",
+                "semantic_role": "cad:FilletSurfaceRole",
+                "feature_assignment_confidence": 0.94
+              },
+              {
+                "cadquery_face_id": "FACE 79",
+                "geometry_type": "cad:PlanarSurface",
+                "semantic_role": "cad:OuterWallRole",
+                "feature_assignment_confidence": 0.95
+              },
+              {
+                "cadquery_face_id": "FACE 80",
+                "geometry_type": "cad:CylindricalSurface",
+                "semantic_role": "cad:FilletSurfaceRole",
+                "feature_assignment_confidence": 0.94
+              },
+              {
+                "cadquery_face_id": "FACE 81",
+                "geometry_type": "cad:CylindricalSurface",
+                "semantic_role": "cad:FilletSurfaceRole",
+                "feature_assignment_confidence": 0.94
+              },
+              {
+                "cadquery_face_id": "FACE 82",
+                "geometry_type": "cad:PlanarSurface",
+                "semantic_role": "cad:SupportFaceRole",
+                "feature_assignment_confidence": 0.9
+              },
+              {
+                "cadquery_face_id": "FACE 83",
+                "geometry_type": "cad:PlanarSurface",
+                "semantic_role": "cad:SideWallRole",
+                "feature_assignment_confidence": 0.95
+              },
+              {
+                "cadquery_face_id": "FACE 84",
+                "geometry_type": "cad:PlanarSurface",
+                "semantic_role": "cad:OuterWallRole",
+                "feature_assignment_confidence": 0.95
+              }
+            ],
+            "confidence": 0.92
+          },
+          {
+            "id": "F009",
+            "name": "Central pin interface",
+            "ontology_class": "cad:PinInterface",
+            "feature_functions": [
+              {
+                "ontology_class": "cad:ReceivePinFunction",
+                "name": "Receive and locate the central connecting pin",
+                "primary": true,
+                "confidence": 0.88
+              }
+            ],
+            "brep_faces": [
+              {
+                "cadquery_face_id": "FACE 85",
+                "geometry_type": "cad:PlanarSurface",
+                "semantic_role": "cad:SeatingFaceRole",
+                "feature_assignment_confidence": 0.94
+              },
+              {
+                "cadquery_face_id": "FACE 86",
+                "geometry_type": "cad:CylindricalSurface",
+                "semantic_role": "cad:OuterWallRole",
+                "feature_assignment_confidence": 0.93
+              },
+              {
+                "cadquery_face_id": "FACE 87",
+                "geometry_type": "cad:PlanarSurface",
+                "semantic_role": "cad:SeatingFaceRole",
+                "feature_assignment_confidence": 0.94
+              },
+              {
+                "cadquery_face_id": "FACE 88",
+                "geometry_type": "cad:CylindricalSurface",
+                "semantic_role": "cad:OuterWallRole",
+                "feature_assignment_confidence": 0.93
+              },
+              {
+                "cadquery_face_id": "FACE 89",
+                "geometry_type": "cad:CylindricalSurface",
+                "semantic_role": "cad:BoreWallRole",
+                "feature_assignment_confidence": 0.96
+              }
+            ],
+            "confidence": 0.92
+          }
+        ]
+      }
+    ]
+  }
+}
+
+aim.json from the planning stage:
+
+{
+  "request": {
+    "request_id": "REQ-001",
+    "raw_text": "Add third rotor blade to the assembly. It should have the same design as the other two. Radii should applied on all four long edges of the blade. Adjust central portion of all three blades so that there is a space for a new blade - reduce thickness of the central portion to cca 0,42mm. New blade should go through the center of the stack.",
+    "action_words": [
+      "Add third rotor blade",
+      "apply radii",
+      "adjust central portion",
+      "reduce thickness"
+    ],
+    "reference_geometry_words": [
+      "assembly",
+      "third rotor blade",
+      "other two",
+      "all four long edges of the blade",
+      "central portion of all three blades",
+      "center of the stack"
+    ],
+    "parameter_words": [
+      "third rotor blade",
+      "all four long edges",
+      "all three blades",
+      "cca 0,42mm"
+    ],
+    "functional_intention_words": [
+      "same design as the other two",
+      "space for a new blade",
+      "go through the center of the stack"
+    ]
+  },
+  "aim": {
+    "primary_aim": "Produce a three-blade rotor assembly in which the added blade matches the existing blade design, has radiused long edges, and passes through the stack center using reduced-thickness central portions.",
+    "functional_design_intentions": [
+      {
+        "name": "Third-blade integration",
+        "description": "Add a third rotor blade to the assembly while maintaining the design established by the other two blades.",
+        "confidence": 0.98
+      },
+      {
+        "name": "Central accommodation space",
+        "description": "Reduce the central portions of all three blades to approximately 0.42 mm thickness so that space is available for the new blade.",
+        "confidence": 0.97
+      },
+      {
+        "name": "Centered stack passage",
+        "description": "Arrange the new blade so that it passes through the center of the blade stack.",
+        "confidence": 0.96
+      }
+    ],
+    "targets_to_change": [
+      {
+        "id": "T01",
+        "action": "add",
+        "target_level": "new_geometry",
+        "reference_geometry": "third rotor blade in the assembly",
+        "section_ids": [],
+        "feature_ids": [],
+        "ontology_class": "cad:Part",
+        "parameters": [
+          {
+            "name": "added_blade_count",
+            "value": 1,
+            "unit": "count",
+            "explicitness": "explicit"
+          },
+          {
+            "name": "final_blade_count",
+            "value": 3,
+            "unit": "count",
+            "explicitness": "explicit"
+          }
+        ],
+        "required_relationships": [
+          {
+            "relation": "same design as",
+            "reference": "the other two rotor blades"
+          },
+          {
+            "relation": "through",
+            "reference": "the center of the stack"
+          }
+        ],
+        "confidence": 0.97
+      },
+      {
+        "id": "T02",
+        "action": "radius",
+        "target_level": "feature",
+        "reference_geometry": "four long edges of the blade",
+        "section_ids": [],
+        "feature_ids": [],
+        "ontology_class": "cad:Fillet",
+        "parameters": [
+          {
+            "name": "radiused_long_edge_count",
+            "value": 4,
+            "unit": "count",
+            "explicitness": "explicit"
+          }
+        ],
+        "required_relationships": [
+          {
+            "relation": "on",
+            "reference": "all four long edges of the blade"
+          }
+        ],
+        "confidence": 0.78
+      },
+      {
+        "id": "T03",
+        "action": "resize",
+        "target_level": "section",
+        "reference_geometry": "central portions of all three blades",
+        "section_ids": [],
+        "feature_ids": [],
+        "ontology_class": "cad:Section",
+        "parameters": [
+          {
+            "name": "central_portion_thickness",
+            "value": 0.42,
+            "unit": "mm",
+            "explicitness": "explicit"
+          },
+          {
+            "name": "affected_blade_count",
+            "value": 3,
+            "unit": "count",
+            "explicitness": "explicit"
+          }
+        ],
+        "required_relationships": [
+          {
+            "relation": "provides space for",
+            "reference": "the new third blade"
+          },
+          {
+            "relation": "at",
+            "reference": "the central portion of each of the three blades"
+          }
+        ],
+        "confidence": 0.96
+      }
+    ],
+    "targets_to_preserve": [
+      {
+        "reference_geometry": "overall blade design established by the two existing rotor blades",
+        "section_ids": [],
+        "feature_ids": [],
+        "preservation_rule": "Preserve the established blade design in the new third blade except for the explicitly required central-portion adjustment and long-edge radii.",
+        "confidence": 0.94
+      },
+      {
+        "reference_geometry": "non-targeted assembly geometry",
+        "section_ids": [],
+        "feature_ids": [],
+        "preservation_rule": "Preserve geometry not required to change for adding, radiusing, centrally thinning, and positioning the third blade.",
+        "confidence": 0.9
+      }
+    ],
+    "predicted_final_outcome": {
+      "geometry": [
+        {
+          "target_id": "T01",
+          "ontology_class": "cad:Part",
+          "description": "The assembly contains three rotor blades, including one added blade with the same design as the other two and extending through the center of the stack.",
+          "properties": [
+            {
+              "name": "final_blade_count",
+              "value": 3,
+              "unit": "count"
+            }
+          ],
+          "relationships": [
+            {
+              "relation": "same design as",
+              "reference": "the other two rotor blades"
+            },
+            {
+              "relation": "through",
+              "reference": "the center of the stack"
+            }
+          ],
+          "confidence": 0.97
+        },
+        {
+          "target_id": "T02",
+          "ontology_class": "cad:Fillet",
+          "description": "Radii are present on all four long edges of the blade.",
+          "properties": [
+            {
+              "name": "radiused_long_edge_count",
+              "value": 4,
+              "unit": "count"
+            }
+          ],
+          "relationships": [
+            {
+              "relation": "on",
+              "reference": "all four long edges of the blade"
+            }
+          ],
+          "confidence": 0.78
+        },
+        {
+          "target_id": "T03",
+          "ontology_class": "cad:Section",
+          "description": "The central portion of each of the three blades has an approximate thickness of 0.42 mm, providing space for the new blade.",
+          "properties": [
+            {
+              "name": "central_portion_thickness",
+              "value": 0.42,
+              "unit": "mm"
+            },
+            {
+              "name": "affected_blade_count",
+              "value": 3,
+              "unit": "count"
+            }
+          ],
+          "relationships": [
+            {
+              "relation": "provides space for",
+              "reference": "the new third blade"
+            }
+          ],
+          "confidence": 0.96
+        }
+      ],
+      "functions": [
+        {
+          "ontology_class": "cad:Function",
+          "name": "Accommodate third rotor blade",
+          "target_ids": [
+            "T01",
+            "T03"
+          ],
+          "description": "The three central blade portions provide the space required to incorporate the third blade into the stack.",
+          "confidence": 0.95
+        },
+        {
+          "ontology_class": "cad:Function",
+          "name": "Maintain blade design consistency",
+          "target_ids": [
+            "T01",
+            "T02"
+          ],
+          "description": "The new blade retains the same blade design as the other two while satisfying the specified long-edge radius requirement.",
+          "confidence": 0.9
+        }
+      ],
+      "behaviors": [
+        {
+          "ontology_class": "cad:Behavior",
+          "name": "Centered blade passage",
+          "target_ids": [
+            "T01",
+            "T03"
+          ],
+          "description": "The reduced central portions allow the new blade to pass through the center of the stack.",
+          "confidence": 0.95
+        }
+      ]
+    },
+    "validation_criteria": [
+      {
+        "category": "geometry",
+        "target_ids": [
+          "T01"
+        ],
+        "description": "The final assembly contains three rotor blades.",
+        "expected_value": 3,
+        "unit": "count"
+      },
+      {
+        "category": "geometry",
+        "target_ids": [
+          "T01"
+        ],
+        "description": "The added third rotor blade has the same design as the other two blades, apart from explicitly requested changes.",
+        "expected_value": null,
+        "unit": ""
+      },
+      {
+        "category": "geometry",
+        "target_ids": [
+          "T02"
+        ],
+        "description": "All four long edges of the applicable blade are radiused.",
+        "expected_value": 4,
+        "unit": "count"
+      },
+      {
+        "category": "geometry",
+        "target_ids": [
+          "T03"
+        ],
+        "description": "The central portion of each of the three blades has an approximate thickness of 0.42 mm.",
+        "expected_value": 0.42,
+        "unit": "mm"
+      },
+      {
+        "category": "geometry",
+        "target_ids": [
+          "T01",
+          "T03"
+        ],
+        "description": "The new blade passes through the center of the stack.",
+        "expected_value": null,
+        "unit": ""
+      },
+      {
+        "category": "function",
+        "target_ids": [
+          "T01",
+          "T03"
+        ],
+        "description": "The adjusted central portions provide space for the new third blade.",
+        "expected_value": null,
+        "unit": ""
+      },
+      {
+        "category": "behavior",
+        "target_ids": [
+          "T01",
+          "T03"
+        ],
+        "description": "The new blade can occupy a centered passage through the stack enabled by the reduced central portions.",
+        "expected_value": null,
+        "unit": ""
+      },
+      {
+        "category": "preservation",
+        "target_ids": [],
+        "description": "Non-targeted assembly geometry and the established overall blade design remain preserved.",
+        "expected_value": null,
+        "unit": ""
+      }
+    ],
+    "unresolved_requirements": [
+      {
+        "description": "The request does not specify the numerical radius to apply to the long edges.",
+        "candidate_interpretations": [
+          "Match an existing long-edge radius present on the other blades.",
+          "Use a radius value to be supplied by the engineer."
+        ],
+        "requires_user_clarification": true
+      },
+      {
+        "description": "The phrase 'the blade' does not state unambiguously whether the four long-edge radii apply only to the new blade or to all three blades.",
+        "candidate_interpretations": [
+          "Apply radii to all four long edges of the new third blade.",
+          "Apply radii to all four long edges of each of the three blades."
+        ],
+        "requires_user_clarification": false
+      },
+      {
+        "description": "The approximate requirement 'cca 0.42 mm' does not specify an acceptable thickness tolerance.",
+        "candidate_interpretations": [
+          "Treat 0.42 mm as the nominal central-portion thickness.",
+          "Apply an engineer-specified tolerance around 0.42 mm."
+        ],
+        "requires_user_clarification": false
+      },
+      {
+        "description": "No exact assembly, blade, central-section, or stack identifiers are supplied.",
+        "candidate_interpretations": [
+          "Resolve the two existing rotor blades and their shared stack from model context.",
+          "Request explicit model identifiers if the assembly contains multiple possible blade stacks."
+        ],
+        "requires_user_clarification": false
+      }
+    ]
+  }
+}
+
+operation.json from the planning stage:
+
+{
+  "request_id": "REQ-001",
+  "operation_ontology": {
+    "id": "cqop:CadQueryOperationOntology",
+    "version": "1.2.0"
+  },
+  "aim_summary": {
+    "goal": "Produce a three-blade rotor assembly with a matching added blade, four radiused long edges, and 0.42 mm central blade portions permitting centered stack passage.",
+    "change_targets": [
+      "T01",
+      "T02",
+      "T03"
+    ],
+    "preserve_targets": [
+      "overall blade design established by the two existing rotor blades",
+      "non-targeted assembly geometry"
+    ],
+    "expected_outcome": "Three matching blade-like bodies occupy the assembly, each has a nominal 0.42 mm central portion, and the added centered blade has four radiused long edges."
+  },
+  "operations_plan": [
+    {
+      "operation_id": "OP01",
+      "summary": "Reduce the central portions of the two existing blade-like cross arms R01 and R02 to 0.42 mm while preserving their remaining geometry.",
+      "confidence": 0.55,
+      "depends_on_operation_ids": [],
+      "steps": [
+        {
+          "step_id": "S01",
+          "step_index": 1,
+          "ontology_operation": "ReplaceSectionProfiletoBody",
+          "description": "Replace the central material-bearing region of SOLID 0 with an equivalent region having a 0.42 mm thickness.",
+          "required_parameters": {
+            "target_body": {
+              "value": "SOLID 0",
+              "unit": "",
+              "source_type": "model_json_entity",
+              "cadquery_type": "cq.Workplane",
+              "model_reference": {
+                "part_id": "P001",
+                "section_ids": [
+                  "R01"
+                ],
+                "feature_ids": [
+                  "F001"
+                ],
+                "face_ids": [],
+                "solid_ids": [
+                  "SOLID 0"
+                ]
+              },
+              "source_step_id": "",
+              "confidence": 0.72
+            },
+            "old_section_region": {
+              "value": null,
+              "unit": "",
+              "source_type": "unresolved",
+              "cadquery_type": "cq.Shape",
+              "model_reference": {
+                "part_id": "P001",
+                "section_ids": [
+                  "R01"
+                ],
+                "feature_ids": [
+                  "F001"
+                ],
+                "face_ids": [],
+                "solid_ids": [
+                  "SOLID 0"
+                ]
+              },
+              "source_step_id": "",
+              "confidence": 0.18
+            },
+            "new_section_profile": {
+              "value": null,
+              "unit": "",
+              "source_type": "unresolved",
+              "cadquery_type": "cq.Wire",
+              "model_reference": {
+                "part_id": "P001",
+                "section_ids": [
+                  "R01"
+                ],
+                "feature_ids": [
+                  "F001"
+                ],
+                "face_ids": [],
+                "solid_ids": [
+                  "SOLID 0"
+                ]
+              },
+              "source_step_id": "",
+              "confidence": 0.18
+            },
+            "section_plane": {
+              "value": null,
+              "unit": "",
+              "source_type": "unresolved",
+              "cadquery_type": "cq.Plane",
+              "model_reference": {
+                "part_id": "P001",
+                "section_ids": [
+                  "R01"
+                ],
+                "feature_ids": [
+                  "F001"
+                ],
+                "face_ids": [],
+                "solid_ids": [
+                  "SOLID 0"
+                ]
+              },
+              "source_step_id": "",
+              "confidence": 0.16
+            },
+            "section_distance": {
+              "value": 0.42,
+              "unit": "mm",
+              "source_type": "request_value",
+              "cadquery_type": "float",
+              "model_reference": {
+                "part_id": "",
+                "section_ids": [],
+                "feature_ids": [],
+                "face_ids": [],
+                "solid_ids": []
+              },
+              "source_step_id": "",
+              "confidence": 0.96
+            },
+            "both_directions": {
+              "value": null,
+              "unit": "",
+              "source_type": "unresolved",
+              "cadquery_type": "bool",
+              "model_reference": {
+                "part_id": "P001",
+                "section_ids": [
+                  "R01"
+                ],
+                "feature_ids": [
+                  "F001"
+                ],
+                "face_ids": [],
+                "solid_ids": [
+                  "SOLID 0"
+                ]
+              },
+              "source_step_id": "",
+              "confidence": 0.2
+            }
+          },
+          "ontology_conformant": false,
+          "depends_on_step_ids": [],
+          "output": {
+            "name": "thinned_blade_R01",
+            "cadquery_type": "cq.Workplane"
+          },
+          "confidence": 0.36
+        },
+        {
+          "step_id": "S02",
+          "step_index": 2,
+          "ontology_operation": "ReplaceSectionProfiletoBody",
+          "description": "Replace the central material-bearing region of SOLID 1 with an equivalent region having a 0.42 mm thickness.",
+          "required_parameters": {
+            "target_body": {
+              "value": "SOLID 1",
+              "unit": "",
+              "source_type": "model_json_entity",
+              "cadquery_type": "cq.Workplane",
+              "model_reference": {
+                "part_id": "P001",
+                "section_ids": [
+                  "R02"
+                ],
+                "feature_ids": [
+                  "F004"
+                ],
+                "face_ids": [],
+                "solid_ids": [
+                  "SOLID 1"
+                ]
+              },
+              "source_step_id": "",
+              "confidence": 0.74
+            },
+            "old_section_region": {
+              "value": null,
+              "unit": "",
+              "source_type": "unresolved",
+              "cadquery_type": "cq.Shape",
+              "model_reference": {
+                "part_id": "P001",
+                "section_ids": [
+                  "R02"
+                ],
+                "feature_ids": [
+                  "F004"
+                ],
+                "face_ids": [],
+                "solid_ids": [
+                  "SOLID 1"
+                ]
+              },
+              "source_step_id": "",
+              "confidence": 0.18
+            },
+            "new_section_profile": {
+              "value": null,
+              "unit": "",
+              "source_type": "unresolved",
+              "cadquery_type": "cq.Wire",
+              "model_reference": {
+                "part_id": "P001",
+                "section_ids": [
+                  "R02"
+                ],
+                "feature_ids": [
+                  "F004"
+                ],
+                "face_ids": [],
+                "solid_ids": [
+                  "SOLID 1"
+                ]
+              },
+              "source_step_id": "",
+              "confidence": 0.18
+            },
+            "section_plane": {
+              "value": null,
+              "unit": "",
+              "source_type": "unresolved",
+              "cadquery_type": "cq.Plane",
+              "model_reference": {
+                "part_id": "P001",
+                "section_ids": [
+                  "R02"
+                ],
+                "feature_ids": [
+                  "F004"
+                ],
+                "face_ids": [],
+                "solid_ids": [
+                  "SOLID 1"
+                ]
+              },
+              "source_step_id": "",
+              "confidence": 0.16
+            },
+            "section_distance": {
+              "value": 0.42,
+              "unit": "mm",
+              "source_type": "request_value",
+              "cadquery_type": "float",
+              "model_reference": {
+                "part_id": "",
+                "section_ids": [],
+                "feature_ids": [],
+                "face_ids": [],
+                "solid_ids": []
+              },
+              "source_step_id": "",
+              "confidence": 0.96
+            },
+            "both_directions": {
+              "value": null,
+              "unit": "",
+              "source_type": "unresolved",
+              "cadquery_type": "bool",
+              "model_reference": {
+                "part_id": "P001",
+                "section_ids": [
+                  "R02"
+                ],
+                "feature_ids": [
+                  "F004"
+                ],
+                "face_ids": [],
+                "solid_ids": [
+                  "SOLID 1"
+                ]
+              },
+              "source_step_id": "",
+              "confidence": 0.2
+            }
+          },
+          "ontology_conformant": false,
+          "depends_on_step_ids": [],
+          "output": {
+            "name": "thinned_blade_R02",
+            "cadquery_type": "cq.Workplane"
+          },
+          "confidence": 0.37
+        }
+      ],
+      "expected_result": {
+        "geometry": "The central portions of the two existing blade-like cross arms have a nominal thickness of 0.42 mm.",
+        "function": "The reduced central portions contribute space for the third blade.",
+        "behavior": "The existing blades permit an additional blade to pass through the stack center."
+      },
+      "validation_criteria": [
+        {
+          "category": "geometry",
+          "description": "The central portion of each existing blade-like cross arm measures approximately 0.42 mm thick."
+        },
+        {
+          "category": "preservation",
+          "description": "Geometry of R01 and R02 outside their central portions, including existing bores and root transitions, remains unchanged."
+        },
+        {
+          "category": "preservation",
+          "description": "The central clamp assembly R03 remains unchanged."
+        }
+      ]
+    },
+    {
+      "operation_id": "OP02",
+      "summary": "Create one matching third blade from the thinned R01 blade and place it through the center of the stack.",
+      "confidence": 0.53,
+      "depends_on_operation_ids": [
+        "OP01"
+      ],
+      "steps": [
+        {
+          "step_id": "S03",
+          "step_index": 1,
+          "ontology_operation": "CopyFeaturetoLocations",
+          "description": "Copy the thinned R01 blade to the unresolved centered placement required for the third blade.",
+          "required_parameters": {
+            "seed_feature": {
+              "value": "thinned_blade_R01",
+              "unit": "",
+              "source_type": "previous_step_output",
+              "cadquery_type": "cq.Workplane",
+              "model_reference": {
+                "part_id": "P001",
+                "section_ids": [
+                  "R01"
+                ],
+                "feature_ids": [
+                  "F001",
+                  "F002",
+                  "F003"
+                ],
+                "face_ids": [],
+                "solid_ids": [
+                  "SOLID 0"
+                ]
+              },
+              "source_step_id": "S01",
+              "confidence": 0.66
+            },
+            "locations": {
+              "value": null,
+              "unit": "",
+              "source_type": "unresolved",
+              "cadquery_type": "list[cq.Location]",
+              "model_reference": {
+                "part_id": "P001",
+                "section_ids": [
+                  "R03"
+                ],
+                "feature_ids": [
+                  "F009"
+                ],
+                "face_ids": [
+                  "FACE 85",
+                  "FACE 86",
+                  "FACE 87",
+                  "FACE 88",
+                  "FACE 89"
+                ],
+                "solid_ids": [
+                  "SOLID 2"
+                ]
+              },
+              "source_step_id": "",
+              "confidence": 0.22
+            }
+          },
+          "ontology_conformant": false,
+          "depends_on_step_ids": [
+            "S01"
+          ],
+          "output": {
+            "name": "centered_third_blade",
+            "cadquery_type": "cq.Workplane"
+          },
+          "confidence": 0.42
+        }
+      ],
+      "expected_result": {
+        "geometry": "One additional blade matching the established R01 blade design is positioned through the stack center and has a 0.42 mm central portion.",
+        "function": "The added blade completes a three-blade arrangement while retaining the existing blade design.",
+        "behavior": "The added blade occupies the centered passage enabled by the reduced central portions."
+      },
+      "validation_criteria": [
+        {
+          "category": "geometry",
+          "description": "Exactly one blade is added, producing a final count of three blade-like bodies."
+        },
+        {
+          "category": "geometry",
+          "description": "The added blade matches the source blade design except for explicitly requested central thinning and long-edge radii."
+        },
+        {
+          "category": "geometry",
+          "description": "The added blade passes through the center defined by the central stack geometry."
+        },
+        {
+          "category": "function",
+          "description": "The reduced central portions provide sufficient space for the added third blade."
+        },
+        {
+          "category": "behavior",
+          "description": "The added blade can occupy the centered stack passage without requiring changes to the clamp geometry."
+        },
+        {
+          "category": "preservation",
+          "description": "Non-targeted geometry of P001 remains unchanged when the third blade is added."
+        }
+      ]
+    },
+    {
+      "operation_id": "OP03",
+      "summary": "Apply constant-radius fillets to all four long edges of the added third blade.",
+      "confidence": 0.61,
+      "depends_on_operation_ids": [
+        "OP02"
+      ],
+      "steps": [
+        {
+          "step_id": "S04",
+          "step_index": 1,
+          "ontology_operation": "CreateFillettoEdges",
+          "description": "Fillet the four longitudinal edges of the added blade using the requested radius, which is not numerically specified.",
+          "required_parameters": {
+            "target_body": {
+              "value": "centered_third_blade",
+              "unit": "",
+              "source_type": "previous_step_output",
+              "cadquery_type": "cq.Workplane",
+              "model_reference": {
+                "part_id": "P001",
+                "section_ids": [
+                  "R01"
+                ],
+                "feature_ids": [
+                  "F001",
+                  "F002",
+                  "F003"
+                ],
+                "face_ids": [],
+                "solid_ids": [
+                  "SOLID 0"
+                ]
+              },
+              "source_step_id": "S03",
+              "confidence": 0.68
+            },
+            "target_edges": {
+              "value": null,
+              "unit": "",
+              "source_type": "unresolved",
+              "cadquery_type": "list[cq.Edge]",
+              "model_reference": {
+                "part_id": "P001",
+                "section_ids": [
+                  "R01"
+                ],
+                "feature_ids": [
+                  "F001"
+                ],
+                "face_ids": [],
+                "solid_ids": [
+                  "SOLID 0"
+                ]
+              },
+              "source_step_id": "",
+              "confidence": 0.3
+            },
+            "radius": {
+              "value": null,
+              "unit": "mm",
+              "source_type": "unresolved",
+              "cadquery_type": "float",
+              "model_reference": {
+                "part_id": "",
+                "section_ids": [],
+                "feature_ids": [],
+                "face_ids": [],
+                "solid_ids": []
+              },
+              "source_step_id": "",
+              "confidence": 0.05
+            }
+          },
+          "ontology_conformant": false,
+          "depends_on_step_ids": [
+            "S03"
+          ],
+          "output": {
+            "name": "finished_third_blade",
+            "cadquery_type": "cq.Workplane"
+          },
+          "confidence": 0.34
+        }
+      ],
+      "expected_result": {
+        "geometry": "All four long edges of the added third blade have constant-radius fillets.",
+        "function": "The added blade retains the established blade design while satisfying the requested long-edge treatment.",
+        "behavior": ""
+      },
+      "validation_criteria": [
+        {
+          "category": "geometry",
+          "description": "Exactly four longitudinal edges of the added blade are radiused."
+        },
+        {
+          "category": "geometry",
+          "description": "All four long-edge fillets use the same resolved radius."
+        },
+        {
+          "category": "preservation",
+          "description": "The blade geometry outside the four selected long edges and central thickness adjustment remains unchanged."
+        },
+        {
+          "category": "preservation",
+          "description": "The two existing blades and non-targeted assembly geometry receive no additional edge treatment."
+        }
+      ]
+    }
+  ]
+}
+
+
+        Given the instructions and task information in operation.json, generate a CadQuery Python function that execute the modeling tasks you designed. First use CadQuery to extract information you need regarding the model, such as surfaces you want to use as reference faces. Then write CadQuery code with correct dimensions and coordinates to perform the edit.
+
+        The script that runs the function is provided for reference, as well as an example function, but you should only create your version of the function my_cad_function. Do not include any of the rest of the script.
+
+        Once you have generated the function, it will be executed in CadQuery. You will then be provided with a rendering of the CAD model created by your function, and any prints, debug or error messages. You will then have the opportunity to refine your function based on this feedback, and it will be re-executed. Continue this process until the task is complete, or you reach the maximum number of iterations.
+
+        If the task involves editing an existing model, the path to that model's .step file is passed to your function as args["input_file"], and is also listed as brep_start_path_step in the task information. Load it from args["input_file"] rather than hard-coding a path. For these cases, you might need to print out debug information once the model is loaded in your first iteration.
+
+        Return a json object with two fields. Do not include any other text outside of the json object in your response:
+        'complete': true if the task has been completed. IMPORTANT: This should only be judged by looking at the output from the last iteration, not whether a function has been returned this iteration. If there is no valid output that corresponds to the instruction, the task is not complete. The first iteration can never be complete. If this is true, then the current function will NOT be executed, and the function from the last iteration will be used.
+        'my_cad_function': CadQuery python function as a string. Use the same definition and arguments as the example.
+        Script example:
+
+        
+
+#!/usr/bin/env python3
+
+import cadquery as cq
+from cadquery import exporters
+import os
+import sys
+
+###
+# Function definitions
+###
+
+def _shape_from_result(result):
+    if hasattr(result, "val"):
+        return result.val()
+    if isinstance(result, cq.Assembly):
+        return result.toCompound()
+    return result
+
+
+def export_as_step(result, output_dir):
+    """Export CadQuery result as STEP file"""
+    try:
+        output_path = os.path.join(output_dir, "tmp.step")
+        if isinstance(result, cq.Assembly):
+            result.save(output_path)
+            print(f"Exported assembly to: {output_path}")
+            return
+        exporters.export(_shape_from_result(result), output_path, exportType="STEP")
+        print(f"Exported shape to: {output_path}")
+    except Exception as e:
+        print(f"Error exporting STEP file: {e}")
+        import traceback
+        traceback.print_exc()
+
+
+def export_as_stl(result, output_dir):
+    """Export CadQuery result as STL file"""
+    try:
+        output_path = os.path.join(output_dir, "tmp.stl")
+        exporters.export(_shape_from_result(result), output_path, exportType="STL")
+        print(f"Exported STL to: {output_path}")
+    except Exception as e:
+        print(f"Error exporting STL file: {e}")
+        import traceback
+        traceback.print_exc()
+
+
+def export_as_image(result, output_dir):
+    """Export CadQuery result as an image (SVG or PNG if VTK available)"""
+    try:
+        # Get the shape from result
+        if hasattr(result, 'val'):
+            shape = result.val()
+        elif isinstance(result, cq.Assembly):
+            # For assemblies, try to get combined shape
+            shape = result.toCompound()
+        else:
+            shape = result
+        
+        # Try PNG export using VTK (requires cadquery with ocp/vtk support)
+        png_path = os.path.join(output_dir, "tmp.png")
+        try:
+            from cadquery.vis import show
+            # Use show() with screenshot parameter instead of vis.screenshot()
+            show(
+                shape,
+                screenshot=png_path,
+                width=1920,
+                height=1080,
+                interact=False  # Don't open interactive GUI
+            )
+            print(f"Exported PNG image to: {png_path}")
+            return
+        except Exception as e:
+            print(f"Error exporting PNG image: {e}")
+            pass
+        
+        # Try using ocp_vscode or jupyter_cadquery for rendering
+        try:
+            from ocp_tessellate.convert import to_svg
+            svg_path = os.path.join(output_dir, "tmp.svg")
+            svg_content = to_svg(shape)
+            with open(svg_path, 'w') as f:
+                f.write(svg_content)
+            print(f"Exported SVG image to: {svg_path}")
+            return
+        except ImportError:
+            pass
+        
+        # Fallback: export SVG using CadQuery's built-in SVG exporter
+        svg_path = os.path.join(output_dir, "tmp.svg")
+        exporters.export(shape, svg_path, exportType="SVG")
+        print(f"Exported SVG image to: {svg_path}")
+        
+    except Exception as e:
+        print(f"Error exporting image: {e}")
+        import traceback
+        traceback.print_exc()
+
+
+def parse_cadquery_args(argv, required_args=None):
+    """
+    Parses command line arguments passed to CadQuery scripts.
+    Args will be passed as --passkey value(s)
+    Only required args are processed
+    """
+    if required_args is None:
+        required_args = ['--output_dir', '--input_file', '--function_file']
+    
+    args = {}
+    i = 0
+    while i < len(argv):
+        arg = argv[i]
+        if arg in required_args:
+            if i + 1 < len(argv):
+                args[arg.lstrip('-')] = argv[i + 1]
+                i += 1  # skip next since it's a value
+            else:
+                print(f"Warning: No value provided for argument {arg}")
+        i += 1
+    return args
+
+
+def load_and_execute_function(function_string, args):
+    """
+    Load a my_cad_function function from a string and execute it.
+    
+    Args:
+        function_string (str): The complete function definition as a string
+        args (dict): Arguments to pass to the function
+    
+    Returns:
+        CadQuery Workplane, Shape, or Assembly, or None
+    """
+    try:
+        # Create a safe execution environment with necessary imports
+        exec_globals = {
+            'cq': cq,
+            'cadquery': cq,
+            'Workplane': cq.Workplane,
+            'Assembly': cq.Assembly,
+            'exporters': exporters,
+            'os': os,
+            'sys': sys,
+            '__builtins__': __builtins__
+        }
+        
+        # Execute the function definition
+        exec(function_string, exec_globals)
+        
+        # Get the function from the execution environment
+        if 'my_cad_function' not in exec_globals:
+            raise ValueError("Function 'my_cad_function' not found in provided code")
+        
+        my_cad_function = exec_globals['my_cad_function']
+        
+        # Execute the function with arguments
+        return my_cad_function(args)
+        
+    except Exception as e:
+        print(f"Error executing LLM-provided function: {e}")
+        import traceback
+        traceback.print_exc()
+        return None
+
+
+###
+# Example my_cad_function that creates three boxes.
+###
+# def my_cad_function(args):
+#     boxes = []
+#     for translation in [(100, 0, 0), (0, 100, 0), (0, 0, 100)]:
+#         box = cq.Workplane("XY").box(10, 20, 30).translate(translation)
+#         boxes.append(box)
+#     # Combine all boxes into a compound
+#     result = boxes[0]
+#     for box in boxes[1:]:
+#         result = result.union(box)
+#     print(f"Created compound with multiple boxes at different locations.")
+#     return result
+
+###
+# Example my_cad_function that loads a STEP file and prints information.
+###
+# def my_cad_function(args):
+#     if "input_file" in args:
+#         input_file = os.path.expanduser(args["input_file"])
+#         shape = cq.importers.importStep(input_file)
+#         # Get the underlying OCC shape for analysis
+#         if hasattr(shape, 'val'):
+#             occ_shape = shape.val()
+#         else:
+#             occ_shape = shape
+#         print(f"Is Valid: {occ_shape.isValid()}")
+#         print(f"Volume: {occ_shape.Volume():.6f} mm^3")
+#         print(f"Number of faces: {len(occ_shape.Faces())}")
+#         bbox = occ_shape.BoundingBox()
+#         center = bbox.center
+#         print(f"Bbox Center: ({center.x:.4f}, {center.y:.4f}, {center.z:.4f})")
+#         return shape
+#     return None
+
+
+###
+# Main script execution
+###
+
+if __name__ == "__main__":
+    # Process command line arguments
+    argv = sys.argv
+    args = parse_cadquery_args(argv)
+    output_dir = args.get("output_dir", "~/Desktop")
+    output_dir = os.path.expanduser(output_dir)
+    if not os.path.exists(output_dir):
+        os.makedirs(output_dir)
+
+    # Do not delete tmp.step / tmp.stl from a previous successful iteration.
+    # A later failed or timed-out run must leave the last good solid in place
+    # so ingest/eval still have geometry. Preview files can be replaced.
+    for stale_name in ("tmp.png", "tmp.svg"):
+        stale_path = os.path.join(output_dir, stale_name)
+        if os.path.exists(stale_path):
+            os.remove(stale_path)
+
+    # Load function from file or use default
+    result = None
+    if "function_file" in args:
+        function_file = os.path.expanduser(args["function_file"])
+        if os.path.exists(function_file):
+            try:
+                with open(function_file, 'r') as f:
+                    function_string = f.read()
+                print(f"Loading function from: {function_file}")
+                result = load_and_execute_function(function_string, args)
+            except Exception as e:
+                print(f"Error loading function from file: {e}")
+        else:
+            print(f"Function file not found: {function_file}")
+    else:
+        print("No function file provided")
+
+    # Export results if a result was returned
+    if result is not None:
+        export_as_step(result, output_dir)
+        export_as_stl(result, output_dir)
+        export_as_image(result, output_dir)
+    else:
+        print("No CadQuery result returned; skipped STEP/STL/image export.")
+    
+    print("Script completed.")
+
+Instruction:
+
+Edit the existing model according to the provided instructions.
+
+Task information:
+
+request_text:
+
+Add third rotor blade to the assembly. It should have the same design as the other two. Radii should applied on all four long edges of the blade. Adjust central portion of all three blades so that there is a space for a new blade - reduce thickness of the central portion to cca 0,42mm. New blade should go through the center of the stack.
+
+brep_start_path_step:
+
+/home/adml/Research/Hackathon2026/IDETC26-Hackathon-Autodesk-neuralCAD-Edit/data/edit_192_external/breps/F332D3FXML85WLR2_1769607241.221253.step
+
+Last output rendering: None (this is the first iteration)
+
+Iterations remaining: 10

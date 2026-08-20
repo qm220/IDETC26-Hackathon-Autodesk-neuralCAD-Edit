@@ -1,0 +1,153 @@
+Thinking text:
+
+
+Generated script:
+def my_cad_function(args):
+    input_file = os.path.expanduser(args["input_file"])
+    model = cq.importers.importStep(input_file)
+    shape = model.val()
+
+    print("=== MODEL INSPECTION ===")
+    print(f"Valid: {shape.isValid()}")
+    bb = shape.BoundingBox()
+    print(f"Model bbox: x=({bb.xmin:.4f},{bb.xmax:.4f}) y=({bb.ymin:.4f},{bb.ymax:.4f}) z=({bb.zmin:.4f},{bb.zmax:.4f})")
+    print(f"Model center: ({bb.center.x:.4f},{bb.center.y:.4f},{bb.center.z:.4f})")
+    print(f"Solids: {len(shape.Solids())}, Faces: {len(shape.Faces())}, Edges: {len(shape.Edges())}")
+
+    for si, solid in enumerate(shape.Solids()):
+        sb = solid.BoundingBox()
+        sc = solid.Center()
+        print(f"SOLID {si}: volume={solid.Volume():.6f}, center=({sc.x:.4f},{sc.y:.4f},{sc.z:.4f}), bbox=x({sb.xmin:.4f},{sb.xmax:.4f}) y({sb.ymin:.4f},{sb.ymax:.4f}) z({sb.zmin:.4f},{sb.zmax:.4f}), faces={len(solid.Faces())}")
+        edge_lengths = sorted([e.Length() for e in solid.Edges()], reverse=True)
+        print(f"  longest edges: {[round(v,4) for v in edge_lengths[:16]]}")
+
+    print("=== GLOBAL FACE INDEX BINDING ===")
+    for i, face in enumerate(shape.Faces()):
+        c = face.Center()
+        fb = face.BoundingBox()
+        try:
+            geom = face.geomType()
+        except Exception:
+            geom = "UNKNOWN"
+        try:
+            n = face.normalAt(c)
+            normal_text = f"({n.x:.4f},{n.y:.4f},{n.z:.4f})"
+        except Exception:
+            normal_text = "n/a"
+        print(f"FACE {i}: type={geom}, area={face.Area():.5f}, center=({c.x:.4f},{c.y:.4f},{c.z:.4f}), normal={normal_text}, bbox=x({fb.xmin:.4f},{fb.xmax:.4f}) y({fb.ymin:.4f},{fb.ymax:.4f}) z({fb.zmin:.4f},{fb.zmax:.4f}), edges={len(face.Edges())}")
+
+    return model
+
+Program output:
+stdout: Loading function from: /home/adml/Research/Hackathon2026/IDETC26-Hackathon-Autodesk-neuralCAD-Edit/output/gpt-5.6-ontologies/gpt-5.6-sol-ontologies_cadquery-script_1787176720.5204732/brep_end/1787176720.5204732/temp_script.py
+=== MODEL INSPECTION ===
+Valid: True
+Model bbox: x=(-165.8766,165.8766) y=(-15.2400,27.9400) z=(-190.5000,190.5000)
+Model center: (0.0000,6.3500,0.0000)
+Solids: 3, Faces: 90, Edges: 243
+SOLID 0: volume=95495.348211, center=(-5.0781,5.8684,-2.8931), bbox=x(-165.8766,165.8766) y(-0.0000,12.7000) z(-115.7155,115.7155), faces=23
+  longest edges: [381.0, 189.2237, 189.2237, 152.4, 147.32, 147.32, 147.32, 147.32, 147.32, 147.32, 86.36, 86.36, 40.6962, 29.2374, 19.9491, 19.9491]
+SOLID 1: volume=87214.276242, center=(-0.0000,6.6884,-0.0000), bbox=x(-12.7000,12.7000) y(-0.0000,12.7000) z(-190.5000,190.5000), faces=24
+  longest edges: [189.2237, 189.2237, 189.2237, 189.2237, 152.4, 152.4, 147.32, 147.32, 147.32, 147.32, 86.36, 86.36, 40.6962, 19.9491, 19.9491, 19.9491]
+SOLID 2: volume=25876.492332, center=(0.0000,6.3500,-0.0000), bbox=x(-25.4000,25.4000) y(-15.2400,27.9400) z(-25.4000,25.4000), faces=43
+  longest edges: [59.8473, 59.8473, 59.8473, 59.8473, 39.8982, 39.8982, 35.56, 35.56, 35.56, 35.56, 35.56, 35.56, 35.56, 35.56, 35.56, 35.56]
+=== GLOBAL FACE INDEX BINDING ===
+FACE 0: type=CYLINDER, area=126.67687, center=(-21.1824,3.1750,-14.0166), normal=n/a, bbox=x(-24.3574,-18.0074) y(-0.0000,6.3500) z(-17.1916,-10.8416), edges=3
+FACE 1: type=CYLINDER, area=106.51562, center=(20.7888,2.8100,13.7561), normal=(0.8340,-0.0000,0.5518), bbox=x(18.0074,24.3574) y(-0.0000,6.3500) z(10.8416,17.1916), edges=5
+FACE 2: type=PLANE, area=1697.68893, center=(-1.0497,6.3500,-0.6946), normal=(0.0000,1.0000,0.0000), bbox=x(-43.0184,43.0184) y(6.3500,6.3500) z(-34.4194,34.4194), edges=14
+FACE 3: type=CYLINDER, area=3145.36687, center=(93.0451,6.2833,61.5685), normal=(0.0000,1.0000,0.0000), bbox=x(19.4304,160.6204) y(3.1750,9.5250) z(11.3688,107.7720), edges=9
+FACE 4: type=PLANE, area=5.40929, center=(34.6578,6.9690,16.6662), normal=(-0.8340,0.0000,-0.5518), bbox=x(33.3795,35.9786) y(6.3500,7.6200) z(14.6701,18.5981), edges=4
+FACE 5: type=BSPLINE, area=56.45528, center=(39.0058,9.5628,14.3435), normal=(-0.2353,0.5426,-0.8064), bbox=x(35.2778,43.0184) y(6.3500,12.7000) z(12.3934,18.5325), edges=4
+FACE 6: type=CYLINDER, area=93.21246, center=(33.4409,11.0668,22.1281), normal=(-0.5558,0.7456,-0.3677), bbox=x(28.2695,39.5143) y(7.6200,12.7000) z(15.7292,29.1238), edges=6
+FACE 7: type=BSPLINE, area=56.45528, center=(28.4516,9.5628,30.2935), normal=(-0.8342,0.5426,0.0986), bbox=x(26.7252,32.5060) y(6.3500,12.7000) z(26.3205,34.4194), edges=4
+FACE 8: type=PLANE, area=5.40929, center=(28.8895,6.9690,25.3835), normal=(-0.8340,0.0000,-0.5518), bbox=x(27.5687,30.1679) y(6.3500,7.6200) z(23.4516,27.3796), edges=4
+FACE 9: type=BSPLINE, area=56.45528, center=(-39.0058,9.5628,-14.3435), normal=(0.2353,0.5426,0.8064), bbox=x(-43.0184,-35.2778) y(6.3500,12.7000) z(-18.5325,-12.3934), edges=4
+FACE 10: type=CYLINDER, area=101.34150, center=(-33.3131,10.8540,-22.0435), normal=(0.5897,0.7071,0.3902), bbox=x(-39.5143,-28.2695) y(7.6200,12.7000) z(-29.1238,-15.7292), edges=4
+FACE 11: type=BSPLINE, area=56.45528, center=(-28.4516,9.5628,-30.2935), normal=(0.8342,0.5426,-0.0986), bbox=x(-32.5060,-26.7252) y(6.3500,12.7000) z(-34.4194,-26.3205), edges=4
+FACE 12: type=PLANE, area=18.66254, center=(-31.7737,6.9720,-21.0248), normal=(0.8340,-0.0000,0.5518), bbox=x(-35.9786,-27.5687) y(6.3500,7.6200) z(-27.3796,-14.6701), edges=4
+FACE 13: type=PLANE, area=296.62015, center=(-159.0499,6.2061,-104.8498), normal=(-0.8340,0.0000,-0.5518), bbox=x(-165.8766,-151.8600) y(0.0000,12.7000) z(-115.7155,-94.5330), edges=5
+FACE 14: type=PLANE, area=7063.13350, center=(-1.8003,-0.0000,2.7207), normal=(-0.0000,-1.0000,-0.0000), bbox=x(-165.8766,162.3725) y(-0.0000,0.0000) z(-110.4198,115.7155), edges=9
+FACE 15: type=CYLINDER, area=258.42081, center=(-0.0000,3.1750,0.0000), normal=n/a, bbox=x(-6.4770,6.4770) y(-0.0000,6.3500) z(-6.4770,6.4770), edges=5
+FACE 16: type=CYLINDER, area=1469.45170, center=(-103.1742,10.3925,-55.8093), normal=(-0.3902,0.7071,0.5897), bbox=x(-165.8766,-39.5143) y(6.3500,12.7000) z(-99.8286,-13.2369), edges=4
+FACE 17: type=PLANE, area=1870.96401, center=(-97.4392,12.7000,-64.4762), normal=(0.0000,1.0000,0.0000), bbox=x(-162.3725,-32.5060) y(12.7000,12.7000) z(-110.4198,-18.5325), edges=4
+FACE 18: type=CYLINDER, area=1469.45170, center=(91.7043,10.3925,73.1431), normal=(-0.3902,0.7071,0.5897), bbox=x(29.0019,155.3642) y(6.3500,12.7000) z(29.1238,115.7155), edges=4
+FACE 19: type=PLANE, area=1870.96401, center=(97.4392,12.7000,64.4762), normal=(0.0000,1.0000,0.0000), bbox=x(32.5060,162.3725) y(12.7000,12.7000) z(18.5325,110.4198), edges=4
+FACE 20: type=CYLINDER, area=6738.99315, center=(5.7350,5.8335,-8.6670), normal=(0.5474,-0.1267,-0.8272), bbox=x(-155.3642,165.8766) y(-0.0000,12.7000) z(-115.7155,99.8286), edges=10
+FACE 21: type=PLANE, area=2419.35000, center=(-7.0083,3.1750,10.5912), normal=(-0.5518,0.0000,0.8340), bbox=x(-165.8766,151.8600) y(-0.0000,6.3500) z(-94.5330,115.7155), edges=6
+FACE 22: type=PLANE, area=264.95093, center=(158.6650,6.1889,105.4315), normal=(0.8340,-0.0000,0.5518), bbox=x(151.8600,165.8766) y(-0.0000,12.7000) z(94.5330,115.7155), edges=6
+FACE 23: type=CYLINDER, area=3145.36687, center=(-0.0000,6.4167,-111.5709), normal=(-0.0000,-1.0000,-0.0000), bbox=x(-3.1750,3.1750) y(3.1750,9.5250) z(-190.5000,-25.4000), edges=8
+FACE 24: type=CYLINDER, area=106.51564, center=(0.0000,9.8900,-24.9280), normal=(-0.0000,-0.0000,-1.0000), bbox=x(-3.1750,3.1750) y(6.3500,12.7000) z(-28.5750,-22.2250), edges=4
+FACE 25: type=PLANE, area=5.40929, center=(5.2265,5.7310,-38.1000), normal=(-0.0000,-0.0000,1.0000), bbox=x(2.9099,7.6200) y(5.0800,6.3500) z(-38.1000,-38.1000), edges=4
+FACE 26: type=BSPLINE, area=56.45528, center=(9.5628,3.1372,-40.4443), normal=(0.5426,-0.5426,0.6412), bbox=x(6.3500,12.7000) y(-0.0000,6.3500) z(-43.1800,-38.1000), edges=4
+FACE 27: type=CYLINDER, area=93.21246, center=(0.0000,1.6332,-40.0992), normal=(-0.0000,-0.7456,0.6664), bbox=x(-6.3500,6.3500) y(-0.0000,5.0800) z(-43.1800,-38.1000), edges=6
+FACE 28: type=BSPLINE, area=56.45528, center=(-9.5628,3.1372,-40.4443), normal=(-0.5426,-0.5426,0.6412), bbox=x(-12.7000,-6.3500) y(-0.0000,6.3500) z(-43.1800,-38.1000), edges=4
+FACE 29: type=PLANE, area=5.40929, center=(-5.2265,5.7310,-38.1000), normal=(-0.0000,-0.0000,1.0000), bbox=x(-7.6200,-2.9099) y(5.0800,6.3500) z(-38.1000,-38.1000), edges=4
+FACE 30: type=BSPLINE, area=56.45528, center=(-9.5628,3.1372,40.4443), normal=(-0.5426,-0.5426,-0.6412), bbox=x(-12.7000,-6.3500) y(-0.0000,6.3500) z(38.1000,43.1800), edges=4
+FACE 31: type=CYLINDER, area=93.21246, center=(-0.0000,1.6332,40.0992), normal=(0.0000,-0.7456,-0.6664), bbox=x(-6.3500,6.3500) y(-0.0000,5.0800) z(38.1000,43.1800), edges=6
+FACE 32: type=BSPLINE, area=56.45528, center=(9.5628,3.1372,40.4443), normal=(0.5426,-0.5426,-0.6412), bbox=x(6.3500,12.7000) y(-0.0000,6.3500) z(38.1000,43.1800), edges=4
+FACE 33: type=CYLINDER, area=6738.99309, center=(10.3927,6.8665,0.0000), normal=(0.9919,0.1267,0.0000), bbox=x(6.3500,12.7000) y(-0.0000,12.7000) z(-190.5000,190.5000), edges=10
+FACE 34: type=PLANE, area=5.40929, center=(-5.2265,5.7310,38.1000), normal=(0.0000,0.0000,-1.0000), bbox=x(-7.6200,-2.9099) y(5.0800,6.3500) z(38.1000,38.1000), edges=4
+FACE 35: type=PLANE, area=5.40929, center=(5.2265,5.7310,38.1000), normal=(0.0000,0.0000,-1.0000), bbox=x(2.9099,7.6200) y(5.0800,6.3500) z(38.1000,38.1000), edges=4
+FACE 36: type=CYLINDER, area=3145.36688, center=(-0.0000,6.4167,111.5709), normal=(0.0000,-1.0000,-0.0000), bbox=x(-3.1750,3.1750) y(3.1750,9.5250) z(25.4000,190.5000), edges=8
+FACE 37: type=CYLINDER, area=106.51564, center=(-0.0000,9.8900,24.9280), normal=(0.0000,0.0000,1.0000), bbox=x(-3.1750,3.1750) y(6.3500,12.7000) z(22.2250,28.5750), edges=4
+FACE 38: type=PLANE, area=1632.87855, center=(0.0000,6.3500,-0.0000), normal=(0.0000,-1.0000,0.0000), bbox=x(-12.7000,12.7000) y(6.3500,6.3500) z(-43.1800,43.1800), edges=17
+FACE 39: type=PLANE, area=1870.96401, center=(-0.0000,0.0000,116.8400), normal=(0.0000,-1.0000,0.0000), bbox=x(-6.3500,6.3500) y(0.0000,0.0000) z(43.1800,190.5000), edges=4
+FACE 40: type=PLANE, area=256.29765, center=(-0.0000,6.3500,190.5000), normal=(-0.0000,-0.0000,1.0000), bbox=x(-12.7000,12.7000) y(0.0000,12.7000) z(190.5000,190.5000), edges=5
+FACE 41: type=CYLINDER, area=6738.99305, center=(-10.3927,6.8665,-0.0000), normal=(-0.9919,0.1267,-0.0000), bbox=x(-12.7000,-6.3500) y(-0.0000,12.7000) z(-190.5000,190.5000), edges=11
+FACE 42: type=PLANE, area=2322.00003, center=(0.0000,12.7000,-98.8190), normal=(-0.0000,1.0000,-0.0000), bbox=x(-6.3500,6.3500) y(12.7000,12.7000) z(-190.5000,-1.2763), edges=5
+FACE 43: type=PLANE, area=2322.00003, center=(-0.0000,12.7000,98.8190), normal=(-0.0000,1.0000,-0.0000), bbox=x(-6.3500,6.3500) y(12.7000,12.7000) z(1.2763,190.5000), edges=5
+FACE 44: type=PLANE, area=256.29765, center=(0.0000,6.3500,-190.5000), normal=(0.0000,0.0000,-1.0000), bbox=x(-12.7000,12.7000) y(0.0000,12.7000) z(-190.5000,-190.5000), edges=5
+FACE 45: type=CYLINDER, area=258.41918, center=(0.0000,9.5250,0.0000), normal=(-1.0000,0.0000,-0.0000), bbox=x(-6.4770,6.4770) y(6.3500,12.7000) z(-6.4770,6.4770), edges=7
+FACE 46: type=PLANE, area=1870.96401, center=(0.0000,0.0000,-116.8400), normal=(0.0000,-1.0000,0.0000), bbox=x(-6.3500,6.3500) y(0.0000,0.0000) z(-190.5000,-43.1800), edges=4
+FACE 47: type=CYLINDER, area=121.60979, center=(-20.0910,22.8600,-20.0910), normal=(0.7071,0.0000,0.7071), bbox=x(-22.8600,-15.2400) y(17.7800,27.9400) z(-22.8600,-15.2400), edges=4
+FACE 48: type=PLANE, area=309.67681, center=(-22.8600,22.8600,-0.0000), normal=(1.0000,0.0000,-0.0000), bbox=x(-22.8600,-22.8600) y(17.7800,27.9400) z(-15.2400,15.2400), edges=4
+FACE 49: type=CYLINDER, area=121.60979, center=(-20.0910,22.8600,20.0910), normal=(0.7071,-0.0000,-0.7071), bbox=x(-22.8600,-15.2400) y(17.7800,27.9400) z(15.2400,22.8600), edges=4
+FACE 50: type=PLANE, area=309.67681, center=(0.0000,22.8600,22.8600), normal=(0.0000,-0.0000,-1.0000), bbox=x(-15.2400,15.2400) y(17.7800,27.9400) z(22.8600,22.8600), edges=4
+FACE 51: type=CYLINDER, area=152.01224, center=(22.6310,21.5900,-22.6310), normal=(0.7071,-0.0000,-0.7071), bbox=x(17.7800,25.4000) y(15.2400,27.9400) z(-25.4000,-17.7800), edges=4
+FACE 52: type=PLANE, area=451.61199, center=(0.0000,21.5900,-25.4000), normal=(0.0000,-0.0000,-1.0000), bbox=x(-17.7800,17.7800) y(15.2400,27.9400) z(-25.4000,-25.4000), edges=4
+FACE 53: type=PLANE, area=490.32139, center=(0.0000,27.9400,-0.0000), normal=(-0.0000,1.0000,-0.0000), bbox=x(-25.4000,25.4000) y(27.9400,27.9400) z(-25.4000,25.4000), edges=16
+FACE 54: type=CYLINDER, area=121.60979, center=(20.0910,22.8600,20.0910), normal=(-0.7071,-0.0000,-0.7071), bbox=x(15.2400,22.8600) y(17.7800,27.9400) z(15.2400,22.8600), edges=4
+FACE 55: type=PLANE, area=309.67681, center=(22.8600,22.8600,-0.0000), normal=(-1.0000,0.0000,0.0000), bbox=x(22.8600,22.8600) y(17.7800,27.9400) z(-15.2400,15.2400), edges=4
+FACE 56: type=CYLINDER, area=152.01224, center=(22.6310,21.5900,22.6310), normal=(0.7071,0.0000,0.7071), bbox=x(17.7800,25.4000) y(15.2400,27.9400) z(17.7800,25.4000), edges=4
+FACE 57: type=PLANE, area=451.61199, center=(0.0000,21.5900,25.4000), normal=(-0.0000,0.0000,1.0000), bbox=x(-17.7800,17.7800) y(15.2400,27.9400) z(25.4000,25.4000), edges=4
+FACE 58: type=PLANE, area=2245.77406, center=(0.0000,15.2400,-0.0000), normal=(0.0000,-1.0000,0.0000), bbox=x(-25.4000,25.4000) y(15.2400,15.2400) z(-25.4000,25.4000), edges=9
+FACE 59: type=CYLINDER, area=152.01224, center=(-22.6310,21.5900,22.6310), normal=(-0.7071,0.0000,0.7071), bbox=x(-25.4000,-17.7800) y(15.2400,27.9400) z(17.7800,25.4000), edges=4
+FACE 60: type=PLANE, area=451.61199, center=(-25.4000,21.5900,-0.0000), normal=(-1.0000,0.0000,0.0000), bbox=x(-25.4000,-25.4000) y(15.2400,27.9400) z(-17.7800,17.7800), edges=4
+FACE 61: type=CYLINDER, area=152.01224, center=(-22.6310,21.5900,-22.6310), normal=(-0.7071,-0.0000,-0.7071), bbox=x(-25.4000,-17.7800) y(15.2400,27.9400) z(-25.4000,-17.7800), edges=4
+FACE 62: type=CYLINDER, area=121.60979, center=(20.0910,22.8600,-20.0910), normal=(-0.7071,0.0000,0.7071), bbox=x(15.2400,22.8600) y(17.7800,27.9400) z(-22.8600,-15.2400), edges=4
+FACE 63: type=PLANE, area=2040.47563, center=(0.0000,17.7800,0.0000), normal=(0.0000,1.0000,-0.0000), bbox=x(-22.8600,22.8600) y(17.7800,17.7800) z(-22.8600,22.8600), edges=8
+FACE 64: type=PLANE, area=309.67681, center=(-0.0000,22.8600,-22.8600), normal=(0.0000,0.0000,1.0000), bbox=x(-15.2400,15.2400) y(17.7800,27.9400) z(-22.8600,-22.8600), edges=4
+FACE 65: type=PLANE, area=451.61199, center=(25.4000,21.5900,-0.0000), normal=(1.0000,0.0000,0.0000), bbox=x(25.4000,25.4000) y(15.2400,27.9400) z(-17.7800,17.7800), edges=4
+FACE 66: type=CYLINDER, area=121.60979, center=(-20.0910,-10.1600,-20.0910), normal=(0.7071,-0.0000,0.7071), bbox=x(-22.8600,-15.2400) y(-15.2400,-5.0800) z(-22.8600,-15.2400), edges=4
+FACE 67: type=PLANE, area=309.67681, center=(-22.8600,-10.1600,-0.0000), normal=(1.0000,-0.0000,-0.0000), bbox=x(-22.8600,-22.8600) y(-15.2400,-5.0800) z(-15.2400,15.2400), edges=4
+FACE 68: type=CYLINDER, area=121.60979, center=(-20.0910,-10.1600,20.0910), normal=(0.7071,0.0000,-0.7071), bbox=x(-22.8600,-15.2400) y(-15.2400,-5.0800) z(15.2400,22.8600), edges=4
+FACE 69: type=PLANE, area=309.67681, center=(0.0000,-10.1600,22.8600), normal=(-0.0000,0.0000,-1.0000), bbox=x(-15.2400,15.2400) y(-15.2400,-5.0800) z(22.8600,22.8600), edges=4
+FACE 70: type=CYLINDER, area=152.01224, center=(22.6310,-8.8900,-22.6310), normal=(0.7071,0.0000,-0.7071), bbox=x(17.7800,25.4000) y(-15.2400,-2.5400) z(-25.4000,-17.7800), edges=4
+FACE 71: type=PLANE, area=451.61199, center=(0.0000,-8.8900,-25.4000), normal=(-0.0000,0.0000,-1.0000), bbox=x(-17.7800,17.7800) y(-15.2400,-2.5400) z(-25.4000,-25.4000), edges=4
+FACE 72: type=PLANE, area=490.32139, center=(0.0000,-15.2400,-0.0000), normal=(0.0000,-1.0000,-0.0000), bbox=x(-25.4000,25.4000) y(-15.2400,-15.2400) z(-25.4000,25.4000), edges=16
+FACE 73: type=CYLINDER, area=121.60979, center=(20.0910,-10.1600,20.0910), normal=(-0.7071,0.0000,-0.7071), bbox=x(15.2400,22.8600) y(-15.2400,-5.0800) z(15.2400,22.8600), edges=4
+FACE 74: type=PLANE, area=309.67681, center=(22.8600,-10.1600,-0.0000), normal=(-1.0000,0.0000,-0.0000), bbox=x(22.8600,22.8600) y(-15.2400,-5.0800) z(-15.2400,15.2400), edges=4
+FACE 75: type=CYLINDER, area=152.01224, center=(22.6310,-8.8900,22.6310), normal=(0.7071,-0.0000,0.7071), bbox=x(17.7800,25.4000) y(-15.2400,-2.5400) z(17.7800,25.4000), edges=4
+FACE 76: type=PLANE, area=451.61199, center=(0.0000,-8.8900,25.4000), normal=(-0.0000,-0.0000,1.0000), bbox=x(-17.7800,17.7800) y(-15.2400,-2.5400) z(25.4000,25.4000), edges=4
+FACE 77: type=PLANE, area=2245.77406, center=(0.0000,-2.5400,-0.0000), normal=(-0.0000,1.0000,0.0000), bbox=x(-25.4000,25.4000) y(-2.5400,-2.5400) z(-25.4000,25.4000), edges=9
+FACE 78: type=CYLINDER, area=152.01224, center=(-22.6310,-8.8900,22.6310), normal=(-0.7071,-0.0000,0.7071), bbox=x(-25.4000,-17.7800) y(-15.2400,-2.5400) z(17.7800,25.4000), edges=4
+FACE 79: type=PLANE, area=451.61199, center=(-25.4000,-8.8900,-0.0000), normal=(-1.0000,-0.0000,-0.0000), bbox=x(-25.4000,-25.4000) y(-15.2400,-2.5400) z(-17.7800,17.7800), edges=4
+FACE 80: type=CYLINDER, area=152.01224, center=(-22.6310,-8.8900,-22.6310), normal=(-0.7071,0.0000,-0.7071), bbox=x(-25.4000,-17.7800) y(-15.2400,-2.5400) z(-25.4000,-17.7800), edges=4
+FACE 81: type=CYLINDER, area=121.60979, center=(20.0910,-10.1600,-20.0910), normal=(-0.7071,-0.0000,0.7071), bbox=x(15.2400,22.8600) y(-15.2400,-5.0800) z(-22.8600,-15.2400), edges=4
+FACE 82: type=PLANE, area=2040.47563, center=(0.0000,-5.0800,0.0000), normal=(0.0000,-1.0000,-0.0000), bbox=x(-22.8600,22.8600) y(-5.0800,-5.0800) z(-22.8600,22.8600), edges=8
+FACE 83: type=PLANE, area=309.67681, center=(-0.0000,-10.1600,-22.8600), normal=(-0.0000,-0.0000,1.0000), bbox=x(-15.2400,15.2400) y(-15.2400,-5.0800) z(-22.8600,-22.8600), edges=4
+FACE 84: type=PLANE, area=451.61199, center=(25.4000,-8.8900,-0.0000), normal=(1.0000,-0.0000,-0.0000), bbox=x(25.4000,25.4000) y(-15.2400,-2.5400) z(-17.7800,17.7800), edges=4
+FACE 85: type=PLANE, area=158.34609, center=(0.0000,0.0000,-0.0000), normal=(0.0000,1.0000,0.0000), bbox=x(-9.5250,9.5250) y(-0.0000,0.0000) z(-9.5250,9.5250), edges=2
+FACE 86: type=CYLINDER, area=152.01224, center=(-0.0000,-1.2700,0.0000), normal=n/a, bbox=x(-9.5250,9.5250) y(-2.5400,0.0000) z(-9.5250,9.5250), edges=3
+FACE 87: type=PLANE, area=158.34609, center=(0.0000,12.7000,0.0000), normal=(-0.0000,-1.0000,-0.0000), bbox=x(-9.5250,9.5250) y(12.7000,12.7000) z(-9.5250,9.5250), edges=2
+FACE 88: type=CYLINDER, area=152.01224, center=(-0.0000,13.9700,0.0000), normal=n/a, bbox=x(-9.5250,9.5250) y(12.7000,15.2400) z(-9.5250,9.5250), edges=3
+FACE 89: type=CYLINDER, area=506.70748, center=(0.0000,6.3500,0.0000), normal=n/a, bbox=x(-6.3500,6.3500) y(-0.0000,12.7000) z(-6.3500,6.3500), edges=3
+Exported shape to: /home/adml/Research/Hackathon2026/IDETC26-Hackathon-Autodesk-neuralCAD-Edit/output/gpt-5.6-ontologies/gpt-5.6-sol-ontologies_cadquery-script_1787176720.5204732/brep_end/1787176720.5204732/tmp.step
+Exported STL to: /home/adml/Research/Hackathon2026/IDETC26-Hackathon-Autodesk-neuralCAD-Edit/output/gpt-5.6-ontologies/gpt-5.6-sol-ontologies_cadquery-script_1787176720.5204732/brep_end/1787176720.5204732/tmp.stl
+Exported PNG image to: /home/adml/Research/Hackathon2026/IDETC26-Hackathon-Autodesk-neuralCAD-Edit/output/gpt-5.6-ontologies/gpt-5.6-sol-ontologies_cadquery-script_1787176720.5204732/brep_end/1787176720.5204732/tmp.png
+Script completed.
+
+stderr: 
+
+Exported this iteration:
+tmp.step, tmp.stl, tmp.png, tmp_+Z.png, tmp_-Z.png, tmp_-X.png, tmp_+X.png, tmp_+Y.png, tmp_-Y.png, tmp_iso1.png, tmp_iso2.png

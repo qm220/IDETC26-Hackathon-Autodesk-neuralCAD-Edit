@@ -1,0 +1,212 @@
+{
+  "request": "If edge with bigger radius is considered as top, add supporting structure to the bottom of the frame by offseting inner wall by 2cm with thickness of 0,5cm of the supporting structure all around. This will create step at the bottom of the frame, enlarging bottom surface area. Leave out radii at the bottom edges. Add radii from top, 0,2cm which will create smoothe transition from above. Bottom remains flat.",
+  "request_wording": {
+    "action_words": [
+      "considered",
+      "as",
+      "add",
+      "supporting",
+      "structure",
+      "to",
+      "offseting",
+      "2cm",
+      "thickness",
+      "0,5cm",
+      "supporting",
+      "structure",
+      "all",
+      "around",
+      "create",
+      "step",
+      "at",
+      "Leave",
+      "out",
+      "radii",
+      "at",
+      "Add",
+      "radii",
+      "from",
+      "0,2cm",
+      "remains",
+      "flat"
+    ],
+    "referenced_feature_words": [
+      "edge",
+      "bigger",
+      "radius",
+      "top",
+      "bottom",
+      "frame",
+      "inner",
+      "wall",
+      "bottom",
+      "frame",
+      "bottom",
+      "edges",
+      "top",
+      "Bottom"
+    ],
+    "intention_words": [
+      "enlarging",
+      "bottom",
+      "surface",
+      "area",
+      "create",
+      "smoothe",
+      "transition",
+      "from",
+      "above"
+    ],
+    "grammatical_words": [
+      "If",
+      "with",
+      "is",
+      "the",
+      "of",
+      "the",
+      "by",
+      "by",
+      "with",
+      "of",
+      "of",
+      "the",
+      "This",
+      "will",
+      "the",
+      "of",
+      "the",
+      "the",
+      "which",
+      "will"
+    ]
+  },
+  "actions": [
+    {
+      "operation": "Create an all-around supporting structure that forms a step at the bottom of the frame by offsetting the inner wall.",
+      "parameters": {
+        "inner_wall_offset": "2 cm",
+        "supporting_structure_thickness": "0.5 cm"
+      },
+      "target": "The inner wall and bottom of the existing frame.",
+      "relational_constraint": "Use the edge having the bigger existing radius to establish the top orientation. Place the supporting structure at the bottom and continue it all around the inner-wall contour.",
+      "unresolved_reference": "Identify the edge with the bigger radius, the resulting top and bottom orientation, and the inner-wall contour. The offset direction and the vertical extent of the supporting structure are not explicitly stated and must be resolved from the model or clarified.",
+      "target section code": [
+        "R01"
+      ],
+      "target face code": [
+        "F001",
+        "F002",
+        "F008",
+        "FACE 8",
+        "FACE 9",
+        "FACE 10",
+        "FACE 11",
+        "FACE 12",
+        "FACE 33",
+        "FACE 45",
+        "FACE 46",
+        "FACE 47"
+      ],
+      "steps": [
+        "Establish the requested through-thickness orientation from the asymmetric edge treatment rather than from a camera label: F007, represented by FACE 35 through FACE 42, is the continuous 10 mm outer fillet and therefore identifies the user-defined top side. F009 and FACE 34 are the adjacent narrow top land. The opposite broad planar land F008, FACE 12, is consequently the bottom working side.",
+        "Use FACE 12 as the support sketch plane, or construct a datum plane coincident with FACE 12 if direct face sketching is undesirable. Set the extrusion direction normal to FACE 12 and away from the existing frame, opposite the F007/F009 top side.",
+        "Project the complete rounded-rectangular inner perimeter associated with F002 onto the sketch. The source inner-wall geometry consists of straight wall faces FACE 9, FACE 11, FACE 33, and FACE 45 and 50 mm-radius corner wall faces FACE 8, FACE 10, FACE 46, and FACE 47.",
+        "Offset the projected inner contour inward into the central opening by 20 mm. This direction reduces the clear opening and enlarges the bottom seating area. Preserve a continuous closed rounded-rectangular contour through all four corners.",
+        "Create the supporting profile as a closed annular region whose inner boundary is the new 20 mm inward offset and whose outer boundary overlaps or follows the existing bottom frame land sufficiently to produce a robust union. Prefer using the outer wire of FACE 12 so the new base supports the complete existing frame land while extending 20 mm into the opening.",
+        "Pad or extrude the support profile 5 mm from FACE 12 away from the original body. Use an additive union so the support becomes part of SOLID 0 and remains continuous around the entire opening.",
+        "Verify that the resulting feature forms one valid solid, creates a uniform 5 mm-high bottom step, and retains a continuous reduced central opening without self-intersections at the 50 mm-radius corners."
+      ]
+    },
+    {
+      "operation": "Omit fillets or other radii from the bottom edges, leaving those edges unrounded.",
+      "parameters": {},
+      "target": "The bottom edges of the frame and newly created supporting step, as applicable.",
+      "relational_constraint": "Only bottom edges are to remain without radii.",
+      "unresolved_reference": "Identify the complete set of edges considered bottom edges after creation of the supporting structure.",
+      "target section code": [
+        "R01"
+      ],
+      "target face code": [
+        "F001",
+        "F008",
+        "FACE 12"
+      ],
+      "steps": [
+        "After the 5 mm support extrusion is fused to R01, identify the newly generated planar face farthest from FACE 12 in the extrusion direction; this is the final bottom face.",
+        "Identify every edge bounding that final bottom face, including the lower inner perimeter of the reduced opening and any lower outer perimeter edges generated by the support.",
+        "Exclude all of these lower edges from fillet and chamfer operations. Do not apply the requested 2 mm transition radius to any edge incident to the final bottom face.",
+        "Keep the lower intersections between the planar bottom face and the support side walls geometrically sharp so the full bottom footprint remains available for seating.",
+        "Do not separately delete original F004 or F005 solely because they are 2 mm fillets; after the additive support is created, they are not the final lower edges. Any portions consumed by the union may be regenerated by the Boolean result."
+      ]
+    },
+    {
+      "operation": "Add fillet radii to the top-side edges of the supporting structure or step.",
+      "parameters": {
+        "radius": "0.2 cm"
+      },
+      "target": "The top-side transition edges associated with the newly created supporting structure.",
+      "relational_constraint": "Apply the radii from the top to produce a smooth transition from above; do not apply them to the bottom edges.",
+      "unresolved_reference": "Identify the exact top-side edges that form the transition between the original frame and the supporting structure.",
+      "target section code": [
+        "R01"
+      ],
+      "target face code": [
+        "F002",
+        "F004",
+        "F008",
+        "FACE 0",
+        "FACE 1",
+        "FACE 2",
+        "FACE 3",
+        "FACE 4",
+        "FACE 5",
+        "FACE 6",
+        "FACE 7",
+        "FACE 8",
+        "FACE 9",
+        "FACE 10",
+        "FACE 11",
+        "FACE 12",
+        "FACE 33",
+        "FACE 45",
+        "FACE 46",
+        "FACE 47"
+      ],
+      "steps": [
+        "Perform this fillet after the support extrusion and Boolean union so the new transition-edge loop exists in the final topology.",
+        "Select the continuous upper inner edge loop of the support: the loop where the exposed top surface of the inward-projecting support meets its new inner vertical wall around the reduced opening.",
+        "Use F002 inner-wall faces FACE 8, FACE 9, FACE 10, FACE 11, FACE 33, FACE 45, FACE 46, and FACE 47 and bottom land FACE 12 as localization references. The selected edges themselves are newly generated and therefore do not have original-model B-rep IDs.",
+        "Apply a constant-radius 2 mm fillet to the complete upper transition loop, propagating through all straight and rounded-corner segments.",
+        "Confirm that the fillet is applied only from the upper side of the support and produces a smooth approach into the reduced opening. Do not include the lower inner edge or any edge belonging to the final bottom face.",
+        "Check that the 2 mm radius is compatible with the 5 mm support thickness and the 20 mm flange width and that no corner segment fails or collapses."
+      ]
+    },
+    {
+      "operation": "Preserve a flat, planar bottom.",
+      "parameters": {},
+      "target": "The bottom face of the frame and supporting structure.",
+      "relational_constraint": "The bottom must remain flat and must not be altered by the top fillets.",
+      "unresolved_reference": "Identify the final bottom face or coplanar set of bottom faces after the supporting structure is created.",
+      "target section code": [
+        "R01"
+      ],
+      "target face code": [
+        "F001",
+        "F008",
+        "FACE 12"
+      ],
+      "steps": [
+        "Use the plane of FACE 12 as the dimensional reference for the support and extrude the support a uniform 5 mm normal distance so its terminal face is exactly planar and parallel to FACE 12.",
+        "Where the support covers the frame footprint, merge coplanar terminal regions when possible so the final bottom is one planar annular seating face rather than fragmented coincident faces.",
+        "Restrict the 2 mm fillet operation to the upper transition loop and verify that no selected fillet edge is incident to the terminal bottom face.",
+        "Do not add draft, chamfer, crown, recess, or lower-edge rounding to the support base.",
+        "Validate the completed geometry by checking that all points on the final bottom face or coplanar face set share one plane, that the enlarged seating area is continuous around the opening, and that the result remains a single valid solid."
+      ]
+    }
+  ],
+  "intention": [
+    "Provide additional support at the bottom of the frame.",
+    "Enlarge the bottom surface area of the frame.",
+    "Create a smooth transition when approached from above while retaining a flat bottom."
+  ]
+}

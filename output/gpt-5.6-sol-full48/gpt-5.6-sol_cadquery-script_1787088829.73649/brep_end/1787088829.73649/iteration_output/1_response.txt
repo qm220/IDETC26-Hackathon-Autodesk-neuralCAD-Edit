@@ -1,0 +1,107 @@
+Thinking text:
+**Planning fittings layout**
+
+I'm considering the view from the +Z axis to see the existing fittings, which project to the right along the X direction. They probably curve from the +Z tank and then turn towards +X. The face centers seem unnecessary. I'm planning to explicitly lower the fitting and axis based on the revolved design. It might help to add a positive-Z header axis to the original attachment for simplicity.
+**Considering port design adjustments**
+
+I can adjust the port body to overlap with the existing part by 10 mm, ensuring its bore extends through this overlap. However, the original overlap still needs to plug the inner end. Externally, the port opening should be clear near the base but not at the header, which looks visually satisfying. I might subtract the bore from the model globally using a `shape.cut(bore1.fuse(bore2))` method from OpenCascade, even if the original is invalid. I can also try running cuts sequentially as a fallback.
+
+Generated script:
+def my_cad_function(args):
+    import os
+    import cadquery as cq
+
+    input_file = os.path.expanduser(args["input_file"])
+    imported = cq.importers.importStep(input_file)
+    original = imported.val()
+    bbox = original.BoundingBox()
+
+    print(f"Loaded model: solids={len(original.Solids())}, valid={original.isValid()}")
+    print(
+        f"Bounds: X=({bbox.xmin:.2f},{bbox.xmax:.2f}), "
+        f"Y=({bbox.ymin:.2f},{bbox.ymax:.2f}), "
+        f"Z=({bbox.zmin:.2f},{bbox.zmax:.2f})"
+    )
+
+    # Orientation supplied by the planning stage:
+    # top = +Y, bottom = -Y, right = -Z, left = +Z.
+    x_center = -88.9
+    outlet_center = cq.Vector(x_center, 156.0, -263.0)
+    inlet_center = cq.Vector(x_center, -145.0, 263.0)
+    outlet_direction = cq.Vector(0, 0, -1)
+    inlet_direction = cq.Vector(0, 0, 1)
+
+    def shifted(origin, direction, distance):
+        return cq.Vector(
+            origin.x + direction.x * distance,
+            origin.y + direction.y * distance,
+            origin.z + direction.z * distance,
+        )
+
+    def make_hose_port(origin, direction):
+        # The flange overlaps the existing header wall by 4 mm. The stepped
+        # collars provide a recognizable hose-barb connection, while the
+        # axial cut leaves a clearly open fluid passage.
+        pieces = [
+            cq.Solid.makeCylinder(18.0, 12.0, shifted(origin, direction, -4.0), direction),
+            cq.Solid.makeCone(16.0, 12.5, 8.0, shifted(origin, direction, 5.0), direction),
+            cq.Solid.makeCylinder(12.5, 51.0, shifted(origin, direction, 6.0), direction),
+            cq.Solid.makeCone(16.0, 12.7, 7.0, shifted(origin, direction, 17.0), direction),
+            cq.Solid.makeCone(16.0, 12.7, 7.0, shifted(origin, direction, 30.0), direction),
+            cq.Solid.makeCone(16.0, 12.7, 7.0, shifted(origin, direction, 43.0), direction),
+            cq.Solid.makeCylinder(15.0, 7.0, shifted(origin, direction, 50.0), direction),
+        ]
+
+        body = pieces[0]
+        for piece in pieces[1:]:
+            body = body.fuse(piece)
+
+        bore = cq.Solid.makeCylinder(
+            7.5, 82.0, shifted(origin, direction, -18.0), direction
+        )
+        mouth_leadin = cq.Solid.makeCone(
+            9.5, 7.5, 5.0, shifted(origin, direction, 54.0), direction
+        )
+        return body.cut(bore.fuse(mouth_leadin)), bore
+
+    outlet, outlet_bore = make_hose_port(outlet_center, outlet_direction)
+    inlet, inlet_bore = make_hose_port(inlet_center, inlet_direction)
+
+    # Open both passages through the adjacent header/frame wall. Cutting the
+    # imported compound may fail when the source STEP contains invalid
+    # subshapes, so retain a safe fallback while keeping the ports hollow.
+    modified_base = original
+    try:
+        modified_base = original.cut(outlet_bore.fuse(inlet_bore))
+        print("Header penetration cuts completed.")
+    except Exception as exc:
+        print(f"Header penetration cut warning: {exc}")
+        print("Returning hollow overlapping ports without modifying source topology.")
+
+    result_shapes = list(modified_base.Solids())
+    result_shapes.extend([outlet, inlet])
+    result = cq.Compound.makeCompound(result_shapes)
+
+    print("Created outlet at semantic top-right (+Y/-Z).")
+    print("Created inlet at semantic bottom-left (-Y/+Z).")
+    print(f"Result solids={len(result.Solids())}, valid={result.isValid()}")
+    return cq.Workplane(obj=result)
+
+
+Program output:
+stdout: Loading function from: /home/adml/Research/Hackathon2026/IDETC26-Hackathon-Autodesk-neuralCAD-Edit/output/gpt-5.6-sol-full48/gpt-5.6-sol_cadquery-script_1787088829.73649/brep_end/1787088829.73649/temp_script.py
+Loaded model: solids=20, valid=False
+Bounds: X=(-112.03,12.70), Y=(-171.45,187.82), Z=(-266.70,309.98)
+Header penetration cuts completed.
+Created outlet at semantic top-right (+Y/-Z).
+Created inlet at semantic bottom-left (-Y/+Z).
+Result solids=38, valid=False
+Exported shape to: /home/adml/Research/Hackathon2026/IDETC26-Hackathon-Autodesk-neuralCAD-Edit/output/gpt-5.6-sol-full48/gpt-5.6-sol_cadquery-script_1787088829.73649/brep_end/1787088829.73649/tmp.step
+Exported STL to: /home/adml/Research/Hackathon2026/IDETC26-Hackathon-Autodesk-neuralCAD-Edit/output/gpt-5.6-sol-full48/gpt-5.6-sol_cadquery-script_1787088829.73649/brep_end/1787088829.73649/tmp.stl
+Exported PNG image to: /home/adml/Research/Hackathon2026/IDETC26-Hackathon-Autodesk-neuralCAD-Edit/output/gpt-5.6-sol-full48/gpt-5.6-sol_cadquery-script_1787088829.73649/brep_end/1787088829.73649/tmp.png
+Script completed.
+
+stderr: 
+
+Exported this iteration:
+tmp.step, tmp.stl, tmp.png, tmp_+Z.png, tmp_-Z.png, tmp_-X.png, tmp_+X.png, tmp_+Y.png, tmp_-Y.png, tmp_iso1.png, tmp_iso2.png

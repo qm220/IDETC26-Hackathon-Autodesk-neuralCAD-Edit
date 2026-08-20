@@ -1,74 +1,216 @@
-Analyze the attached multi-view images of a mechanical/CAD part (aim for
-+Z, -Z, -X, +X, +Y, -Y, and isometric views iso1 / iso2 if available).
-Produce a single JSON file describing the part's structure. Follow these
-steps in order:
+You are given, in this order:
 
-1. FEATURE IDENTIFICATION
-   List distinct functional features (mounting points, joints, interfaces)
-   and structural features (ribs, shells, spines, cavities) visible across
-   the views.
+1. Labeled multi-view images of the original mechanical part.
+2. A CadQuery STEP/B-rep analysis report.
+3. The Hierarchical CAD Model Ontology in Turtle.
 
-2. SECTIONING
-   Divide the part into logical sections. For each
-   section, capture: a short name, its relative location on
-   the part, and a plain-language description of its geometry. Assign a unique RGB colour for each section.
+Generate a compact, ontology-grounded model.json using exactly this hierarchy:
 
-3. For each section, reason about the FUNCTIONAL INTENT, the PHYSICAL BEHAVIOR of the section to perform the function.
+Part -> Section -> Feature -> B-rep Face
 
-4. Analyse the RELATIONSHIPs between each sections. Two types of RELATIONSHIPS should be considered.
-   First, functional relationships, with a list of example relationships provided:
-   transmits_load, locates_mating_part, seals_against, guides_motion, provides_clearance,
-   constrains_dof, mounts_to, distributes_stress.
-   Second, structural relationships, with a list of example relationships provided:
-   shares_face, adjacent_to, coaxial_with, attached_to, contained_in, supports,
-   blends_into, offset_from.
+Include only fields present in the required JSON schema.
 
-5. MAJOR SURFACE INVENTORY
-   Within each section, identify the MAJOR surfaces that are visually
-   distinguishable across the views (distinct flat facets, distinct
-   curved/cylindrical patches, especially fillet bands and chamfers) — not a full
-   CAD B-rep face count. Assign each face a unique 4-digit code (0000, 0001, ...)
-   sequential across the whole part. Give each face a short name and one-line
-   description. Note this is not an exact topological face count (which would
-   typically be much higher due to small fillet/blend faces invisible in
-   shaded renders), but include as many faces as you can.
 
-6. ADJACENCY ORDERING
-   Within each section's surface list, order the surfaces so each is
-   physically adjacent to its neighbors in the list (a walk across the
-   section, not an arbitrary order). If a section contains disconnected
-   sub-groups (e.g. two separate tabs that don't touch), order each
-   sub-group internally.
+==================================================
+GROUNDING RULES
+==================================================
 
-7. A STEP file analysis report is also provided as a .txt file which includes the information of all the faces of this B-rep model. Analyse the information of the step model and match the major faces you identified before with the corresponding step face, identify their unique id.
+1. CadQuery is the geometric authority.
 
-8. For the faces that are not matched up with major faces but within the STEP analysis report list. Categorise them into sections where they most likely belong. List their B-rep id from the STEP analysis report as minor faces for each section.
+- Copy source-view labels, solid IDs, FACE IDs, and surface types from the
+  supplied inputs.
+- Use reported dimensions, centroids, axes, bounding boxes, and topology only
+  to interpret and assign geometry; do not output those properties.
+- Never invent, rename, or alter a solid ID or FACE ID.
 
-OUTPUT FORMAT (JSON, model.json, no markdown fences, use this schema):
+2. The ontology is the semantic authority.
+
+- Every `ontology_class`, `geometry_type`, and `semantic_role` must be an exact
+  `cad:` class from the supplied ontology.
+- Use the most specific applicable class. If uncertain, use a valid parent
+  class rather than inventing a class.
+- Human-readable `name` values may be descriptive and need not equal a class
+  label.
+
+3. Images support semantic interpretation.
+
+- Infer sections, features, functions and face roles from all views together with the CadQuery report.
+- Identify the object and decide its semantic orientation if it is clear. If successful, associate front, back, left, right, top and bottom semantic views with +X, -X, +Y, -Y, +Z and -Z. 
+- A label such as +X or -Z is a CAD view direction, not automatically the
+  object's semantic right, left, front, back, top, or bottom.
+- Use `unknown` for unresolved view sides and lower confidence for uncertain
+  interpretations.
+
+4. Confidence values are numbers from 0.0 to 1.0.
+
+- Function confidence measures confidence in the functional interpretation.
+- Feature confidence measures confidence in the feature identification and
+  ontology classification.
+- Face confidence measures confidence that the FACE belongs to that Feature.
+
+
+==================================================
+REQUIRED CONTENT
+==================================================
+
+PART
+
+- `id`: unique part ID.
+- `name`: concise part name.
+- `ontology_class`: always `cad:Part`.
+- `source_views`: all supplied view identifiers.
+- `solid_ids`: exact CadQuery solid IDs belonging to the Part.
+- `semantic_orientation.status`: `resolved`, `partial`, or `unknown`.
+- `semantic_orientation.confidence`: confidence in the overall orientation.
+- `semantic_orientation.view_sides`: map each of +X, -X, +Y, -Y, +Z, and -Z
+  to `right`, `left`, `front`, `back`, `top`, `bottom`, or `unknown`.
+- `part_functions`: the Part's engineering purposes.
+
+SECTIONS
+
+- Divide the Part into a small number of major functional or structural
+  regions. A Section is larger than an individual hole, rib, fillet, chamfer,
+  or face.
+- Give each Section a unique ID such as `R01`, a concise name, the most
+  specific valid Section class, its exact solid IDs, and its engineering
+  functions.
+- Avoid unnecessary fragmentation.
+
+FEATURES
+
+- Within each Section, identify Features needed to understand or edit the
+  model, such as holes, slots, pockets, bosses, ribs, walls, flanges, lugs,
+  hubs, teeth, fillets, chamfers, or interfaces.
+- Give each Feature a unique ID such as `F001`, a concise name, the most
+  specific valid Feature class, its engineering functions, and confidence.
+- A repeated set may be one Feature containing all corresponding faces unless
+  individual instances need separate semantic identities.
+
+FUNCTIONS
+
+- Use valid subclasses of `cad:EngineeringFunction` for all part, section, and
+  feature functions.
+- A function states purpose, such as support, mount, locate, guide, connect,
+  transfer load, transmit torque, provide clearance, protect, or contain. Do
+  not use a geometry label as a function.
+- Set `primary` to `true` for a main function and `false` for a secondary one.
+
+B-REP FACES
+
+- Assign every CadQuery FACE ID exactly once to the Feature it realizes.
+- `cadquery_face_id`: exact FACE ID from the report.
+- `geometry_type`: the matching ontology Surface class.
+- `semantic_role`: the most specific valid ontology FaceRole class.
+- `feature_assignment_confidence`: confidence in the face-to-feature
+  assignment.
+- Use geometry, topology, visual correspondence, and repeated patterns to make
+  assignments. If no Feature is certain, assign the face to the best-supported
+  Feature with lower confidence; do not omit or invent FACE IDs.
+- Do not output edges, wires, or vertices.
+
+
+==================================================
+FINAL CHECK
+==================================================
+
+Before returning the JSON, verify that:
+
+1. Every output field exists in the required structure below.
+2. Every solid ID and FACE ID exists in the CadQuery report.
+3. Every FACE ID is assigned once and only once.
+4. Every Section belongs to the Part and every Feature belongs to one Section.
+5. Every ontology value is an exact class from the supplied ontology.
+6. Every function describes engineering purpose rather than shape.
+7. Uncertainty is reflected in the relevant confidence field.
+8. No descriptions, behaviors, relationships, colours, locations, feature
+   groups, evidence, salience, unclassified-face blocks, or other extra fields
+   are added.
+9. The result is valid JSON.
+
+
+==================================================
+OUTPUT
+==================================================
+
+Return ONLY valid JSON.
+Do not use Markdown fences.
+
+Ontology class, role, function, behavior, and relation values MUST use the
+cad: prefix from the Hierarchical CAD Model Ontology (for example
+cad:ThroughHoleFeature, cad:BoreWallRole, cad:MountFunction, cad:coaxialWith).
+Colours must be visually distinct across sections.
+
+In semantic_orientation, also fill view_sides so each CAD camera label maps to
+the most likely human-semantic side of the object (or "unknown").
+
 {
-  "part": {"name": "", "description": "", "source_views": [], "symmetry_note": ""},
-  "Section": [
-    {
-      "id": "",
-      "name": "",
-      "features included": [],
-      "function intent": "",
-      "physical behavior": "",
-      "geometry": "",
-      "location": "",
-      "colour": {"R": 0, "G": 0, "B": 0},
-      "major_faces": [{"face_code": "0000", "name": "", "Brep_id": "FACE 0", "description": ""}],
-      "minor_faces_Brep_id": ["FACE 1", "FACE 2"],
-      "relationships": [
-        {
-          "source id": "",
-          "target id": "",
-          "function relationship": "",
-          "structural relationship": ""
-        }
-      ]
-    }
-  ]
+  "part": {
+    "id": "",
+    "name": "",
+    "ontology_class": "cad:Part",
+    "source_views": [],
+    "solid_ids": [],
+    "semantic_orientation": {
+      "status": "",
+      "confidence": null,
+      "view_sides": {
+        "+X": "right|left|front|back|top|bottom|unknown",
+        "-X": "right|left|front|back|top|bottom|unknown",
+        "+Y": "right|left|front|back|top|bottom|unknown",
+        "-Y": "right|left|front|back|top|bottom|unknown",
+        "+Z": "right|left|front|back|top|bottom|unknown",
+        "-Z": "right|left|front|back|top|bottom|unknown"
+      }
+    },
+    "part_functions": [
+      {
+        "ontology_class": "",
+        "name": "",
+        "primary": null,
+        "confidence": null
+      }
+    ],
+    "sections": [
+      {
+        "id": "",
+        "name": "",
+        "ontology_class": "",
+        "solid_ids": [],
+        "section_functions": [
+          {
+            "ontology_class": "",
+            "name": "",
+            "primary": null,
+            "confidence": null
+          }
+        ],
+        "features": [
+          {
+            "id": "",
+            "name": "",
+            "ontology_class": "",
+            "feature_functions": [
+              {
+                "ontology_class": "",
+                "name": "",
+                "primary": null,
+                "confidence": null
+              }
+            ],
+            "brep_faces": [
+              {
+                "cadquery_face_id": "",
+                "geometry_type": "",
+                "semantic_role": "",
+                "feature_assignment_confidence": null
+              }
+            ],
+            "confidence": null
+          }
+        ]
+      }
+    ]
+  }
 }
-
-Labeled multi-view images of the original part follow. The STEP B-rep analysis report follows after the images.
+Labeled multi-view images of the original part follow, then the CadQuery
+STEP/B-rep analysis report, then the Hierarchical CAD Model Ontology Turtle.

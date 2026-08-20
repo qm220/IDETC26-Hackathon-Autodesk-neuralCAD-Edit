@@ -1,0 +1,23 @@
+def my_cad_function(args):
+    input_file = os.path.expanduser(args["input_file"])
+    imported = cq.importers.importStep(input_file)
+    body = imported.val() if hasattr(imported, "val") else imported
+
+    slot_specs = [
+        (-40.0, 7.60, 24.0, 6.0),
+        (-8.0, 7.70, 24.0, 5.0),
+        (24.0, 7.82, 20.0, 3.4),
+    ]
+
+    cut_depth = 30.0
+    result = cq.Workplane("XY").newObject([body])
+
+    for cx, cz, length, height in slot_specs:
+        radius = height / 2.0
+        center_spacing = length - 2.0 * radius
+        prism = cq.Workplane("XY").box(center_spacing, cut_depth, height).translate((cx, 0.0, cz))
+        left_cap = cq.Workplane("XZ").center(cx - center_spacing / 2.0, cz).circle(radius).extrude(cut_depth / 2.0, both=True)
+        right_cap = cq.Workplane("XZ").center(cx + center_spacing / 2.0, cz).circle(radius).extrude(cut_depth / 2.0, both=True)
+        result = result.cut(prism.union(left_cap).union(right_cap))
+
+    return result

@@ -1,0 +1,26 @@
+def my_cad_function(args):
+    input_file = os.path.expanduser(args["input_file"])
+    imported = cq.importers.importStep(input_file)
+    model_shape = imported.val() if hasattr(imported, "val") else imported
+
+    faces = model_shape.Faces()
+    front_face = faces[53]
+    rear_face = faces[72]
+    thickness_mm = 2.54
+
+    def make_outward_cover(reference_face):
+        normal = reference_face.normalAt().normalized()
+        return cq.Solid.extrudeLinear(
+            reference_face.outerWire(),
+            [],
+            normal.multiply(thickness_mm)
+        )
+
+    front_cover = make_outward_cover(front_face)
+    rear_cover = make_outward_cover(rear_face)
+
+    result = cq.Assembly(name="crossed_arm_hub_with_covers")
+    result.add(model_shape, name="original_model")
+    result.add(front_cover, name="front_cover")
+    result.add(rear_cover, name="rear_cover")
+    return result

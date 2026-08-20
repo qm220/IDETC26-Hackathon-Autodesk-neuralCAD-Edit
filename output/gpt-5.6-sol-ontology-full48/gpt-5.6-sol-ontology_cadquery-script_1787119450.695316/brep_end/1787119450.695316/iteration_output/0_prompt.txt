@@ -1,0 +1,1691 @@
+The planning stage produced model.json (hierarchical part → sections → features
+→ B-rep faces), aim.json (desired final state from the edit request), and
+operation.json (grounded edit operations, parameters, constraints, targets,
+and modeling plans). Use those artifacts when writing my_cad_function.
+
+Section ids look like R01. Feature ids look like F001. FACE N values are
+CadQuery Faces() indices from the STEP analysis. Bind them to actual STEP
+geometry by inspecting the loaded model (print faces and coordinates) before
+editing. If an operation needs boundary topology such as a chamfer or fillet
+edge, derive it in CadQuery from the grounded face(s).
+
+Implement each operation's modeling_plan steps. Load the start model from
+args["input_file"].
+
+model.json from the planning stage:
+
+{
+  "part": {
+    "id": "P01",
+    "name": "Rounded rectangular frame",
+    "description": "A single-piece rounded rectangular frame or bezel with a large central opening, continuous inner and outer perimeter walls, two broad annular faces, and multiple continuous edge-fillet loops. CadQuery reports one connected solid, so the geometry represents one functional component rather than an assembly or disconnected bodies.",
+    "source_views": [
+      "+Z",
+      "-Z",
+      "-X",
+      "+X",
+      "+Y",
+      "-Y",
+      "iso1"
+    ],
+    "solid_ids": [
+      "SOLID 0"
+    ],
+    "symmetry_note": "The frame has a repeated four-corner rounded-rectangle structure and approximate bilateral symmetry about its two in-plane centerlines. Straight perimeter segments alternate with four geometrically corresponding rounded corners. The two inner edge fillet loops form a paired pattern on opposite sides of the frame.",
+    "semantic_orientation": {
+      "status": "ambiguous",
+      "description": "The likely front and back are the two broad annular sides of the frame, but the model is oblique to the CAD axes and no application context distinguishes a unique human-semantic front, top, or right side. Camera labels are therefore not assigned human-semantic sides.",
+      "confidence": 0.38,
+      "view_sides": {
+        "+X": "unknown",
+        "-X": "unknown",
+        "+Y": "unknown",
+        "-Y": "unknown",
+        "+Z": "unknown",
+        "-Z": "unknown"
+      }
+    },
+    "sections": [
+      {
+        "id": "R01",
+        "name": "Continuous perimeter frame section",
+        "ontology_class": "cad:OuterSection",
+        "description": "The complete load-carrying rounded rectangular band surrounding the central opening. It includes the broad frame body, inner opening wall, exterior wall, and all edge transitions.",
+        "location": "Surrounds the large central opening and follows the complete rounded rectangular perimeter of SOLID 0.",
+        "solid_ids": [
+          "SOLID 0"
+        ],
+        "colour": {
+          "R": 70,
+          "G": 145,
+          "B": 210
+        },
+        "section_functions": [
+          {
+            "ontology_class": "cad:SupportFunction",
+            "name": "Support surrounding structure",
+            "description": "Provides a continuous structural boundary around the central opening.",
+            "primary": true,
+            "confidence": 0.84
+          },
+          {
+            "ontology_class": "cad:ProtectFunction",
+            "name": "Protect opening perimeter",
+            "description": "Forms a rounded protective boundary around the central opening.",
+            "primary": false,
+            "confidence": 0.72
+          },
+          {
+            "ontology_class": "cad:MountFunction",
+            "name": "Provide frame seating surfaces",
+            "description": "The two broad annular faces may seat or mount the frame against adjacent parts.",
+            "primary": false,
+            "confidence": 0.58
+          }
+        ],
+        "section_behaviors": [
+          {
+            "ontology_class": "cad:ResistBendingBehavior",
+            "name": "Resist perimeter bending",
+            "description": "The closed-loop band resists bending through continuity around the opening.",
+            "confidence": 0.8
+          },
+          {
+            "ontology_class": "cad:CarryTensionBehavior",
+            "name": "Carry circumferential tension",
+            "description": "The continuous frame can carry tensile loading around its perimeter.",
+            "confidence": 0.7
+          },
+          {
+            "ontology_class": "cad:DistributeStressBehavior",
+            "name": "Distribute corner stress",
+            "description": "Rounded corners and edge transitions spread stress between straight frame segments.",
+            "confidence": 0.86
+          }
+        ],
+        "feature_groups": [
+          {
+            "id": "FG01",
+            "name": "Paired inner edge fillet loops",
+            "ontology_class": "cad:RepeatedFeatureGroup",
+            "feature_class": "cad:FilletFeature",
+            "pattern_type": "cad:PairedPattern",
+            "member_count": 2,
+            "member_feature_ids": [
+              "F004",
+              "F006"
+            ],
+            "representative_feature_ids": [
+              "F004",
+              "F006"
+            ],
+            "pattern_description": "Two corresponding radius-2 mm fillet loops occur along opposite edges of the central opening. Each loop comprises four cylindrical straight segments and four toroidal corner segments.",
+            "confidence": 0.94
+          }
+        ],
+        "features": [
+          {
+            "id": "F001",
+            "name": "Annular frame body and seating faces",
+            "ontology_class": "cad:ShellFeature",
+            "parent_feature_id": null,
+            "description": "The primary rounded-rectangular material band, represented most directly by its two opposing planar annular faces.",
+            "interface_type": "cad:SeatingInterface",
+            "feature_functions": [
+              {
+                "ontology_class": "cad:SupportFunction",
+                "name": "Support frame loads",
+                "description": "Forms the principal structural band around the opening.",
+                "primary": true,
+                "confidence": 0.91
+              },
+              {
+                "ontology_class": "cad:MountFunction",
+                "name": "Provide seating surfaces",
+                "description": "The opposing planar annular faces may contact or seat against adjacent components.",
+                "primary": false,
+                "confidence": 0.62
+              }
+            ],
+            "feature_behaviors": [
+              {
+                "ontology_class": "cad:ResistBendingBehavior",
+                "name": "Resist bending",
+                "description": "The closed annular band resists bending around the central opening.",
+                "confidence": 0.84
+              },
+              {
+                "ontology_class": "cad:SpreadLoadBehavior",
+                "name": "Spread contact load",
+                "description": "The broad planar faces spread loads over the frame perimeter.",
+                "confidence": 0.71
+              }
+            ],
+            "relationships": [
+              {
+                "target_feature_id": "F002",
+                "category": "cad:GeometricFeatureRelationship",
+                "relation": "cad:surroundsFeature",
+                "description": "The frame body surrounds the central cutout.",
+                "confidence": 0.99
+              },
+              {
+                "target_feature_id": "F003",
+                "category": "cad:StructuralFeatureRelationship",
+                "relation": "cad:sharesBoundaryWith",
+                "description": "The frame body terminates at and shares its exterior boundaries with the outer perimeter wall.",
+                "confidence": 0.96
+              }
+            ],
+            "brep_faces": [
+              {
+                "brep_id": "FACE 12",
+                "face_code": "FACE 12",
+                "entity_type": "cad:Face",
+                "geometry_type": "cad:PlanarSurface",
+                "semantic_role": "cad:MountingFaceRole",
+                "name": "Primary broad annular face",
+                "description": "Large planar rounded-rectangular annular face with an inner wire defining the opening.",
+                "salience": "cad:PrimarySalience",
+                "confidence": 0.99,
+                "evidence": [
+                  "CadQuery type PLANE",
+                  "Area 23354.999729 mm^2",
+                  "Two wires and sixteen edges indicate an annular face",
+                  "Bounding box spans most of the part"
+                ]
+              },
+              {
+                "brep_id": "FACE 34",
+                "face_code": "FACE 34",
+                "entity_type": "cad:Face",
+                "geometry_type": "cad:PlanarSurface",
+                "semantic_role": "cad:SeatingFaceRole",
+                "name": "Opposing annular face",
+                "description": "Opposing planar annular surface of the continuous frame band.",
+                "salience": "cad:PrimarySalience",
+                "confidence": 0.98,
+                "evidence": [
+                  "CadQuery type PLANE",
+                  "Area 2569.867229 mm^2",
+                  "Two wires and sixteen edges",
+                  "Normal opposes the broad FACE 12 orientation"
+                ]
+              }
+            ],
+            "confidence": 0.94
+          },
+          {
+            "id": "F002",
+            "name": "Central rounded-rectangular cutout",
+            "ontology_class": "cad:CutoutFeature",
+            "parent_feature_id": null,
+            "description": "Large through-opening enclosed by four straight inner-wall faces and four radius-50 mm cylindrical corner faces.",
+            "interface_type": null,
+            "feature_functions": [
+              {
+                "ontology_class": "cad:ProvideClearanceFunction",
+                "name": "Provide central clearance",
+                "description": "Leaves a large unobstructed opening through the frame.",
+                "primary": true,
+                "confidence": 0.99
+              },
+              {
+                "ontology_class": "cad:ReduceMassFunction",
+                "name": "Reduce central mass",
+                "description": "Removes material from the center while retaining a continuous perimeter structure.",
+                "primary": false,
+                "confidence": 0.91
+              }
+            ],
+            "feature_behaviors": [
+              {
+                "ontology_class": "cad:ConstrainTranslationBehavior",
+                "name": "Define transverse clearance boundary",
+                "description": "The continuous inner wall geometrically bounds objects passing through the opening.",
+                "confidence": 0.72
+              }
+            ],
+            "relationships": [
+              {
+                "target_feature_id": "F001",
+                "category": "cad:GeometricFeatureRelationship",
+                "relation": "cad:insideFeature",
+                "description": "The cutout lies inside the surrounding frame body.",
+                "confidence": 0.99
+              },
+              {
+                "target_feature_id": "F004",
+                "category": "cad:StructuralFeatureRelationship",
+                "relation": "cad:blendsInto",
+                "description": "One edge of the inner wall blends into the first radius-2 mm inner fillet loop.",
+                "confidence": 0.97
+              },
+              {
+                "target_feature_id": "F006",
+                "category": "cad:StructuralFeatureRelationship",
+                "relation": "cad:blendsInto",
+                "description": "The opposite edge of the inner wall blends into the second radius-2 mm inner fillet loop.",
+                "confidence": 0.97
+              }
+            ],
+            "brep_faces": [
+              {
+                "brep_id": "FACE 8",
+                "face_code": "FACE 8",
+                "entity_type": "cad:Face",
+                "geometry_type": "cad:CylindricalSurface",
+                "semantic_role": "cad:CavityWallRole",
+                "name": "Inner corner wall 1",
+                "description": "Radius-50 mm cylindrical corner of the central opening.",
+                "salience": "cad:RepresentativeSalience",
+                "confidence": 0.98,
+                "evidence": [
+                  "CadQuery type CYLINDER",
+                  "Cylinder radius 50 mm",
+                  "Corner bounding box at one end of the opening"
+                ]
+              },
+              {
+                "brep_id": "FACE 9",
+                "face_code": "FACE 9",
+                "entity_type": "cad:Face",
+                "geometry_type": "cad:PlanarSurface",
+                "semantic_role": "cad:CavityWallRole",
+                "name": "Inner straight wall 1",
+                "description": "Long planar side wall of the central opening.",
+                "salience": "cad:PrimarySalience",
+                "confidence": 0.98,
+                "evidence": [
+                  "CadQuery type PLANE",
+                  "Area 10560 mm^2",
+                  "Long 660 mm extent between rounded corners"
+                ]
+              },
+              {
+                "brep_id": "FACE 10",
+                "face_code": "FACE 10",
+                "entity_type": "cad:Face",
+                "geometry_type": "cad:CylindricalSurface",
+                "semantic_role": "cad:CavityWallRole",
+                "name": "Inner corner wall 2",
+                "description": "Radius-50 mm cylindrical corner of the central opening.",
+                "salience": "cad:RepresentativeSalience",
+                "confidence": 0.98,
+                "evidence": [
+                  "CadQuery type CYLINDER",
+                  "Cylinder radius 50 mm",
+                  "Geometric counterpart to FACE 8"
+                ]
+              },
+              {
+                "brep_id": "FACE 11",
+                "face_code": "FACE 11",
+                "entity_type": "cad:Face",
+                "geometry_type": "cad:PlanarSurface",
+                "semantic_role": "cad:CavityWallRole",
+                "name": "Inner end wall 1",
+                "description": "Planar end wall of the central opening.",
+                "salience": "cad:PrimarySalience",
+                "confidence": 0.98,
+                "evidence": [
+                  "CadQuery type PLANE",
+                  "Area 7360 mm^2",
+                  "Plane at x=-176.619997"
+                ]
+              },
+              {
+                "brep_id": "FACE 33",
+                "face_code": "FACE 33",
+                "entity_type": "cad:Face",
+                "geometry_type": "cad:PlanarSurface",
+                "semantic_role": "cad:CavityWallRole",
+                "name": "Inner end wall 2",
+                "description": "Opposing planar end wall of the central opening.",
+                "salience": "cad:PrimarySalience",
+                "confidence": 0.98,
+                "evidence": [
+                  "CadQuery type PLANE",
+                  "Area 7360 mm^2",
+                  "Plane at x=-936.619997",
+                  "Opposing counterpart to FACE 11"
+                ]
+              },
+              {
+                "brep_id": "FACE 45",
+                "face_code": "FACE 45",
+                "entity_type": "cad:Face",
+                "geometry_type": "cad:PlanarSurface",
+                "semantic_role": "cad:CavityWallRole",
+                "name": "Inner straight wall 2",
+                "description": "Opposing long planar side wall of the central opening.",
+                "salience": "cad:PrimarySalience",
+                "confidence": 0.98,
+                "evidence": [
+                  "CadQuery type PLANE",
+                  "Area 10560 mm^2",
+                  "Long 660 mm extent",
+                  "Opposing counterpart to FACE 9"
+                ]
+              },
+              {
+                "brep_id": "FACE 46",
+                "face_code": "FACE 46",
+                "entity_type": "cad:Face",
+                "geometry_type": "cad:CylindricalSurface",
+                "semantic_role": "cad:CavityWallRole",
+                "name": "Inner corner wall 3",
+                "description": "Radius-50 mm cylindrical corner of the central opening.",
+                "salience": "cad:RepresentativeSalience",
+                "confidence": 0.98,
+                "evidence": [
+                  "CadQuery type CYLINDER",
+                  "Cylinder radius 50 mm",
+                  "Repeated inner-corner geometry"
+                ]
+              },
+              {
+                "brep_id": "FACE 47",
+                "face_code": "FACE 47",
+                "entity_type": "cad:Face",
+                "geometry_type": "cad:CylindricalSurface",
+                "semantic_role": "cad:CavityWallRole",
+                "name": "Inner corner wall 4",
+                "description": "Radius-50 mm cylindrical corner completing the central opening.",
+                "salience": "cad:RepresentativeSalience",
+                "confidence": 0.98,
+                "evidence": [
+                  "CadQuery type CYLINDER",
+                  "Cylinder radius 50 mm",
+                  "Fourth repeated inner-corner face"
+                ]
+              }
+            ],
+            "confidence": 0.99
+          },
+          {
+            "id": "F003",
+            "name": "Outer rounded-rectangular perimeter wall",
+            "ontology_class": "cad:WallFeature",
+            "parent_feature_id": null,
+            "description": "Continuous exterior wall composed of four planar straight segments and four radius-63 mm cylindrical corner segments.",
+            "interface_type": "cad:ContactInterface",
+            "feature_functions": [
+              {
+                "ontology_class": "cad:ProtectFunction",
+                "name": "Protect frame perimeter",
+                "description": "Defines the exterior boundary and protects the frame edge.",
+                "primary": true,
+                "confidence": 0.89
+              },
+              {
+                "ontology_class": "cad:SupportFunction",
+                "name": "Support edge loading",
+                "description": "Carries contact and bending loads around the exterior perimeter.",
+                "primary": false,
+                "confidence": 0.78
+              }
+            ],
+            "feature_behaviors": [
+              {
+                "ontology_class": "cad:ReactContactLoadBehavior",
+                "name": "React perimeter contact",
+                "description": "The continuous exterior wall reacts contact from surrounding structures.",
+                "confidence": 0.78
+              },
+              {
+                "ontology_class": "cad:ResistBendingBehavior",
+                "name": "Resist exterior bending",
+                "description": "The closed outer boundary stiffens the frame against bending.",
+                "confidence": 0.81
+              }
+            ],
+            "relationships": [
+              {
+                "target_feature_id": "F001",
+                "category": "cad:StructuralFeatureRelationship",
+                "relation": "cad:attachedTo",
+                "description": "The exterior wall is an integral boundary of the frame body.",
+                "confidence": 0.99
+              },
+              {
+                "target_feature_id": "F005",
+                "category": "cad:StructuralFeatureRelationship",
+                "relation": "cad:blendsInto",
+                "description": "One exterior edge blends through the radius-2 mm outer fillet loop.",
+                "confidence": 0.97
+              },
+              {
+                "target_feature_id": "F007",
+                "category": "cad:StructuralFeatureRelationship",
+                "relation": "cad:blendsInto",
+                "description": "The opposite exterior edge blends through the radius-10 mm outer fillet loop.",
+                "confidence": 0.98
+              }
+            ],
+            "brep_faces": [
+              {
+                "brep_id": "FACE 21",
+                "face_code": "FACE 21",
+                "entity_type": "cad:Face",
+                "geometry_type": "cad:CylindricalSurface",
+                "semantic_role": "cad:OuterWallRole",
+                "name": "Outer corner wall 1",
+                "description": "Radius-63 mm cylindrical exterior corner.",
+                "salience": "cad:RepresentativeSalience",
+                "confidence": 0.98,
+                "evidence": [
+                  "CadQuery type CYLINDER",
+                  "Cylinder radius 63 mm"
+                ]
+              },
+              {
+                "brep_id": "FACE 22",
+                "face_code": "FACE 22",
+                "entity_type": "cad:Face",
+                "geometry_type": "cad:PlanarSurface",
+                "semantic_role": "cad:OuterWallRole",
+                "name": "Outer straight wall 1",
+                "description": "Long planar exterior side wall.",
+                "salience": "cad:PrimarySalience",
+                "confidence": 0.97,
+                "evidence": [
+                  "CadQuery type PLANE",
+                  "Area 5280 mm^2",
+                  "Long 660 mm extent"
+                ]
+              },
+              {
+                "brep_id": "FACE 23",
+                "face_code": "FACE 23",
+                "entity_type": "cad:Face",
+                "geometry_type": "cad:CylindricalSurface",
+                "semantic_role": "cad:OuterWallRole",
+                "name": "Outer corner wall 2",
+                "description": "Radius-63 mm cylindrical exterior corner.",
+                "salience": "cad:RepresentativeSalience",
+                "confidence": 0.98,
+                "evidence": [
+                  "CadQuery type CYLINDER",
+                  "Cylinder radius 63 mm"
+                ]
+              },
+              {
+                "brep_id": "FACE 24",
+                "face_code": "FACE 24",
+                "entity_type": "cad:Face",
+                "geometry_type": "cad:PlanarSurface",
+                "semantic_role": "cad:OuterWallRole",
+                "name": "Outer end wall 1",
+                "description": "Planar exterior end wall.",
+                "salience": "cad:PrimarySalience",
+                "confidence": 0.97,
+                "evidence": [
+                  "CadQuery type PLANE",
+                  "Area 3680 mm^2",
+                  "Plane at x=-949.619997"
+                ]
+              },
+              {
+                "brep_id": "FACE 43",
+                "face_code": "FACE 43",
+                "entity_type": "cad:Face",
+                "geometry_type": "cad:PlanarSurface",
+                "semantic_role": "cad:OuterWallRole",
+                "name": "Outer end wall 2",
+                "description": "Opposing planar exterior end wall.",
+                "salience": "cad:PrimarySalience",
+                "confidence": 0.97,
+                "evidence": [
+                  "CadQuery type PLANE",
+                  "Area 3680 mm^2",
+                  "Plane at x=-163.619997"
+                ]
+              },
+              {
+                "brep_id": "FACE 44",
+                "face_code": "FACE 44",
+                "entity_type": "cad:Face",
+                "geometry_type": "cad:CylindricalSurface",
+                "semantic_role": "cad:OuterWallRole",
+                "name": "Outer corner wall 3",
+                "description": "Radius-63 mm cylindrical exterior corner.",
+                "salience": "cad:RepresentativeSalience",
+                "confidence": 0.98,
+                "evidence": [
+                  "CadQuery type CYLINDER",
+                  "Cylinder radius 63 mm"
+                ]
+              },
+              {
+                "brep_id": "FACE 48",
+                "face_code": "FACE 48",
+                "entity_type": "cad:Face",
+                "geometry_type": "cad:CylindricalSurface",
+                "semantic_role": "cad:OuterWallRole",
+                "name": "Outer corner wall 4",
+                "description": "Radius-63 mm cylindrical exterior corner completing the perimeter.",
+                "salience": "cad:RepresentativeSalience",
+                "confidence": 0.98,
+                "evidence": [
+                  "CadQuery type CYLINDER",
+                  "Cylinder radius 63 mm"
+                ]
+              },
+              {
+                "brep_id": "FACE 49",
+                "face_code": "FACE 49",
+                "entity_type": "cad:Face",
+                "geometry_type": "cad:PlanarSurface",
+                "semantic_role": "cad:OuterWallRole",
+                "name": "Outer straight wall 2",
+                "description": "Opposing long planar exterior side wall.",
+                "salience": "cad:PrimarySalience",
+                "confidence": 0.97,
+                "evidence": [
+                  "CadQuery type PLANE",
+                  "Area 5280 mm^2",
+                  "Long 660 mm extent"
+                ]
+              }
+            ],
+            "confidence": 0.98
+          },
+          {
+            "id": "F004",
+            "name": "First inner perimeter edge fillet",
+            "ontology_class": "cad:FilletFeature",
+            "parent_feature_id": null,
+            "description": "Continuous radius-2 mm transition loop along one edge of the central opening.",
+            "interface_type": null,
+            "feature_functions": [
+              {
+                "ontology_class": "cad:DistributeStressFunction",
+                "name": "Reduce inner-edge stress concentration",
+                "description": "Rounds the junction between the inner opening wall and an adjacent annular face.",
+                "primary": true,
+                "confidence": 0.96
+              }
+            ],
+            "feature_behaviors": [
+              {
+                "ontology_class": "cad:DistributeStressBehavior",
+                "name": "Distribute inner-edge stress",
+                "description": "The 2 mm radius smooths load transfer across the inner edge.",
+                "confidence": 0.96
+              }
+            ],
+            "relationships": [
+              {
+                "target_feature_id": "F002",
+                "category": "cad:StructuralFeatureRelationship",
+                "relation": "cad:sharesBoundaryWith",
+                "description": "The fillet runs continuously along one boundary of the central cutout wall.",
+                "confidence": 0.98
+              },
+              {
+                "target_feature_id": "F001",
+                "category": "cad:StructuralFeatureRelationship",
+                "relation": "cad:blendsInto",
+                "description": "The fillet transitions into an annular frame face.",
+                "confidence": 0.96
+              },
+              {
+                "target_feature_id": "F006",
+                "category": "cad:GeometricFeatureRelationship",
+                "relation": "cad:alignedWith",
+                "description": "The two radius-2 mm inner fillet loops follow corresponding opening boundaries on opposite sides.",
+                "confidence": 0.93
+              }
+            ],
+            "brep_faces": [
+              {
+                "brep_id": "FACE 0",
+                "face_code": "FACE 0",
+                "entity_type": "cad:Face",
+                "geometry_type": "cad:CylindricalSurface",
+                "semantic_role": "cad:FilletSurfaceRole",
+                "name": "Inner fillet straight segment 1",
+                "description": "Radius-2 mm cylindrical straight segment.",
+                "salience": "cad:RepresentativeSalience",
+                "confidence": 0.97,
+                "evidence": [
+                  "Cylinder radius 2 mm",
+                  "Long perimeter-aligned bounding box"
+                ]
+              },
+              {
+                "brep_id": "FACE 1",
+                "face_code": "FACE 1",
+                "entity_type": "cad:Face",
+                "geometry_type": "cad:ToroidalSurface",
+                "semantic_role": "cad:FilletSurfaceRole",
+                "name": "Inner fillet corner segment 1",
+                "description": "Toroidal radius-2 mm transition around a rounded opening corner.",
+                "salience": "cad:RepresentativeSalience",
+                "confidence": 0.98,
+                "evidence": [
+                  "Torus major radius 52 mm",
+                  "Torus minor radius 2 mm"
+                ]
+              },
+              {
+                "brep_id": "FACE 2",
+                "face_code": "FACE 2",
+                "entity_type": "cad:Face",
+                "geometry_type": "cad:CylindricalSurface",
+                "semantic_role": "cad:FilletSurfaceRole",
+                "name": "Inner fillet straight segment 2",
+                "description": "Radius-2 mm cylindrical straight segment.",
+                "salience": "cad:RepresentativeSalience",
+                "confidence": 0.97,
+                "evidence": [
+                  "Cylinder radius 2 mm",
+                  "Axis parallel to the long frame direction"
+                ]
+              },
+              {
+                "brep_id": "FACE 3",
+                "face_code": "FACE 3",
+                "entity_type": "cad:Face",
+                "geometry_type": "cad:ToroidalSurface",
+                "semantic_role": "cad:FilletSurfaceRole",
+                "name": "Inner fillet corner segment 2",
+                "description": "Toroidal radius-2 mm opening-corner transition.",
+                "salience": "cad:RepresentativeSalience",
+                "confidence": 0.98,
+                "evidence": [
+                  "Torus major radius 52 mm",
+                  "Torus minor radius 2 mm"
+                ]
+              },
+              {
+                "brep_id": "FACE 4",
+                "face_code": "FACE 4",
+                "entity_type": "cad:Face",
+                "geometry_type": "cad:CylindricalSurface",
+                "semantic_role": "cad:FilletSurfaceRole",
+                "name": "Inner fillet straight segment 3",
+                "description": "Radius-2 mm cylindrical straight segment.",
+                "salience": "cad:RepresentativeSalience",
+                "confidence": 0.97,
+                "evidence": [
+                  "Cylinder radius 2 mm",
+                  "Opposing counterpart to FACE 0"
+                ]
+              },
+              {
+                "brep_id": "FACE 5",
+                "face_code": "FACE 5",
+                "entity_type": "cad:Face",
+                "geometry_type": "cad:ToroidalSurface",
+                "semantic_role": "cad:FilletSurfaceRole",
+                "name": "Inner fillet corner segment 3",
+                "description": "Toroidal radius-2 mm opening-corner transition.",
+                "salience": "cad:RepresentativeSalience",
+                "confidence": 0.98,
+                "evidence": [
+                  "Torus major radius 52 mm",
+                  "Torus minor radius 2 mm"
+                ]
+              },
+              {
+                "brep_id": "FACE 6",
+                "face_code": "FACE 6",
+                "entity_type": "cad:Face",
+                "geometry_type": "cad:CylindricalSurface",
+                "semantic_role": "cad:FilletSurfaceRole",
+                "name": "Inner fillet straight segment 4",
+                "description": "Radius-2 mm cylindrical straight segment.",
+                "salience": "cad:RepresentativeSalience",
+                "confidence": 0.97,
+                "evidence": [
+                  "Cylinder radius 2 mm",
+                  "Opposing counterpart to FACE 2"
+                ]
+              },
+              {
+                "brep_id": "FACE 7",
+                "face_code": "FACE 7",
+                "entity_type": "cad:Face",
+                "geometry_type": "cad:ToroidalSurface",
+                "semantic_role": "cad:FilletSurfaceRole",
+                "name": "Inner fillet corner segment 4",
+                "description": "Toroidal radius-2 mm transition completing the inner edge loop.",
+                "salience": "cad:RepresentativeSalience",
+                "confidence": 0.98,
+                "evidence": [
+                  "Torus major radius 52 mm",
+                  "Torus minor radius 2 mm"
+                ]
+              }
+            ],
+            "confidence": 0.97
+          },
+          {
+            "id": "F005",
+            "name": "Small outer perimeter edge fillet",
+            "ontology_class": "cad:FilletFeature",
+            "parent_feature_id": null,
+            "description": "Continuous radius-2 mm transition loop along one exterior edge of the frame.",
+            "interface_type": null,
+            "feature_functions": [
+              {
+                "ontology_class": "cad:DistributeStressFunction",
+                "name": "Round exterior edge",
+                "description": "Reduces sharp-edge contact and stress concentration at one exterior boundary.",
+                "primary": true,
+                "confidence": 0.95
+              }
+            ],
+            "feature_behaviors": [
+              {
+                "ontology_class": "cad:DistributeStressBehavior",
+                "name": "Distribute exterior edge stress",
+                "description": "The small radius smooths the transition between the outer wall and adjacent frame face.",
+                "confidence": 0.94
+              }
+            ],
+            "relationships": [
+              {
+                "target_feature_id": "F003",
+                "category": "cad:StructuralFeatureRelationship",
+                "relation": "cad:sharesBoundaryWith",
+                "description": "The fillet follows one complete edge of the exterior wall.",
+                "confidence": 0.98
+              },
+              {
+                "target_feature_id": "F001",
+                "category": "cad:StructuralFeatureRelationship",
+                "relation": "cad:blendsInto",
+                "description": "The fillet blends the exterior wall into the frame body.",
+                "confidence": 0.96
+              }
+            ],
+            "brep_faces": [
+              {
+                "brep_id": "FACE 13",
+                "face_code": "FACE 13",
+                "entity_type": "cad:Face",
+                "geometry_type": "cad:CylindricalSurface",
+                "semantic_role": "cad:FilletSurfaceRole",
+                "name": "Outer small fillet straight segment 1",
+                "description": "Radius-2 mm cylindrical exterior edge transition.",
+                "salience": "cad:RepresentativeSalience",
+                "confidence": 0.97,
+                "evidence": [
+                  "Cylinder radius 2 mm",
+                  "Located at the outer x-boundary"
+                ]
+              },
+              {
+                "brep_id": "FACE 14",
+                "face_code": "FACE 14",
+                "entity_type": "cad:Face",
+                "geometry_type": "cad:ToroidalSurface",
+                "semantic_role": "cad:FilletSurfaceRole",
+                "name": "Outer small fillet corner segment 1",
+                "description": "Toroidal radius-2 mm exterior corner transition.",
+                "salience": "cad:RepresentativeSalience",
+                "confidence": 0.98,
+                "evidence": [
+                  "Torus major radius 61 mm",
+                  "Torus minor radius 2 mm"
+                ]
+              },
+              {
+                "brep_id": "FACE 15",
+                "face_code": "FACE 15",
+                "entity_type": "cad:Face",
+                "geometry_type": "cad:CylindricalSurface",
+                "semantic_role": "cad:FilletSurfaceRole",
+                "name": "Outer small fillet straight segment 2",
+                "description": "Radius-2 mm cylindrical exterior edge transition.",
+                "salience": "cad:RepresentativeSalience",
+                "confidence": 0.97,
+                "evidence": [
+                  "Cylinder radius 2 mm",
+                  "Long 660 mm extent"
+                ]
+              },
+              {
+                "brep_id": "FACE 16",
+                "face_code": "FACE 16",
+                "entity_type": "cad:Face",
+                "geometry_type": "cad:ToroidalSurface",
+                "semantic_role": "cad:FilletSurfaceRole",
+                "name": "Outer small fillet corner segment 2",
+                "description": "Toroidal radius-2 mm exterior corner transition.",
+                "salience": "cad:RepresentativeSalience",
+                "confidence": 0.98,
+                "evidence": [
+                  "Torus major radius 61 mm",
+                  "Torus minor radius 2 mm"
+                ]
+              },
+              {
+                "brep_id": "FACE 17",
+                "face_code": "FACE 17",
+                "entity_type": "cad:Face",
+                "geometry_type": "cad:CylindricalSurface",
+                "semantic_role": "cad:FilletSurfaceRole",
+                "name": "Outer small fillet straight segment 3",
+                "description": "Radius-2 mm cylindrical exterior edge transition.",
+                "salience": "cad:RepresentativeSalience",
+                "confidence": 0.97,
+                "evidence": [
+                  "Cylinder radius 2 mm",
+                  "Opposing outer boundary counterpart to FACE 13"
+                ]
+              },
+              {
+                "brep_id": "FACE 18",
+                "face_code": "FACE 18",
+                "entity_type": "cad:Face",
+                "geometry_type": "cad:ToroidalSurface",
+                "semantic_role": "cad:FilletSurfaceRole",
+                "name": "Outer small fillet corner segment 3",
+                "description": "Toroidal radius-2 mm exterior corner transition.",
+                "salience": "cad:RepresentativeSalience",
+                "confidence": 0.98,
+                "evidence": [
+                  "Torus major radius 61 mm",
+                  "Torus minor radius 2 mm"
+                ]
+              },
+              {
+                "brep_id": "FACE 19",
+                "face_code": "FACE 19",
+                "entity_type": "cad:Face",
+                "geometry_type": "cad:CylindricalSurface",
+                "semantic_role": "cad:FilletSurfaceRole",
+                "name": "Outer small fillet straight segment 4",
+                "description": "Radius-2 mm cylindrical exterior edge transition.",
+                "salience": "cad:RepresentativeSalience",
+                "confidence": 0.97,
+                "evidence": [
+                  "Cylinder radius 2 mm",
+                  "Long 660 mm extent"
+                ]
+              },
+              {
+                "brep_id": "FACE 20",
+                "face_code": "FACE 20",
+                "entity_type": "cad:Face",
+                "geometry_type": "cad:ToroidalSurface",
+                "semantic_role": "cad:FilletSurfaceRole",
+                "name": "Outer small fillet corner segment 4",
+                "description": "Toroidal radius-2 mm transition completing the exterior edge loop.",
+                "salience": "cad:RepresentativeSalience",
+                "confidence": 0.98,
+                "evidence": [
+                  "Torus major radius 61 mm",
+                  "Torus minor radius 2 mm"
+                ]
+              }
+            ],
+            "confidence": 0.97
+          },
+          {
+            "id": "F006",
+            "name": "Second inner perimeter edge fillet",
+            "ontology_class": "cad:FilletFeature",
+            "parent_feature_id": null,
+            "description": "Continuous radius-2 mm transition loop along the opposite edge of the central opening.",
+            "interface_type": null,
+            "feature_functions": [
+              {
+                "ontology_class": "cad:DistributeStressFunction",
+                "name": "Reduce opposite inner-edge stress concentration",
+                "description": "Rounds the second junction between the central opening wall and the frame body.",
+                "primary": true,
+                "confidence": 0.96
+              }
+            ],
+            "feature_behaviors": [
+              {
+                "ontology_class": "cad:DistributeStressBehavior",
+                "name": "Distribute opposite inner-edge stress",
+                "description": "Smoothly transfers load across the opposite inner edge.",
+                "confidence": 0.96
+              }
+            ],
+            "relationships": [
+              {
+                "target_feature_id": "F002",
+                "category": "cad:StructuralFeatureRelationship",
+                "relation": "cad:sharesBoundaryWith",
+                "description": "The fillet follows the opposite boundary of the central cutout wall.",
+                "confidence": 0.98
+              },
+              {
+                "target_feature_id": "F001",
+                "category": "cad:StructuralFeatureRelationship",
+                "relation": "cad:blendsInto",
+                "description": "The fillet transitions into the opposing annular frame face.",
+                "confidence": 0.96
+              },
+              {
+                "target_feature_id": "F004",
+                "category": "cad:GeometricFeatureRelationship",
+                "relation": "cad:alignedWith",
+                "description": "This fillet follows the same rounded-rectangular opening path as the first inner fillet.",
+                "confidence": 0.93
+              }
+            ],
+            "brep_faces": [
+              {
+                "brep_id": "FACE 25",
+                "face_code": "FACE 25",
+                "entity_type": "cad:Face",
+                "geometry_type": "cad:CylindricalSurface",
+                "semantic_role": "cad:FilletSurfaceRole",
+                "name": "Second inner fillet straight segment 1",
+                "description": "Radius-2 mm cylindrical transition segment.",
+                "salience": "cad:RepresentativeSalience",
+                "confidence": 0.97,
+                "evidence": [
+                  "Cylinder radius 2 mm",
+                  "Opening-perimeter alignment"
+                ]
+              },
+              {
+                "brep_id": "FACE 26",
+                "face_code": "FACE 26",
+                "entity_type": "cad:Face",
+                "geometry_type": "cad:ToroidalSurface",
+                "semantic_role": "cad:FilletSurfaceRole",
+                "name": "Second inner fillet corner segment 1",
+                "description": "Toroidal radius-2 mm opening-corner transition.",
+                "salience": "cad:RepresentativeSalience",
+                "confidence": 0.98,
+                "evidence": [
+                  "Torus major radius 52 mm",
+                  "Torus minor radius 2 mm"
+                ]
+              },
+              {
+                "brep_id": "FACE 27",
+                "face_code": "FACE 27",
+                "entity_type": "cad:Face",
+                "geometry_type": "cad:CylindricalSurface",
+                "semantic_role": "cad:FilletSurfaceRole",
+                "name": "Second inner fillet straight segment 2",
+                "description": "Radius-2 mm cylindrical transition segment.",
+                "salience": "cad:RepresentativeSalience",
+                "confidence": 0.97,
+                "evidence": [
+                  "Cylinder radius 2 mm",
+                  "Long 660 mm extent"
+                ]
+              },
+              {
+                "brep_id": "FACE 28",
+                "face_code": "FACE 28",
+                "entity_type": "cad:Face",
+                "geometry_type": "cad:ToroidalSurface",
+                "semantic_role": "cad:FilletSurfaceRole",
+                "name": "Second inner fillet corner segment 2",
+                "description": "Toroidal radius-2 mm opening-corner transition.",
+                "salience": "cad:RepresentativeSalience",
+                "confidence": 0.98,
+                "evidence": [
+                  "Torus major radius 52 mm",
+                  "Torus minor radius 2 mm"
+                ]
+              },
+              {
+                "brep_id": "FACE 29",
+                "face_code": "FACE 29",
+                "entity_type": "cad:Face",
+                "geometry_type": "cad:CylindricalSurface",
+                "semantic_role": "cad:FilletSurfaceRole",
+                "name": "Second inner fillet straight segment 3",
+                "description": "Radius-2 mm cylindrical transition segment.",
+                "salience": "cad:RepresentativeSalience",
+                "confidence": 0.97,
+                "evidence": [
+                  "Cylinder radius 2 mm",
+                  "Opposing counterpart to FACE 25"
+                ]
+              },
+              {
+                "brep_id": "FACE 30",
+                "face_code": "FACE 30",
+                "entity_type": "cad:Face",
+                "geometry_type": "cad:ToroidalSurface",
+                "semantic_role": "cad:FilletSurfaceRole",
+                "name": "Second inner fillet corner segment 3",
+                "description": "Toroidal radius-2 mm opening-corner transition.",
+                "salience": "cad:RepresentativeSalience",
+                "confidence": 0.98,
+                "evidence": [
+                  "Torus major radius 52 mm",
+                  "Torus minor radius 2 mm"
+                ]
+              },
+              {
+                "brep_id": "FACE 31",
+                "face_code": "FACE 31",
+                "entity_type": "cad:Face",
+                "geometry_type": "cad:CylindricalSurface",
+                "semantic_role": "cad:FilletSurfaceRole",
+                "name": "Second inner fillet straight segment 4",
+                "description": "Radius-2 mm cylindrical transition segment.",
+                "salience": "cad:RepresentativeSalience",
+                "confidence": 0.97,
+                "evidence": [
+                  "Cylinder radius 2 mm",
+                  "Long 660 mm extent"
+                ]
+              },
+              {
+                "brep_id": "FACE 32",
+                "face_code": "FACE 32",
+                "entity_type": "cad:Face",
+                "geometry_type": "cad:ToroidalSurface",
+                "semantic_role": "cad:FilletSurfaceRole",
+                "name": "Second inner fillet corner segment 4",
+                "description": "Toroidal radius-2 mm transition completing the second inner loop.",
+                "salience": "cad:RepresentativeSalience",
+                "confidence": 0.98,
+                "evidence": [
+                  "Torus major radius 52 mm",
+                  "Torus minor radius 2 mm"
+                ]
+              }
+            ],
+            "confidence": 0.97
+          },
+          {
+            "id": "F007",
+            "name": "Large outer perimeter edge fillet",
+            "ontology_class": "cad:FilletFeature",
+            "parent_feature_id": null,
+            "description": "Continuous radius-10 mm transition loop along the opposite exterior edge of the frame.",
+            "interface_type": null,
+            "feature_functions": [
+              {
+                "ontology_class": "cad:DistributeStressFunction",
+                "name": "Provide broad exterior transition",
+                "description": "Creates a large rounded exterior edge that reduces stress concentration and sharp contact.",
+                "primary": true,
+                "confidence": 0.97
+              },
+              {
+                "ontology_class": "cad:ProtectFunction",
+                "name": "Protect exposed exterior edge",
+                "description": "The broad radius reduces the severity of impact or handling contact.",
+                "primary": false,
+                "confidence": 0.83
+              }
+            ],
+            "feature_behaviors": [
+              {
+                "ontology_class": "cad:DistributeStressBehavior",
+                "name": "Spread exterior transition load",
+                "description": "The 10 mm radius spreads loads over a broader transition than the small exterior fillet.",
+                "confidence": 0.97
+              },
+              {
+                "ontology_class": "cad:ReactContactLoadBehavior",
+                "name": "React rounded-edge contact",
+                "description": "The broad curved surface can react distributed perimeter contact.",
+                "confidence": 0.77
+              }
+            ],
+            "relationships": [
+              {
+                "target_feature_id": "F003",
+                "category": "cad:StructuralFeatureRelationship",
+                "relation": "cad:sharesBoundaryWith",
+                "description": "The large fillet follows the complete opposite edge of the exterior wall.",
+                "confidence": 0.99
+              },
+              {
+                "target_feature_id": "F001",
+                "category": "cad:StructuralFeatureRelationship",
+                "relation": "cad:blendsInto",
+                "description": "The large fillet blends the exterior wall into the adjacent annular frame face.",
+                "confidence": 0.98
+              }
+            ],
+            "brep_faces": [
+              {
+                "brep_id": "FACE 35",
+                "face_code": "FACE 35",
+                "entity_type": "cad:Face",
+                "geometry_type": "cad:ToroidalSurface",
+                "semantic_role": "cad:FilletSurfaceRole",
+                "name": "Large outer fillet corner segment 1",
+                "description": "Toroidal radius-10 mm transition at an exterior corner.",
+                "salience": "cad:RepresentativeSalience",
+                "confidence": 0.99,
+                "evidence": [
+                  "Torus major radius 53 mm",
+                  "Torus minor radius 10 mm"
+                ]
+              },
+              {
+                "brep_id": "FACE 36",
+                "face_code": "FACE 36",
+                "entity_type": "cad:Face",
+                "geometry_type": "cad:CylindricalSurface",
+                "semantic_role": "cad:FilletSurfaceRole",
+                "name": "Large outer fillet straight segment 1",
+                "description": "Radius-10 mm cylindrical exterior transition.",
+                "salience": "cad:RepresentativeSalience",
+                "confidence": 0.99,
+                "evidence": [
+                  "Cylinder radius 10 mm",
+                  "Long perimeter-aligned extent"
+                ]
+              },
+              {
+                "brep_id": "FACE 37",
+                "face_code": "FACE 37",
+                "entity_type": "cad:Face",
+                "geometry_type": "cad:ToroidalSurface",
+                "semantic_role": "cad:FilletSurfaceRole",
+                "name": "Large outer fillet corner segment 2",
+                "description": "Toroidal radius-10 mm transition at an exterior corner.",
+                "salience": "cad:RepresentativeSalience",
+                "confidence": 0.99,
+                "evidence": [
+                  "Torus major radius 53 mm",
+                  "Torus minor radius 10 mm"
+                ]
+              },
+              {
+                "brep_id": "FACE 38",
+                "face_code": "FACE 38",
+                "entity_type": "cad:Face",
+                "geometry_type": "cad:CylindricalSurface",
+                "semantic_role": "cad:FilletSurfaceRole",
+                "name": "Large outer fillet straight segment 2",
+                "description": "Radius-10 mm cylindrical exterior transition.",
+                "salience": "cad:RepresentativeSalience",
+                "confidence": 0.99,
+                "evidence": [
+                  "Cylinder radius 10 mm",
+                  "Long 660 mm extent"
+                ]
+              },
+              {
+                "brep_id": "FACE 39",
+                "face_code": "FACE 39",
+                "entity_type": "cad:Face",
+                "geometry_type": "cad:ToroidalSurface",
+                "semantic_role": "cad:FilletSurfaceRole",
+                "name": "Large outer fillet corner segment 3",
+                "description": "Toroidal radius-10 mm transition at an exterior corner.",
+                "salience": "cad:RepresentativeSalience",
+                "confidence": 0.99,
+                "evidence": [
+                  "Torus major radius 53 mm",
+                  "Torus minor radius 10 mm"
+                ]
+              },
+              {
+                "brep_id": "FACE 40",
+                "face_code": "FACE 40",
+                "entity_type": "cad:Face",
+                "geometry_type": "cad:CylindricalSurface",
+                "semantic_role": "cad:FilletSurfaceRole",
+                "name": "Large outer fillet straight segment 3",
+                "description": "Radius-10 mm cylindrical exterior transition.",
+                "salience": "cad:RepresentativeSalience",
+                "confidence": 0.99,
+                "evidence": [
+                  "Cylinder radius 10 mm",
+                  "Opposing counterpart to FACE 36"
+                ]
+              },
+              {
+                "brep_id": "FACE 41",
+                "face_code": "FACE 41",
+                "entity_type": "cad:Face",
+                "geometry_type": "cad:ToroidalSurface",
+                "semantic_role": "cad:FilletSurfaceRole",
+                "name": "Large outer fillet corner segment 4",
+                "description": "Toroidal radius-10 mm transition at the fourth exterior corner.",
+                "salience": "cad:RepresentativeSalience",
+                "confidence": 0.99,
+                "evidence": [
+                  "Torus major radius 53 mm",
+                  "Torus minor radius 10 mm"
+                ]
+              },
+              {
+                "brep_id": "FACE 42",
+                "face_code": "FACE 42",
+                "entity_type": "cad:Face",
+                "geometry_type": "cad:CylindricalSurface",
+                "semantic_role": "cad:FilletSurfaceRole",
+                "name": "Large outer fillet straight segment 4",
+                "description": "Radius-10 mm cylindrical transition completing the exterior fillet loop.",
+                "salience": "cad:RepresentativeSalience",
+                "confidence": 0.99,
+                "evidence": [
+                  "Cylinder radius 10 mm",
+                  "Long 660 mm extent"
+                ]
+              }
+            ],
+            "confidence": 0.99
+          }
+        ],
+        "unclassified_brep_faces": [],
+        "relationships": [],
+        "confidence": 0.96
+      }
+    ]
+  }
+}
+
+aim.json from the planning stage:
+
+{
+  "request": "Make the whole frame structure taller by 0,5cm. The area profile remains the same.",
+  "request_wording": {
+    "action_words": [
+      "Make",
+      "taller",
+      "by",
+      "0,5cm",
+      "remains",
+      "same"
+    ],
+    "referenced_feature_words": [
+      "whole",
+      "frame",
+      "structure",
+      "area",
+      "profile"
+    ],
+    "intention_words": [],
+    "grammatical_words": [
+      "the",
+      "The"
+    ]
+  },
+  "actions": [
+    {
+      "operation": "Increase the overall height of the entire frame structure.",
+      "parameters": {
+        "height_increase": "0,5 cm"
+      },
+      "target": "The whole frame structure.",
+      "relational_constraint": "Keep the area profile unchanged while increasing the frame structure's height.",
+      "unresolved_reference": "Identify the complete frame structure, its height direction and height-defining geometry, and the area profile that must remain unchanged."
+    }
+  ],
+  "intention": []
+}
+
+operation.json from the planning stage:
+
+{
+  "request": "Make the whole frame structure taller by 0,5cm. The area profile remains the same.",
+  "request_wording": {
+    "action_words": [
+      "Make",
+      "taller",
+      "by",
+      "0,5cm",
+      "remains",
+      "same"
+    ],
+    "referenced_feature_words": [
+      "whole",
+      "frame",
+      "structure",
+      "area",
+      "profile"
+    ],
+    "intention_words": [],
+    "grammatical_words": [
+      "the",
+      "The"
+    ]
+  },
+  "actions": [
+    {
+      "operation": "Increase the overall height of the entire frame structure.",
+      "parameters": {
+        "height_increase": "0,5 cm"
+      },
+      "target": "The whole frame structure.",
+      "relational_constraint": "Keep the area profile unchanged while increasing the frame structure's height.",
+      "unresolved_reference": "Identify the complete frame structure, its height direction and height-defining geometry, and the area profile that must remain unchanged.",
+      "target section code": [
+        "R01"
+      ],
+      "target face code": [
+        "F001",
+        "FACE 12",
+        "FACE 34",
+        "F002",
+        "FACE 8",
+        "FACE 9",
+        "FACE 10",
+        "FACE 11",
+        "FACE 33",
+        "FACE 45",
+        "FACE 46",
+        "FACE 47",
+        "F003",
+        "FACE 21",
+        "FACE 22",
+        "FACE 23",
+        "FACE 24",
+        "FACE 43",
+        "FACE 44",
+        "FACE 48",
+        "FACE 49",
+        "F004",
+        "F005",
+        "F006",
+        "F007"
+      ],
+      "steps": [
+        "Treat 0,5 cm as a 5 mm increase. Apply it to the local extrusion or thickness direction of the complete connected frame solid SOLID 0, rather than to a global CAD axis. The semantic orientation is ambiguous with confidence 0.38, so no front, back, top, bottom, left, or right axis assignment should be inferred from the camera labels.",
+        "Use the two opposing planar annular surfaces of F001, FACE 12 and FACE 34, to establish the local height direction. Their opposing normals define the direction perpendicular to the rounded-rectangular area profile.",
+        "Preserve the existing rounded-rectangular planform exactly. Do not offset or scale the outer perimeter F003 or the central opening F002 in the profile plane. Retain the four outer radius-63 mm corners, the four inner radius-50 mm corners, the 660 mm straight-segment extents, and the existing frame-band width.",
+        "Where editable construction history is available, modify the depth parameter of the base annular extrusion or pad that creates F001. Increase its original depth by 5 mm while retaining the same closed annular sketch and its inner opening loop.",
+        "Use FACE 12 as the fixed profile-side datum and extend the frame toward the opposing FACE 34 side by 5 mm. If the source feature is explicitly defined as a symmetric mid-plane extrusion, preserve that design intent instead by adding 2.5 mm to each side for the same total 5 mm increase.",
+        "Extend or regenerate all central-opening wall surfaces of F002 between the two annular sides. This includes FACE 8, FACE 9, FACE 10, FACE 11, FACE 33, FACE 45, FACE 46, and FACE 47. Their in-plane positions and inner corner radii must remain unchanged.",
+        "Extend or regenerate all exterior perimeter wall surfaces of F003 through the increased depth. This includes FACE 21, FACE 22, FACE 23, FACE 24, FACE 43, FACE 44, FACE 48, and FACE 49. Preserve the original exterior rounded-rectangle boundary and radius-63 mm corners.",
+        "Regenerate the edge treatments after changing the base depth so that they terminate correctly on the revised annular face. Preserve F004 and F006 as continuous radius-2 mm inner fillet loops, corresponding to source FACE 0 through FACE 7 and FACE 25 through FACE 32.",
+        "Preserve F005 as the continuous radius-2 mm outer fillet loop corresponding to source FACE 13 through FACE 20, and preserve F007 as the continuous radius-10 mm outer fillet loop corresponding to source FACE 35 through FACE 42. Do not scale either fillet radius with the height increase.",
+        "Recompute the final solid and verify that it remains one connected solid, SOLID 0, with the same central through-opening and the same projected annular area profile. Confirm that the separation of the two height-defining annular sides has increased by exactly 5 mm and that no in-plane perimeter dimension has changed."
+      ]
+    }
+  ],
+  "intention": []
+}
+
+
+        Given the instructions and task information in operation.json, generate a CadQuery Python function that execute the modeling tasks you designed. First use CadQuery to extract information you need regarding the model, such as surfaces you want to use as reference faces. Then write CadQuery code with correct dimensions and coordinates to perform the edit.
+
+        The script that runs the function is provided for reference, as well as an example function, but you should only create your version of the function my_cad_function. Do not include any of the rest of the script.
+
+        Once you have generated the function, it will be executed in CadQuery. You will then be provided with a rendering of the CAD model created by your function, and any prints, debug or error messages. You will then have the opportunity to refine your function based on this feedback, and it will be re-executed. Continue this process until the task is complete, or you reach the maximum number of iterations.
+
+        If the task involves editing an existing model, the path to that model's .step file is passed to your function as args["input_file"], and is also listed as brep_start_path_step in the task information. Load it from args["input_file"] rather than hard-coding a path. For these cases, you might need to print out debug information once the model is loaded in your first iteration.
+
+        Return a json object with two fields. Do not include any other text outside of the json object in your response:
+        'complete': true if the task has been completed. IMPORTANT: This should only be judged by looking at the output from the last iteration, not whether a function has been returned this iteration. If there is no valid output that corresponds to the instruction, the task is not complete. The first iteration can never be complete. If this is true, then the current function will NOT be executed, and the function from the last iteration will be used.
+        'my_cad_function': CadQuery python function as a string. Use the same definition and arguments as the example.
+        Script example:
+
+        
+
+#!/usr/bin/env python3
+
+import cadquery as cq
+from cadquery import exporters
+import os
+import sys
+
+###
+# Function definitions
+###
+
+def _shape_from_result(result):
+    if hasattr(result, "val"):
+        return result.val()
+    if isinstance(result, cq.Assembly):
+        return result.toCompound()
+    return result
+
+
+def export_as_step(result, output_dir):
+    """Export CadQuery result as STEP file"""
+    try:
+        output_path = os.path.join(output_dir, "tmp.step")
+        if isinstance(result, cq.Assembly):
+            result.save(output_path)
+            print(f"Exported assembly to: {output_path}")
+            return
+        exporters.export(_shape_from_result(result), output_path, exportType="STEP")
+        print(f"Exported shape to: {output_path}")
+    except Exception as e:
+        print(f"Error exporting STEP file: {e}")
+        import traceback
+        traceback.print_exc()
+
+
+def export_as_stl(result, output_dir):
+    """Export CadQuery result as STL file"""
+    try:
+        output_path = os.path.join(output_dir, "tmp.stl")
+        exporters.export(_shape_from_result(result), output_path, exportType="STL")
+        print(f"Exported STL to: {output_path}")
+    except Exception as e:
+        print(f"Error exporting STL file: {e}")
+        import traceback
+        traceback.print_exc()
+
+
+def export_as_image(result, output_dir):
+    """Export CadQuery result as an image (SVG or PNG if VTK available)"""
+    try:
+        # Get the shape from result
+        if hasattr(result, 'val'):
+            shape = result.val()
+        elif isinstance(result, cq.Assembly):
+            # For assemblies, try to get combined shape
+            shape = result.toCompound()
+        else:
+            shape = result
+        
+        # Try PNG export using VTK (requires cadquery with ocp/vtk support)
+        png_path = os.path.join(output_dir, "tmp.png")
+        try:
+            from cadquery.vis import show
+            # Use show() with screenshot parameter instead of vis.screenshot()
+            show(
+                shape,
+                screenshot=png_path,
+                width=1920,
+                height=1080,
+                interact=False  # Don't open interactive GUI
+            )
+            print(f"Exported PNG image to: {png_path}")
+            return
+        except Exception as e:
+            print(f"Error exporting PNG image: {e}")
+            pass
+        
+        # Try using ocp_vscode or jupyter_cadquery for rendering
+        try:
+            from ocp_tessellate.convert import to_svg
+            svg_path = os.path.join(output_dir, "tmp.svg")
+            svg_content = to_svg(shape)
+            with open(svg_path, 'w') as f:
+                f.write(svg_content)
+            print(f"Exported SVG image to: {svg_path}")
+            return
+        except ImportError:
+            pass
+        
+        # Fallback: export SVG using CadQuery's built-in SVG exporter
+        svg_path = os.path.join(output_dir, "tmp.svg")
+        exporters.export(shape, svg_path, exportType="SVG")
+        print(f"Exported SVG image to: {svg_path}")
+        
+    except Exception as e:
+        print(f"Error exporting image: {e}")
+        import traceback
+        traceback.print_exc()
+
+
+def parse_cadquery_args(argv, required_args=None):
+    """
+    Parses command line arguments passed to CadQuery scripts.
+    Args will be passed as --passkey value(s)
+    Only required args are processed
+    """
+    if required_args is None:
+        required_args = ['--output_dir', '--input_file', '--function_file']
+    
+    args = {}
+    i = 0
+    while i < len(argv):
+        arg = argv[i]
+        if arg in required_args:
+            if i + 1 < len(argv):
+                args[arg.lstrip('-')] = argv[i + 1]
+                i += 1  # skip next since it's a value
+            else:
+                print(f"Warning: No value provided for argument {arg}")
+        i += 1
+    return args
+
+
+def load_and_execute_function(function_string, args):
+    """
+    Load a my_cad_function function from a string and execute it.
+    
+    Args:
+        function_string (str): The complete function definition as a string
+        args (dict): Arguments to pass to the function
+    
+    Returns:
+        CadQuery Workplane, Shape, or Assembly, or None
+    """
+    try:
+        # Create a safe execution environment with necessary imports
+        exec_globals = {
+            'cq': cq,
+            'cadquery': cq,
+            'Workplane': cq.Workplane,
+            'Assembly': cq.Assembly,
+            'exporters': exporters,
+            'os': os,
+            'sys': sys,
+            '__builtins__': __builtins__
+        }
+        
+        # Execute the function definition
+        exec(function_string, exec_globals)
+        
+        # Get the function from the execution environment
+        if 'my_cad_function' not in exec_globals:
+            raise ValueError("Function 'my_cad_function' not found in provided code")
+        
+        my_cad_function = exec_globals['my_cad_function']
+        
+        # Execute the function with arguments
+        return my_cad_function(args)
+        
+    except Exception as e:
+        print(f"Error executing LLM-provided function: {e}")
+        import traceback
+        traceback.print_exc()
+        return None
+
+
+###
+# Example my_cad_function that creates three boxes.
+###
+# def my_cad_function(args):
+#     boxes = []
+#     for translation in [(100, 0, 0), (0, 100, 0), (0, 0, 100)]:
+#         box = cq.Workplane("XY").box(10, 20, 30).translate(translation)
+#         boxes.append(box)
+#     # Combine all boxes into a compound
+#     result = boxes[0]
+#     for box in boxes[1:]:
+#         result = result.union(box)
+#     print(f"Created compound with multiple boxes at different locations.")
+#     return result
+
+###
+# Example my_cad_function that loads a STEP file and prints information.
+###
+# def my_cad_function(args):
+#     if "input_file" in args:
+#         input_file = os.path.expanduser(args["input_file"])
+#         shape = cq.importers.importStep(input_file)
+#         # Get the underlying OCC shape for analysis
+#         if hasattr(shape, 'val'):
+#             occ_shape = shape.val()
+#         else:
+#             occ_shape = shape
+#         print(f"Is Valid: {occ_shape.isValid()}")
+#         print(f"Volume: {occ_shape.Volume():.6f} mm^3")
+#         print(f"Number of faces: {len(occ_shape.Faces())}")
+#         bbox = occ_shape.BoundingBox()
+#         center = bbox.center
+#         print(f"Bbox Center: ({center.x:.4f}, {center.y:.4f}, {center.z:.4f})")
+#         return shape
+#     return None
+
+
+###
+# Main script execution
+###
+
+if __name__ == "__main__":
+    # Process command line arguments
+    argv = sys.argv
+    args = parse_cadquery_args(argv)
+    output_dir = args.get("output_dir", "~/Desktop")
+    output_dir = os.path.expanduser(output_dir)
+    if not os.path.exists(output_dir):
+        os.makedirs(output_dir)
+
+    # Do not delete tmp.step / tmp.stl from a previous successful iteration.
+    # A later failed or timed-out run must leave the last good solid in place
+    # so ingest/eval still have geometry. Preview files can be replaced.
+    for stale_name in ("tmp.png", "tmp.svg"):
+        stale_path = os.path.join(output_dir, stale_name)
+        if os.path.exists(stale_path):
+            os.remove(stale_path)
+
+    # Load function from file or use default
+    result = None
+    if "function_file" in args:
+        function_file = os.path.expanduser(args["function_file"])
+        if os.path.exists(function_file):
+            try:
+                with open(function_file, 'r') as f:
+                    function_string = f.read()
+                print(f"Loading function from: {function_file}")
+                result = load_and_execute_function(function_string, args)
+            except Exception as e:
+                print(f"Error loading function from file: {e}")
+        else:
+            print(f"Function file not found: {function_file}")
+    else:
+        print("No function file provided")
+
+    # Export results if a result was returned
+    if result is not None:
+        export_as_step(result, output_dir)
+        export_as_stl(result, output_dir)
+        export_as_image(result, output_dir)
+    else:
+        print("No CadQuery result returned; skipped STEP/STL/image export.")
+    
+    print("Script completed.")
+
+Instruction:
+
+Edit the existing model according to the provided instructions.
+
+Task information:
+
+request_text:
+
+Make the whole frame structure taller by 0,5cm. The area profile remains the same.
+
+brep_start_path_step:
+
+/home/adml/Research/Hackathon2026/IDETC26-Hackathon-Autodesk-neuralCAD-Edit/data/edit_192_external/breps/B7A2N74ZJBF9MZHU_1770171513.0662978.step
+
+Last output rendering: None (this is the first iteration)
+
+Iterations remaining: 10

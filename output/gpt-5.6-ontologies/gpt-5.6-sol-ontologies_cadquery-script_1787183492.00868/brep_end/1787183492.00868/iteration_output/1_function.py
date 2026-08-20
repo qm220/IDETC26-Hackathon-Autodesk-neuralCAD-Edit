@@ -1,0 +1,162 @@
+def my_cad_function(args):
+    import os
+    import math
+    import cadquery as cq
+
+    input_file = os.path.expanduser(args["input_file"])
+    model = cq.importers.importStep(input_file)
+    shape = model.val()
+    solids = list(shape.Solids())
+
+    # These are the four link-arm plates identified from the original model.
+    link_indices = [0, 8, 9, 10]
+    replacement_links = []
+
+    def cylinder_data(face):
+        if face.geomType() != "CYLINDER":
+            return None
+        try:
+            cyl = face._geomAdaptor().Cylinder()
+            axis = cyl.Axis().Direction()
+            center = face.Center()
+            return (
+                float(cyl.Radius()),
+                (center.x, center.y, center.z),
+                (axis.X(), axis.Y(), axis.Z()),
+            )
+        except Exception:
+            return None
+
+    for solid_index in link_indices:
+        source_link = solids[solid_index]
+        bb = source_link.BoundingBox()
+        zmin = bb.zmin
+        thickness = bb.zlen
+
+        # Locate the three original through bores. Their original radius is
+        # 2.5 mm and their axes are parallel to Z.
+        hole_centers = []
+        outer_arc_radii = []
+        for face in source_link.Faces():
+            data = cylinder_data(face)
+            if data is None:
+                continue
+            radius, center, axis = data
+            if abs(abs(axis[2]) - 1.0) < 1.0e-5:
+                if abs(radius - 2.5) < 0.05:
+                    candidate = (center[0], center[1])
+                    if not any(
+                        math.hypot(candidate[0] - p[0], candidate[1] - p[1]) < 1.0e-4
+                        for p in hole_centers
+                    ):
+                        hole_centers.append(candidate)
+                elif 4.0 < radius < 5.0:
+                    outer_arc_radii.append(radius)
+
+        if len(hole_centers) != 3:
+            raise ValueError(
+                "Expected three link-arm bores on solid %d, found %d"
+                % (solid_index, len(hole_centers))
+            )
+
+        # The farthest pair are the arm endpoints; the remaining point is the
+        # center pivot. Hole locations and axes remain unchanged.
+        best_pair = None
+        best_distance = -1.0
+        for i in range(len(hole_centers)):
+            for j in range(i + 1, len(hole_centers)):
+                d = math.hypot(
+                    hole_centers[j][0] - hole_centers[i][0],
+                    hole_centers[j][1] - hole_centers[i][1],
+                )
+                if d > best_distance:
+                    best_distance = d
+                    best_pair = (hole_centers[i], hole_centers[j])
+
+        p1, p2 = best_pair
+        ux = (p2[0] - p1[0]) / best_distance
+        uy = (p2[1] - p1[1]) / best_distance
+        nx, ny = -uy, ux
+
+        # Increase every link-arm bore from diameter 5 mm to diameter 6 mm.
+        new_hole_radius = 3.0
+
+        # Preserve the original radial material around the end bores while
+        # accommodating the 0.5 mm radial hole increase. The resulting outer
+        # profile is a true obround/long-hole profile and is substantially
+        # wider through the arm span for increased bending stiffness.
+        original_outer_radius = max(outer_arc_radii) if outer_arc_radii else 4.4
+        profile_radius = original_outer_radius + 0.5
+
+        corners = [
+            (p1[0] + nx * profile_radius, p1[1] + ny * profile_radius),
+            (p2[0] + nx * profile_radius, p2[1] + ny * profile_radius),
+            (p2[0] - nx * profile_radius, p2[1] - ny * profile_radius),
+            (p1[0] - nx * profile_radius, p1[1] - ny * profile_radius),
+        ]
+
+        # Build the capsule from a central rectangle and circular ends.
+        link = (
+            cq.Workplane("XY")
+            .workplane(offset=zmin)
+            .moveTo(corners[0][0], corners[0][1])
+            .lineTo(corners[1][0], corners[1][1])
+            .lineTo(corners[2][0], corners[2][1])
+            .lineTo(corners[3][0], corners[3][1])
+            .close()
+            .extrude(thickness)
+        )
+
+        for px, py in (p1, p2):
+            end_body = (
+                cq.Workplane("XY")
+                .workplane(offset=zmin)
+                .center(px, py)
+                .circle(profile_radius)
+                .extrude(thickness)
+            )
+            link = link.union(end_body)
+
+        # Retain the small edge treatment used on the original arm plates.
+        try:
+            link = link.edges("#Z").fillet(0.1)
+        except Exception:
+            pass
+
+        # Cut all three bores at their original centers with the new diameter.
+        for hx, hy in hole_centers:
+            cutter = (
+                cq.Workplane("XY")
+                .workplane(offset=zmin - 0.1)
+                .center(hx, hy)
+                .circle(new_hole_radius)
+                .extrude(thickness + 0.2)
+            )
+            link = link.cut(cutter)
+
+        replacement = link.val()
+        if not replacement.isValid():
+            raise ValueError("Replacement link solid %d is invalid" % solid_index)
+        replacement_links.append(replacement)
+
+        print(
+            "LINK %d: thickness=%.6f, profile_radius=%.6f, "
+            "hole_diameter=6.000000, centers=%s"
+            % (solid_index, thickness, profile_radius, hole_centers)
+        )
+
+    # Preserve every platform and pin solid without modification and replace
+    # only the four targeted link plates.
+    output_solids = [
+        solid for index, solid in enumerate(solids) if index not in link_indices
+    ]
+    output_solids.extend(replacement_links)
+
+    result_shape = cq.Compound.makeCompound(output_solids)
+    result = cq.Workplane(obj=result_shape)
+
+    print("RESULT VALID:", result_shape.isValid())
+    print("RESULT SOLID COUNT:", len(result_shape.Solids()))
+    print("RESULT VOLUME:", result_shape.Volume())
+
+    return result

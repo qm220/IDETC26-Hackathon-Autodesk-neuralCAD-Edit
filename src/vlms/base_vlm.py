@@ -16,6 +16,11 @@ CAD_ARTIFACTS = (
     ("tmp.png", "{i}_output.png"),
     ("tmp.svg", "{i}_output.svg"),
 )
+CADQUERY_TASK_INFO_KEYS = (
+    "request_text",
+    "brep_start_path_step",
+    "brep_start_path_stp",
+)
 
 
 def estimate_token_cost(config: dict, token_counts: dict) -> float:
@@ -432,6 +437,18 @@ class BaseVLM(ABC):
 
         return messages
 
+    def _cadquery_task_info_parts(self, task_info_dict):
+        """Compact CadQuery task info: NL request and start STEP only."""
+        row = task_info_dict or {}
+        parts = []
+        for key in CADQUERY_TASK_INFO_KEYS:
+            value = row.get(key)
+            if value in (None, ""):
+                continue
+            parts.append(f"{key}:")
+            parts.append(str(value))
+        return parts
+
     def _write_iteration_prompt_log(self, iteration_dir, iter_count, max_iters, prompt_parts, api_messages):
         prompt_records = []
         prompt_text_chunks = []
@@ -607,60 +624,65 @@ class BaseVLM(ABC):
         task_info_dict,
         planning=None,
         harness_script=None,
+        include_operation=True,
+        include_aim=True,
     ):
         parts = []
         if planning:
-            from .task_analysis import planning_message_parts
-            parts.extend(planning_message_parts(planning))
+            from .task_analysis import labeled_view_parts, planning_message_parts, planning_start_view_tuples
+
+            start_views = planning_start_view_tuples(planning)
+            if start_views:
+                parts.extend(labeled_view_parts(start_views))
+            parts.extend(
+                planning_message_parts(
+                    planning,
+                    include_operation=include_operation,
+                    include_aim=include_aim,
+                    include_preface=False,
+                )
+            )
         parts.append(loop_instruction)
         if harness_script is not None:
             parts.append(harness_script)
         parts.append("Instruction:")
         parts.append(instruction_text)
-        parts.append("Task information:")
-        parts.extend(self.load_task_info_dict(task_info_dict))
+        task_info_parts = self._cadquery_task_info_parts(task_info_dict)
+        if task_info_parts:
+            parts.append("Task information:")
+            parts.extend(task_info_parts)
         return parts
 
     def _last_iteration_feedback_parts(self, program_output, view_paths, script):
-        parts = [
-            "Program output from last iteration:",
-            program_output or "None",
-            "Visual output from last iteration:",
-        ]
+        parts = ["Multi-view images from last iteration:"]
         if view_paths:
             for name, path in view_paths:
                 parts.append(f"View: {name}")
                 parts.append(path)
         else:
             parts.append("None")
-        parts.append("CadQuery text output from last iteration:")
-        parts.append(script or "None")
+        parts.extend(
+            [
+                "CadQuery function from last iteration:",
+                script or "None",
+                "Program output from last iteration:",
+                program_output or "None",
+            ]
+        )
         return parts
 
     def _required_actions_block(self, planning=None) -> str:
-        """List operation.json action operation + target fields for follow-up prompts."""
+        """Compact acceptance checklist from operation.json for later iterations."""
+        from .task_analysis import format_required_actions_block
+
         operation_json = (planning or {}).get("operation") or {}
-        actions = operation_json.get("actions") or []
-        lines = ["The required actions are:"]
-        n = 0
-        for action in actions:
-            if not isinstance(action, dict):
-                continue
-            operation = str(action.get("operation") or "").strip() or "(unspecified operation)"
-            target = str(action.get("target") or "").strip() or "(unspecified target)"
-            n += 1
-            lines.append(f"{n}. Operation: {operation}")
-            lines.append(f"   Target: {target}")
-        if n == 0:
-            lines.append("(none listed in operation.json)")
-        return "\n".join(lines)
+        return format_required_actions_block(operation_json)
 
     def _fill_followup_instruction(self, template: str, planning=None) -> str:
-        block = self._required_actions_block(planning)
         placeholder = "[The required actions are:...]"
-        if placeholder in template:
-            return template.replace(placeholder, block)
-        return template.rstrip() + "\n\n" + block + "\n"
+        if placeholder not in template:
+            return template
+        return template.replace(placeholder, self._required_actions_block(planning))
 
     def visual_update_loop(self, instruction_text, task_info_dict, harness_script_file, output_dir, max_iters=10, run_function=None, conversation_instruction="", followup_instruction="", output_script_key=None, input_file=None, planning=None):
         if run_function is None:
@@ -668,10 +690,9 @@ class BaseVLM(ABC):
 
         harness_script = self.read_text_file(harness_script_file)
         last_feedback = []
-        later_instruction = self._fill_followup_instruction(
-            followup_instruction or conversation_instruction,
-            planning=planning,
-        )
+        later_instruction = (followup_instruction or conversation_instruction).replace(
+            "[The required actions are:...]", ""
+        ).replace("\n\n\n", "\n\n")
 
         iters_remaining = max_iters
 
@@ -689,17 +710,33 @@ class BaseVLM(ABC):
                     task_info_dict,
                     planning=planning,
                     harness_script=harness_script,
+                    include_operation=True,
+                    include_aim=True,
                 )
                 messages.append("Last output rendering: None (this is the first iteration)")
             else:
-                messages = self._cadquery_prefix_parts(
-                    later_instruction,
-                    instruction_text,
-                    task_info_dict,
-                    planning=planning,
-                    harness_script=None,
-                )
+                messages = []
                 messages.extend(last_feedback)
+                if planning:
+                    from .task_analysis import planning_message_parts, aim_json_parts
+
+                    messages.extend(
+                        planning_message_parts(
+                            planning,
+                            include_operation=False,
+                            include_aim=False,
+                            include_preface=False,
+                        )
+                    )
+                    if planning.get("aim"):
+                        messages.extend(aim_json_parts(planning, for_check=True))
+                messages.append(later_instruction)
+                messages.append("Instruction:")
+                messages.append(instruction_text)
+                task_info_parts = self._cadquery_task_info_parts(task_info_dict)
+                if task_info_parts:
+                    messages.append("Task information:")
+                    messages.extend(task_info_parts)
             messages.append(f"Iterations remaining: {iters_remaining}")
             iteration_dir = os.path.join(output_dir, "iteration_output")
             os.makedirs(iteration_dir, exist_ok=True)
@@ -849,8 +886,42 @@ class BaseVLM(ABC):
         return f"stdout: {result.stdout}\nstderr: {result.stderr}"
     
     def cadquery_script(self, instruction_text, task_info_dict, harness_script_file, output_dir, max_iters=10):
+        run_planning = bool(self.config.get("run_planning", True))
         conversation_instruction = """
-        Given the instructions and task information in operation.json, generate a CadQuery Python function that execute the modeling tasks you designed. First use CadQuery to extract information you need regarding the model, such as surfaces you want to use as reference faces. Then write CadQuery code with correct dimensions and coordinates to perform the edit.
+        Given the instructions and task information in operation.json, generate a CadQuery Python function that execute the modeling operations planned out. This operation aims to edit a engineering CAD model based on natural language request from an engineer. References to the original are provide through multiview images and model.json. More detailed, specific geometric information, such as coordinates and dimensions, can be retrieved from the B-rep model through CadQuery code.
+
+        An example working CadQuery function is provided for reference, but you should only create your version of the function my_cad_function. Do not include any of the rest of the script.
+
+        Once you have generated the function, it will be executed in CadQuery. You will then be provided with a rendering of the CAD model created by your function, and any prints, debug or error messages. You will have the opportunity to refine your function based on this feedback, and it will be re-executed. Continue this process until the task is complete, or you reach the maximum number of iterations.
+
+        If the task involves editing an existing model, the path to that model's .step file is passed to your function as args["input_file"], and is also listed as brep_start_path_step in the task information. Load it from args["input_file"] rather than hard-coding a path. For these cases, you might need to print out debug information once the model is loaded in your first iteration.
+
+        Return a json object with two fields. Do not include any other text outside of the json object in your response:
+        'complete': true if the task has been completed. IMPORTANT: This should only be judged by looking at the output from the last iteration, not whether a function has been returned this iteration. If there is no valid output that corresponds to the instruction, the task is not complete. The first iteration can never be complete. If this is true, then the current function will NOT be executed, and the function from the last iteration will be used.
+        'my_cad_function': CadQuery python function as a string. Use the same definition and arguments as the example.
+        Script example:
+
+        """
+
+        followup_instruction = """
+The multiview images generated from the code sent in your last response are attached, followed by the CadQuery function and program output from the last iteration. First, judge whether the current model satisfies the desired final state described in aim.json. Four perspectives should be considered: (1) Geometric consistency: Verify the model matches the predicted geometric outcome and comply with the constraints if any. (2) Functional alignment: Verify that the model can perform intended functions as described in aim.json. (3) Behavioral correctness: Assess whether the model can behave as expected based on the intended behavior described in aim.json. (4) Preservation of geometry: Ensure the model preserves the geometries that are identified as area to preserve in aim.json. Considering the flexible nature of design, do not be too strict on those validations, make sensible judgements.
+
+If all four perspectives are satisfied, report the operation is finished in your response.
+
+If not, analyse errors and update the code accordingly. You would have access to the last iteration's results and the original CAD geometries stored in model.json. Use them to help you identify the errors and update the code accordingly.
+
+Once you have generated the new function, it will be executed in CadQuery on the original CAD model. You will then be provided with the latest rendering of the CAD model created by your function, and any prints, debug or error messages. You will then have the opportunity to refine your function based on this feedback, and it will be re-executed.
+
+Continue this process until the task is complete, or you reach the maximum number of iterations. If the task involves editing an existing model, the path to that model's .step file is passed to your function as args["input_file"], and is also listed as brep_start_path_step in the task information. Load it from args["input_file"] rather than hard-coding a path. For these cases, you might need to print out debug information once the model is loaded in your first iteration.
+
+        Return a json object with two fields. Do not include any other text outside of the json object in your response:
+        'complete': true if the task has been completed. IMPORTANT: This should only be judged by looking at the output from the last iteration, not whether a function has been returned this iteration. If there is no valid output that corresponds to the instruction, the task is not complete. The first iteration can never be complete. If this is true, then the current function will NOT be executed, and the function from the last iteration will be used.
+        'my_cad_function': CadQuery python function as a string. Use the same definition and arguments as the example..
+        """
+
+        if not run_planning:
+            conversation_instruction = """
+        Given the instructions and task information, generate a CadQuery Python function that performs the requested edit. First use CadQuery to extract information you need regarding the model, such as surfaces you want to use as reference faces. Then write CadQuery code with correct dimensions and coordinates to perform the edit.
 
         The script that runs the function is provided for reference, as well as an example function, but you should only create your version of the function my_cad_function. Do not include any of the rest of the script.
 
@@ -864,11 +935,8 @@ class BaseVLM(ABC):
         Script example:
 
         """
-
-        followup_instruction = """
-The multiview images generated from the code sent in your last response are attached. The text output from the cadquery are also provided. First, judge whether the required actions identified has been done correctly and the effect is satisfactory.
-
-[The required actions are:...]
+            followup_instruction = """
+The multiview images generated from the code sent in your last response are attached. The CadQuery function and program output from the last iteration are also provided. First, judge whether the requested edit has been done correctly and the effect is satisfactory.
 
 If yes, report the operation is finished in your response.
 
@@ -891,7 +959,7 @@ Return a json object with three fields. Do not include any other text outside of
                 break
 
         planning = None
-        if self.config.get("run_planning", True):
+        if run_planning:
             from .task_analysis import run_task_analysis
             planning = run_task_analysis(self, task_info_dict, output_dir)
 

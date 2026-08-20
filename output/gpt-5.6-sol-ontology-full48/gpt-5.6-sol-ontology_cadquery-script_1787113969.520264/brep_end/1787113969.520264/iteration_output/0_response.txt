@@ -1,0 +1,384 @@
+Thinking text:
+**Processing shape faces**
+
+I'm thinking about how to shape faces sequentially. I need to consider surface types using geomType() and gather information about the center, bounding box, and area. The axis coordinate y should be thin. I'll print the data for selected faces and focus on those near the center, possibly including the edges or face1 wires bounds. I'll import the necessary functions and check the solids' bounding boxes and faces, ensuring the shape remains unchanged and appropriately formatted in JSON.
+
+Generated script:
+def my_cad_function(args):
+    import os
+    input_file = os.path.expanduser(args["input_file"])
+    model = cq.importers.importStep(input_file)
+    shape = model.val() if hasattr(model, "val") else model
+
+    print("=== MODEL INSPECTION ===")
+    print(f"Valid: {shape.isValid()}")
+    print(f"Solids: {len(shape.Solids())}, Faces: {len(shape.Faces())}, Volume: {shape.Volume():.6f}")
+    bb = shape.BoundingBox()
+    print(f"Model bbox: x=[{bb.xmin:.4f},{bb.xmax:.4f}] y=[{bb.ymin:.4f},{bb.ymax:.4f}] z=[{bb.zmin:.4f},{bb.zmax:.4f}]")
+
+    for si, solid in enumerate(shape.Solids()):
+        sb = solid.BoundingBox()
+        print(f"SOLID {si}: faces={len(solid.Faces())}, volume={solid.Volume():.6f}, bbox=x[{sb.xmin:.4f},{sb.xmax:.4f}] y[{sb.ymin:.4f},{sb.ymax:.4f}] z[{sb.zmin:.4f},{sb.zmax:.4f}]")
+
+    faces = shape.Faces()
+
+    def describe_face(index):
+        if index < 0 or index >= len(faces):
+            print(f"FACE {index}: out of range")
+            return
+        f = faces[index]
+        fb = f.BoundingBox()
+        c = f.Center()
+        try:
+            gt = f.geomType()
+        except Exception:
+            gt = "UNKNOWN"
+        try:
+            n = f.normalAt(c)
+            normal_text = f"({n.x:.4f},{n.y:.4f},{n.z:.4f})"
+        except Exception:
+            normal_text = "n/a"
+        print(
+            f"FACE {index}: type={gt}, area={f.Area():.6f}, center=({c.x:.4f},{c.y:.4f},{c.z:.4f}), "
+            f"normal={normal_text}, wires={len(f.Wires())}, edges={len(f.Edges())}, "
+            f"bbox=x[{fb.xmin:.4f},{fb.xmax:.4f}] y[{fb.ymin:.4f},{fb.ymax:.4f}] z[{fb.zmin:.4f},{fb.zmax:.4f}]"
+        )
+
+    print("=== GROUNDED TARGET FACES ===")
+    for idx in [0, 1, 2, 3, 4, 147, 223, 224, 225, 226, 227, 228, 229, 230, 231, 232, 233, 496, 497, 668, 669]:
+        describe_face(idx)
+
+    print("=== CENTRAL FACES IN CARRIER RANGE 497-669 ===")
+    for idx in range(497, min(670, len(faces))):
+        f = faces[idx]
+        fb = f.BoundingBox()
+        radial_extent = max(abs(fb.xmin), abs(fb.xmax), abs(fb.zmin), abs(fb.zmax))
+        if radial_extent <= 23.0:
+            describe_face(idx)
+
+    print("=== INSERT FACE 1 BOUNDARY EDGES ===")
+    if len(faces) > 1:
+        for ei, edge in enumerate(faces[1].Edges()):
+            eb = edge.BoundingBox()
+            ec = edge.Center()
+            try:
+                et = edge.geomType()
+            except Exception:
+                et = "UNKNOWN"
+            print(f"FACE 1 EDGE {ei}: type={et}, length={edge.Length():.6f}, center=({ec.x:.4f},{ec.y:.4f},{ec.z:.4f}), bbox=x[{eb.xmin:.4f},{eb.xmax:.4f}] y[{eb.ymin:.4f},{eb.ymax:.4f}] z[{eb.zmin:.4f},{eb.zmax:.4f}]")
+
+    return model
+
+Program output:
+stdout: Loading function from: /home/adml/Research/Hackathon2026/IDETC26-Hackathon-Autodesk-neuralCAD-Edit/output/gpt-5.6-sol-ontology-full48/gpt-5.6-sol-ontology_cadquery-script_1787113969.520264/brep_end/1787113969.520264/temp_script.py
+=== MODEL INSPECTION ===
+Valid: True
+Solids: 2, Faces: 1482, Volume: 29778.338003
+Model bbox: x=[-56.5112,56.5110] y=[-6.3500,3.1750] z=[-56.6036,56.2341]
+SOLID 0: faces=234, volume=2162.777148, bbox=x[-15.7500,15.7500] y[-4.6250,3.1750] z[-15.7500,15.7500]
+SOLID 1: faces=1248, volume=27615.571303, bbox=x[-56.5112,56.5110] y[-6.3500,3.1750] z[-56.6036,56.2341]
+=== GROUNDED TARGET FACES ===
+FACE 0: type=CONE, area=68.864686, center=(-0.0000,2.9236,0.0000), normal=n/a, wires=1, edges=3, bbox=x[-15.7500,15.7500] y[2.6750,3.1750] z[-15.7500,15.7500]
+FACE 1: type=PLANE, area=372.760131, center=(-0.0000,3.1750,-0.0000), normal=(-0.0000,1.0000,-0.0000), wires=2, edges=193, bbox=x[-15.2500,15.2500] y[3.1750,3.1750] z[-15.2500,15.2500]
+FACE 2: type=CYLINDER, area=247.400421, center=(0.0000,1.4250,0.0000), normal=n/a, wires=1, edges=3, bbox=x[-15.7500,15.7500] y[0.1750,2.6750] z[-15.7500,15.7500]
+FACE 3: type=PLANE, area=5.464422, center=(0.2001,-0.7250,10.7966), normal=(-0.8660,-0.0000,-0.5000), wires=1, edges=4, bbox=x[0.0250,0.3753] y[-4.6250,3.1750] z[10.4933,11.1000]
+FACE 4: type=PLANE, area=5.464422, center=(-0.2001,-0.7250,10.7966), normal=(0.8660,0.0000,-0.5000), wires=1, edges=4, bbox=x[-0.3753,-0.0250] y[-4.6250,3.1750] z[10.4933,11.1000]
+FACE 147: type=CYLINDER, area=4.865016, center=(3.3746,-0.7250,9.9413), normal=(-0.3214,-0.0000,-0.9469), wires=1, edges=4, bbox=x[3.0784,3.6689] y[-4.6250,3.1750] z[9.8382,10.0386]
+FACE 223: type=CYLINDER, area=26.347155, center=(-9.8115,-1.7250,9.8115), normal=(-0.7071,0.0000,0.7071), wires=1, edges=4, bbox=x[-11.1317,-7.0464] y[-3.6250,0.1750] z[7.0464,11.1317]
+FACE 224: type=PLANE, area=229.230480, center=(-0.0000,0.1750,-0.0000), normal=(0.0000,-1.0000,0.0000), wires=2, edges=17, bbox=x[-15.7500,15.7500] y[0.1750,0.1750] z[-15.7500,15.7500]
+FACE 225: type=CYLINDER, area=19.531765, center=(4.6599,-1.7250,11.2500), normal=(0.3827,0.0000,0.9239), wires=1, edges=4, bbox=x[2.7451,7.0464] y[-3.6250,0.1750] z[10.7003,12.7102]
+FACE 226: type=CYLINDER, area=26.347155, center=(9.8115,-1.7250,9.8115), normal=(0.7071,0.0000,0.7071), wires=1, edges=4, bbox=x[7.0464,11.1317] y[-3.6250,0.1750] z[7.0464,11.1317]
+FACE 227: type=CYLINDER, area=19.531765, center=(11.2500,-1.7250,4.6599), normal=(0.9239,0.0000,0.3827), wires=1, edges=4, bbox=x[10.7003,12.7102] y[-3.6250,0.1750] z[2.7451,7.0464]
+FACE 228: type=CYLINDER, area=26.347155, center=(13.8755,-1.7250,0.0000), normal=(1.0000,0.0000,0.0000), wires=1, edges=4, bbox=x[12.7102,14.5000] y[-3.6250,0.1750] z[-2.7451,2.7451]
+FACE 229: type=CYLINDER, area=19.531765, center=(11.2500,-1.7250,-4.6599), normal=(0.9239,0.0000,-0.3827), wires=1, edges=4, bbox=x[10.7003,12.7102] y[-3.6250,0.1750] z[-7.0464,-2.7451]
+FACE 230: type=CYLINDER, area=26.347155, center=(9.8115,-1.7250,-9.8115), normal=(0.7071,-0.0000,-0.7071), wires=1, edges=4, bbox=x[7.0464,11.1317] y[-3.6250,0.1750] z[-11.1317,-7.0464]
+FACE 231: type=CYLINDER, area=19.531765, center=(-4.6599,-1.7250,11.2500), normal=(-0.3827,0.0000,0.9239), wires=1, edges=4, bbox=x[-7.0464,-2.7451] y[-3.6250,0.1750] z[10.7003,12.7102]
+FACE 232: type=CYLINDER, area=26.347155, center=(0.0000,-1.7250,13.8755), normal=(0.0000,0.0000,1.0000), wires=1, edges=4, bbox=x[-2.7451,2.7451] y[-3.6250,0.1750] z[12.7102,14.5000]
+FACE 233: type=PLANE, area=173.963792, center=(0.7168,-4.6250,0.0000), normal=(0.0000,-1.0000,0.0000), wires=2, edges=212, bbox=x[-13.0585,14.4100] y[-4.6250,-4.6250] z[-14.4100,14.4100]
+FACE 496: type=PLANE, area=1726.822903, center=(0.0056,3.1750,-0.0087), normal=(0.0000,1.0000,0.0000), wires=12, edges=179, bbox=x[-46.6800,46.6800] y[3.1750,3.1750] z[-46.6961,46.5352]
+FACE 497: type=BSPLINE, area=13.086925, center=(-5.6239,2.8265,41.6566), normal=(0.7658,0.4641,-0.4451), wires=1, edges=4, bbox=x[-7.3641,-2.7894] y[2.1590,3.1750] z[37.7401,44.6907]
+FACE 668: type=CONE, area=36.004883, center=(-0.0000,3.0483,0.0000), normal=n/a, wires=1, edges=3, bbox=x[-16.0796,16.0796] y[2.9210,3.1750] z[-16.0796,16.0796]
+FACE 669: type=CYLINDER, area=273.051779, center=(0.0000,1.5480,-0.0000), normal=n/a, wires=1, edges=3, bbox=x[-15.8256,15.8256] y[0.1750,2.9210] z[-15.8256,15.8256]
+=== CENTRAL FACES IN CARRIER RANGE 497-669 ===
+FACE 501: type=BSPLINE, area=11.365714, center=(3.3880,2.8266,19.6662), normal=(-0.6290,0.5120,0.5850), wires=1, edges=4, bbox=x[0.5234,5.4938] y[2.1590,3.1750] z[17.3640,22.6961]
+FACE 502: type=TORUS, area=1.783696, center=(-0.0158,2.8008,18.0234), normal=(-0.0006,0.7030,0.7112), wires=1, edges=4, bbox=x[-0.5863,0.5540] y[2.1590,3.1750] z[17.3652,18.3901]
+FACE 503: type=BSPLINE, area=11.348086, center=(-3.4214,2.8266,19.6568), normal=(0.6284,0.5125,0.5852), wires=1, edges=4, bbox=x[-5.5335,-0.5539] y[2.1590,3.1750] z[17.3629,22.6737]
+FACE 512: type=BSPLINE, area=11.453611, center=(-11.0064,2.8270,15.1477), normal=(-0.5048,0.5100,0.6965), wires=1, edges=4, bbox=x[-14.2881,-8.3729] y[2.1590,3.1750] z[13.3189,17.8281]
+FACE 519: type=BSPLINE, area=11.362548, center=(-17.6523,2.8266,9.3089), normal=(-0.7500,0.5121,-0.4187), wires=1, edges=4, bbox=x[-20.0992,-16.0722] y[2.1590,3.1750] z[5.8723,12.2234]
+FACE 520: type=TORUS, area=1.739647, center=(-17.1393,2.8008,5.5761), normal=(-0.6764,0.7029,0.2201), wires=1, edges=4, bbox=x[-17.6519,-16.3516] y[2.1590,3.1750] z[4.8731,6.2157]
+FACE 525: type=BSPLINE, area=11.452216, center=(-17.8077,2.8266,-5.7869), normal=(-0.8187,0.5096,-0.2649), wires=1, edges=4, bbox=x[-19.8558,-16.5045] y[2.1590,3.1750] z[-9.4336,-2.4800]
+FACE 536: type=BSPLINE, area=11.365464, center=(-14.3013,2.8266,-13.9181), normal=(0.1650,0.5121,-0.8430), wires=1, edges=4, bbox=x[-17.7652,-10.6318] y[2.1590,3.1750] z[-15.6541,-12.7337]
+FACE 537: type=TORUS, area=1.731220, center=(-10.5953,2.8008,-14.5804), normal=(-0.4181,0.7029,-0.5754), wires=1, edges=4, bbox=x[-11.2536,-9.7859] y[2.1590,3.1750] z[-15.1955,-13.7413]
+FACE 538: type=BSPLINE, area=11.364130, center=(-8.8205,2.8266,-17.9018), normal=(-0.8529,0.5121,-0.1015), wires=1, edges=4, bbox=x[-10.3582,-7.6796] y[2.1590,3.1750] z[-21.5738,-14.3560]
+FACE 540: type=CYLINDER, area=5.444736, center=(-10.8091,-0.3002,-14.8747), normal=(-0.5879,0.0000,-0.8090), wires=1, edges=6, bbox=x[-11.2536,-10.3582] y[-2.7595,2.1590] z[-15.1955,-14.5448]
+FACE 541: type=BSPLINE, area=25.577575, center=(-9.1947,0.1127,-17.6012), normal=(-0.9756,-0.0000,-0.2196), wires=1, edges=6, bbox=x[-10.3582,-8.6954] y[-2.7595,2.1590] z[-20.8937,-15.1955]
+FACE 544: type=BSPLINE, area=11.452426, center=(-0.0008,2.8266,-18.7244), normal=(0.0011,0.5095,-0.8605), wires=1, edges=4, bbox=x[-3.6558,3.6558] y[2.1590,3.1750] z[-19.9399,-17.6019]
+FACE 552: type=BSPLINE, area=29.641543, center=(0.0008,-0.1123,-19.0476), normal=(-0.0014,-0.0000,-1.0000), wires=1, edges=6, bbox=x[-2.8861,2.8861] y[-2.6686,2.1590] z[-19.9399,-18.6178]
+FACE 556: type=BSPLINE, area=11.362998, center=(14.2982,2.8266,-13.9221), normal=(-0.1671,0.5121,-0.8425), wires=1, edges=4, bbox=x[10.6279,17.7600] y[2.1590,3.1750] z[-15.6577,-12.7378]
+FACE 557: type=TORUS, area=1.722736, center=(10.5933,2.8008,-14.5819), normal=(0.4181,0.7029,-0.5755), wires=1, edges=4, bbox=x[9.7861,11.2494] y[2.1590,3.1750] z[-15.1954,-13.7443]
+FACE 558: type=BSPLINE, area=11.365577, center=(8.8209,2.8266,-17.9005), normal=(0.8527,0.5120,-0.1034), wires=1, edges=4, bbox=x[7.6792,10.3583] y[2.1590,3.1750] z[-21.5745,-14.3559]
+FACE 561: type=BSPLINE, area=25.573274, center=(13.8973,0.1130,-14.1852), normal=(-0.0928,0.0000,-0.9957), wires=1, edges=6, bbox=x[11.2494,16.8800] y[-2.7595,2.1590] z[-15.6577,-13.7535]
+FACE 565: type=BSPLINE, area=11.452221, center=(17.8082,2.8266,-5.7854), normal=(0.8180,0.5096,-0.2669), wires=1, edges=4, bbox=x[16.5070,19.8558] y[2.1590,3.1750] z[-9.4336,-2.4800]
+FACE 571: type=TORUS, area=1.730970, center=(17.1441,2.8008,5.5615), normal=(0.6766,0.7029,0.2195), wires=1, edges=4, bbox=x[16.3575,17.6555] y[2.1590,3.1750] z[4.8614,6.1984]
+FACE 578: type=BSPLINE, area=11.360650, center=(17.6604,2.8266,9.2894), normal=(0.7505,0.5122,-0.4175), wires=1, edges=4, bbox=x[16.0762,20.1094] y[2.1590,3.1750] z[5.8559,12.2032]
+FACE 580: type=TORUS, area=192.520775, center=(0.0000,-4.5000,0.0000), normal=n/a, wires=1, edges=3, bbox=x[-16.7833,16.7833] y[-4.6253,-4.2620] z[-16.7833,16.7833]
+FACE 581: type=PLANE, area=122.337654, center=(0.0000,-4.6253,0.0000), normal=(0.0000,-1.0000,0.0000), wires=2, edges=17, bbox=x[-14.8967,14.8967] y[-4.6253,-4.6253] z[-14.8967,14.8967]
+FACE 585: type=TORUS, area=3.309323, center=(19.2568,-1.6693,13.4693), normal=(0.1576,-0.9813,0.1102), wires=1, edges=5, bbox=x[17.7988,20.6744] y[-1.8498,-1.5773] z[12.3550,14.5302]
+FACE 589: type=TORUS, area=3.275458, center=(-19.2502,-1.6693,13.4790), normal=(-0.1575,-0.9813,0.1103), wires=1, edges=5, bbox=x[-20.6622,-17.7988] y[-1.8498,-1.5773] z[12.3742,14.5302]
+FACE 604: type=CYLINDER, area=5.418052, center=(10.8071,-0.3002,-14.8762), normal=(0.5877,0.0000,-0.8090), wires=1, edges=6, bbox=x[10.3583,11.2494] y[-2.7595,2.1590] z[-15.1954,-14.5480]
+FACE 605: type=BSPLINE, area=25.581291, center=(9.1948,0.1126,-17.6003), normal=(0.9755,-0.0000,-0.2199), wires=1, edges=6, bbox=x[8.6951,10.3583] y[-2.7595,2.1590] z[-20.8943,-15.1954]
+FACE 607: type=BSPLINE, area=25.578450, center=(-13.9007,0.1130,-14.1810), normal=(0.0923,0.0000,-0.9957), wires=1, edges=6, bbox=x[-16.8851,-11.2536] y[-2.7595,2.1590] z[-15.6541,-13.7495]
+FACE 619: type=CONE, area=1.776714, center=(-11.3549,-4.4967,-4.7033), normal=(0.6533,-0.7071,0.2706), wires=1, edges=4, bbox=x[-12.8126,-10.7003] y[-4.6253,-4.3713] z[-7.0464,-2.7451]
+FACE 620: type=CONE, area=2.596005, center=(-9.8835,-4.5001,-9.8835), normal=(0.5000,-0.7071,0.5000), wires=1, edges=4, bbox=x[-11.3857,-6.9545] y[-4.6253,-4.3713] z[-11.3857,-6.9545]
+FACE 621: type=CONE, area=1.776714, center=(-4.7033,-4.4967,-11.3549), normal=(0.2706,-0.7071,0.6533), wires=1, edges=4, bbox=x[-7.0464,-2.7451] y[-4.6253,-4.3713] z[-12.8126,-10.7003]
+FACE 622: type=CONE, area=2.596005, center=(0.0000,-4.5001,-13.9774), normal=(-0.0000,-0.7071,0.7071), wires=1, edges=4, bbox=x[-2.9775,2.9775] y[-4.6253,-4.3713] z[-14.7540,-12.7102]
+FACE 623: type=CONE, area=1.776714, center=(4.7033,-4.4967,-11.3549), normal=(-0.2706,-0.7071,0.6533), wires=1, edges=4, bbox=x[2.7451,7.0464] y[-4.6253,-4.3713] z[-12.8126,-10.7003]
+FACE 624: type=CONE, area=2.596005, center=(9.8835,-4.5001,-9.8835), normal=(-0.5000,-0.7071,0.5000), wires=1, edges=4, bbox=x[6.9545,11.3857] y[-4.6253,-4.3713] z[-11.3857,-6.9545]
+FACE 625: type=CONE, area=1.776714, center=(11.3549,-4.4967,-4.7033), normal=(-0.6533,-0.7071,0.2706), wires=1, edges=4, bbox=x[10.7003,12.8126] y[-4.6253,-4.3713] z[-7.0464,-2.7451]
+FACE 626: type=CONE, area=2.596005, center=(13.9774,-4.5001,0.0000), normal=(-0.7071,-0.7071,-0.0000), wires=1, edges=4, bbox=x[12.7102,14.7540] y[-4.6253,-4.3713] z[-2.9775,2.9775]
+FACE 627: type=CONE, area=1.776714, center=(11.3549,-4.4967,4.7033), normal=(-0.6533,-0.7071,-0.2706), wires=1, edges=4, bbox=x[10.7003,12.8126] y[-4.6253,-4.3713] z[2.7451,7.0464]
+FACE 628: type=CONE, area=2.596005, center=(9.8835,-4.5001,9.8835), normal=(-0.5000,-0.7071,-0.5000), wires=1, edges=4, bbox=x[6.9545,11.3857] y[-4.6253,-4.3713] z[6.9545,11.3857]
+FACE 629: type=CONE, area=1.776714, center=(4.7033,-4.4967,11.3549), normal=(-0.2706,-0.7071,-0.6533), wires=1, edges=4, bbox=x[2.7451,7.0464] y[-4.6253,-4.3713] z[10.7003,12.8126]
+FACE 630: type=CONE, area=2.596005, center=(-0.0000,-4.5001,13.9774), normal=(0.0000,-0.7071,-0.7071), wires=1, edges=4, bbox=x[-2.9775,2.9775] y[-4.6253,-4.3713] z[12.7102,14.7540]
+FACE 631: type=CONE, area=1.776714, center=(-4.7033,-4.4967,11.3549), normal=(0.2706,-0.7071,-0.6533), wires=1, edges=4, bbox=x[-7.0464,-2.7451] y[-4.6253,-4.3713] z[10.7003,12.8126]
+FACE 632: type=CONE, area=2.596005, center=(-9.8835,-4.5001,9.8835), normal=(0.5000,-0.7071,-0.5000), wires=1, edges=4, bbox=x[-11.3857,-6.9545] y[-4.6253,-4.3713] z[6.9545,11.3857]
+FACE 633: type=CONE, area=1.776714, center=(-11.3549,-4.4967,4.7033), normal=(0.6533,-0.7071,-0.2706), wires=1, edges=4, bbox=x[-12.8126,-10.7003] y[-4.6253,-4.3713] z[2.7451,7.0464]
+FACE 634: type=CONE, area=2.596004, center=(-13.9774,-4.5001,-0.0000), normal=(0.7071,-0.7071,0.0000), wires=1, edges=4, bbox=x[-14.7540,-12.7102] y[-4.6253,-4.3713] z[-2.9775,2.9775]
+FACE 635: type=CYLINDER, area=29.760641, center=(9.8115,-2.2252,9.8115), normal=(-0.7071,-0.0000,-0.7071), wires=1, edges=4, bbox=x[7.0464,11.1317] y[-4.3713,-0.0790] z[7.0464,11.1317]
+FACE 636: type=CYLINDER, area=22.062262, center=(4.6599,-2.2252,11.2500), normal=(-0.3827,-0.0000,-0.9239), wires=1, edges=4, bbox=x[2.7451,7.0464] y[-4.3713,-0.0790] z[10.7003,12.7102]
+FACE 637: type=CYLINDER, area=29.760641, center=(0.0000,-2.2252,13.8755), normal=(-0.0000,-0.0000,-1.0000), wires=1, edges=4, bbox=x[-2.7451,2.7451] y[-4.3713,-0.0790] z[12.7102,14.5000]
+FACE 638: type=CYLINDER, area=22.062262, center=(-4.6599,-2.2252,11.2500), normal=(0.3827,0.0000,-0.9239), wires=1, edges=4, bbox=x[-7.0464,-2.7451] y[-4.3713,-0.0790] z[10.7003,12.7102]
+FACE 639: type=CYLINDER, area=29.760641, center=(-9.8115,-2.2252,9.8115), normal=(0.7071,-0.0000,-0.7071), wires=1, edges=4, bbox=x[-11.1317,-7.0464] y[-4.3713,-0.0790] z[7.0464,11.1317]
+FACE 640: type=CYLINDER, area=22.062262, center=(-11.2500,-2.2252,4.6599), normal=(0.9239,0.0000,-0.3827), wires=1, edges=4, bbox=x[-12.7102,-10.7003] y[-4.3713,-0.0790] z[2.7451,7.0464]
+FACE 641: type=CYLINDER, area=29.760641, center=(-13.8755,-2.2252,-0.0000), normal=(1.0000,0.0000,0.0000), wires=1, edges=4, bbox=x[-14.5000,-12.7102] y[-4.3713,-0.0790] z[-2.7451,2.7451]
+FACE 642: type=CYLINDER, area=22.062262, center=(-11.2500,-2.2252,-4.6599), normal=(0.9239,0.0000,0.3827), wires=1, edges=4, bbox=x[-12.7102,-10.7003] y[-4.3713,-0.0790] z[-7.0464,-2.7451]
+FACE 643: type=CYLINDER, area=29.760641, center=(-9.8115,-2.2252,-9.8115), normal=(0.7071,0.0000,0.7071), wires=1, edges=4, bbox=x[-11.1317,-7.0464] y[-4.3713,-0.0790] z[-11.1317,-7.0464]
+FACE 644: type=CYLINDER, area=22.062262, center=(-4.6599,-2.2252,-11.2500), normal=(0.3827,0.0000,0.9239), wires=1, edges=4, bbox=x[-7.0464,-2.7451] y[-4.3713,-0.0790] z[-12.7102,-10.7003]
+FACE 645: type=CYLINDER, area=29.760641, center=(0.0000,-2.2252,-13.8755), normal=(-0.0000,-0.0000,1.0000), wires=1, edges=4, bbox=x[-2.7451,2.7451] y[-4.3713,-0.0790] z[-14.5000,-12.7102]
+FACE 646: type=CYLINDER, area=22.062262, center=(4.6599,-2.2252,-11.2500), normal=(-0.3827,0.0000,0.9239), wires=1, edges=4, bbox=x[2.7451,7.0464] y[-4.3713,-0.0790] z[-12.7102,-10.7003]
+FACE 647: type=CYLINDER, area=29.760641, center=(9.8115,-2.2252,-9.8115), normal=(-0.7071,-0.0000,0.7071), wires=1, edges=4, bbox=x[7.0464,11.1317] y[-4.3713,-0.0790] z[-11.1317,-7.0464]
+FACE 648: type=CYLINDER, area=22.062262, center=(11.2500,-2.2252,-4.6599), normal=(-0.9239,0.0000,0.3827), wires=1, edges=4, bbox=x[10.7003,12.7102] y[-4.3713,-0.0790] z[-7.0464,-2.7451]
+FACE 649: type=CYLINDER, area=29.760641, center=(13.8755,-2.2252,-0.0000), normal=(-1.0000,-0.0000,0.0000), wires=1, edges=4, bbox=x[12.7102,14.5000] y[-4.3713,-0.0790] z[-2.7451,2.7451]
+FACE 650: type=CYLINDER, area=22.062262, center=(11.2500,-2.2252,4.6599), normal=(-0.9239,-0.0000,-0.3827), wires=1, edges=4, bbox=x[10.7003,12.7102] y[-4.3713,-0.0790] z[2.7451,7.0464]
+FACE 651: type=CONE, area=1.776714, center=(4.7033,0.0463,11.3549), normal=(-0.2706,0.7071,-0.6533), wires=1, edges=4, bbox=x[2.7451,7.0464] y[-0.0790,0.1750] z[10.7003,12.8126]
+FACE 652: type=CONE, area=2.596005, center=(-0.0000,0.0497,13.9774), normal=(0.0000,0.7071,-0.7071), wires=1, edges=4, bbox=x[-2.9775,2.9775] y[-0.0790,0.1750] z[12.7102,14.7540]
+FACE 653: type=CONE, area=1.776714, center=(-4.7033,0.0463,11.3549), normal=(0.2706,0.7071,-0.6533), wires=1, edges=4, bbox=x[-7.0464,-2.7451] y[-0.0790,0.1750] z[10.7003,12.8126]
+FACE 654: type=CONE, area=2.596005, center=(-9.8835,0.0497,9.8835), normal=(0.5000,0.7071,-0.5000), wires=1, edges=4, bbox=x[-11.3857,-6.9545] y[-0.0790,0.1750] z[6.9545,11.3857]
+FACE 655: type=CONE, area=1.776714, center=(-11.3549,0.0463,4.7033), normal=(0.6533,0.7071,-0.2706), wires=1, edges=4, bbox=x[-12.8126,-10.7003] y[-0.0790,0.1750] z[2.7451,7.0464]
+FACE 656: type=CONE, area=2.596005, center=(-13.9774,0.0497,-0.0000), normal=(0.7071,0.7071,0.0000), wires=1, edges=4, bbox=x[-14.7540,-12.7102] y[-0.0790,0.1750] z[-2.9775,2.9775]
+FACE 657: type=CONE, area=1.776714, center=(-11.3549,0.0463,-4.7033), normal=(0.6533,0.7071,0.2706), wires=1, edges=4, bbox=x[-12.8126,-10.7003] y[-0.0790,0.1750] z[-7.0464,-2.7451]
+FACE 658: type=CONE, area=2.596005, center=(-9.8835,0.0497,-9.8835), normal=(0.5000,0.7071,0.5000), wires=1, edges=4, bbox=x[-11.3857,-6.9545] y[-0.0790,0.1750] z[-11.3857,-6.9545]
+FACE 659: type=CONE, area=1.776714, center=(-4.7033,0.0463,-11.3549), normal=(0.2706,0.7071,0.6533), wires=1, edges=4, bbox=x[-7.0464,-2.7451] y[-0.0790,0.1750] z[-12.8126,-10.7003]
+FACE 660: type=CONE, area=2.596005, center=(0.0000,0.0497,-13.9774), normal=(-0.0000,0.7071,0.7071), wires=1, edges=4, bbox=x[-2.9775,2.9775] y[-0.0790,0.1750] z[-14.7540,-12.7102]
+FACE 661: type=CONE, area=1.776714, center=(4.7033,0.0463,-11.3549), normal=(-0.2706,0.7071,0.6533), wires=1, edges=4, bbox=x[2.7451,7.0464] y[-0.0790,0.1750] z[-12.8126,-10.7003]
+FACE 662: type=CONE, area=2.596005, center=(9.8835,0.0497,-9.8835), normal=(-0.5000,0.7071,0.5000), wires=1, edges=4, bbox=x[6.9545,11.3857] y[-0.0790,0.1750] z[-11.3857,-6.9545]
+FACE 663: type=CONE, area=1.776714, center=(11.3549,0.0463,-4.7033), normal=(-0.6533,0.7071,0.2706), wires=1, edges=4, bbox=x[10.7003,12.8126] y[-0.0790,0.1750] z[-7.0464,-2.7451]
+FACE 664: type=CONE, area=2.596005, center=(13.9774,0.0497,0.0000), normal=(-0.7071,0.7071,-0.0000), wires=1, edges=4, bbox=x[12.7102,14.7540] y[-0.0790,0.1750] z[-2.9775,2.9775]
+FACE 665: type=CONE, area=1.776714, center=(11.3549,0.0463,4.7033), normal=(-0.6533,0.7071,-0.2706), wires=1, edges=4, bbox=x[10.7003,12.8126] y[-0.0790,0.1750] z[2.7451,7.0464]
+FACE 666: type=CONE, area=2.596004, center=(9.8835,0.0497,9.8835), normal=(-0.5000,0.7071,-0.5000), wires=1, edges=4, bbox=x[6.9545,11.3857] y[-0.0790,0.1750] z[6.9545,11.3857]
+FACE 667: type=PLANE, area=211.998910, center=(0.0000,0.1750,-0.0000), normal=(-0.0000,1.0000,-0.0000), wires=2, edges=17, bbox=x[-15.8256,15.8256] y[0.1750,0.1750] z[-15.8256,15.8256]
+FACE 668: type=CONE, area=36.004883, center=(-0.0000,3.0483,0.0000), normal=n/a, wires=1, edges=3, bbox=x[-16.0796,16.0796] y[2.9210,3.1750] z[-16.0796,16.0796]
+FACE 669: type=CYLINDER, area=273.051779, center=(0.0000,1.5480,-0.0000), normal=n/a, wires=1, edges=3, bbox=x[-15.8256,15.8256] y[0.1750,2.9210] z[-15.8256,15.8256]
+=== INSERT FACE 1 BOUNDARY EDGES ===
+FACE 1 EDGE 0: type=CIRCLE, length=95.818576, center=(0.0000,3.1750,0.0000), bbox=x[-15.2500,15.2500] y[3.1750,3.1750] z[-15.2500,15.2500]
+FACE 1 EDGE 1: type=LINE, length=0.700567, center=(0.2001,3.1750,10.7966), bbox=x[0.0250,0.3753] y[3.1750,3.1750] z[10.4933,11.1000]
+FACE 1 EDGE 2: type=LINE, length=0.050000, center=(-0.0000,3.1750,11.1000), bbox=x[-0.0250,0.0250] y[3.1750,3.1750] z[11.1000,11.1000]
+FACE 1 EDGE 3: type=LINE, length=0.700567, center=(-0.2001,3.1750,10.7966), bbox=x[-0.3753,-0.0250] y[3.1750,3.1750] z[10.4933,11.1000]
+FACE 1 EDGE 4: type=CIRCLE, length=0.623720, center=(-0.6866,3.1750,10.4760), bbox=x[-0.9976,-0.3753] y[3.1750,3.1750] z[10.4525,10.4933]
+FACE 1 EDGE 5: type=LINE, length=0.700567, center=(-1.2108,3.1750,10.7304), bbox=x[-1.4241,-0.9976] y[3.1750,3.1750] z[10.4525,11.0083]
+FACE 1 EDGE 6: type=LINE, length=0.050000, center=(-1.4488,3.1750,11.0050), bbox=x[-1.4736,-1.4241] y[3.1750,3.1750] z[11.0018,11.0083]
+FACE 1 EDGE 7: type=LINE, length=0.700567, center=(-1.6077,3.1750,10.6782), bbox=x[-1.7417,-1.4736] y[3.1750,3.1750] z[10.3545,11.0018]
+FACE 1 EDGE 8: type=CIRCLE, length=0.623720, center=(-2.0481,3.1750,10.2967), bbox=x[-2.3534,-1.7417] y[3.1750,3.1750] z[10.2329,10.3545]
+FACE 1 EDGE 9: type=LINE, length=0.700567, center=(-2.6011,3.1750,10.4806), bbox=x[-2.8487,-2.3534] y[3.1750,3.1750] z[10.2329,10.7282]
+FACE 1 EDGE 10: type=LINE, length=0.050000, center=(-2.8729,3.1750,10.7218), bbox=x[-2.8970,-2.8487] y[3.1750,3.1750] z[10.7153,10.7282]
+FACE 1 EDGE 11: type=LINE, length=0.700567, center=(-2.9877,3.1750,10.3770), bbox=x[-3.0784,-2.8970] y[3.1750,3.1750] z[10.0386,10.7153]
+FACE 1 EDGE 12: type=CIRCLE, length=0.623720, center=(-3.3746,3.1750,9.9413), bbox=x[-3.6689,-3.0784] y[3.1750,3.1750] z[9.8382,10.0386]
+FACE 1 EDGE 13: type=LINE, length=0.700567, center=(-3.9468,3.1750,10.0514), bbox=x[-4.2247,-3.6689] y[3.1750,3.1750] z[9.8382,10.2646]
+FACE 1 EDGE 14: type=LINE, length=0.050000, center=(-4.2478,3.1750,10.2551), bbox=x[-4.2709,-4.2247] y[3.1750,3.1750] z[10.2455,10.2646]
+FACE 1 EDGE 15: type=LINE, length=0.700567, center=(-4.3166,3.1750,9.8982), bbox=x[-4.3623,-4.2709] y[3.1750,3.1750] z[9.5509,10.2455]
+FACE 1 EDGE 16: type=CIRCLE, length=0.623720, center=(-4.6433,3.1750,9.4158), bbox=x[-4.9216,-4.3623] y[3.1750,3.1750] z[9.2751,9.5509]
+FACE 1 EDGE 17: type=LINE, length=0.700567, center=(-5.2250,3.1750,9.4502), bbox=x[-5.5283,-4.9216] y[3.1750,3.1750] z[9.2751,9.6254]
+FACE 1 EDGE 18: type=LINE, length=0.050000, center=(-5.5500,3.1750,9.6129), bbox=x[-5.5717,-5.5283] y[3.1750,3.1750] z[9.6004,9.6254]
+FACE 1 EDGE 19: type=LINE, length=0.700567, center=(-5.5717,3.1750,9.2501), bbox=x[-5.5717,-5.5717] y[3.1750,3.1750] z[8.8998,9.6004]
+FACE 1 EDGE 20: type=CIRCLE, length=0.623720, center=(-5.8326,3.1750,8.7291), bbox=x[-6.0902,-5.5717] y[3.1750,3.1750] z[8.5533,8.8998]
+FACE 1 EDGE 21: type=LINE, length=0.700567, center=(-6.4138,3.1750,8.6874), bbox=x[-6.7374,-6.0902] y[3.1750,3.1750] z[8.5533,8.8214]
+FACE 1 EDGE 22: type=LINE, length=0.050000, center=(-6.7573,3.1750,8.8062), bbox=x[-6.7771,-6.7374] y[3.1750,3.1750] z[8.7910,8.8214]
+FACE 1 EDGE 23: type=LINE, length=0.700567, center=(-6.7314,3.1750,8.4437), bbox=x[-6.7771,-6.6856] y[3.1750,3.1750] z[8.0964,8.7910]
+FACE 1 EDGE 24: type=CIRCLE, length=0.623720, center=(-6.9221,3.1750,7.8932), bbox=x[-7.1545,-6.6856] y[3.1750,3.1750] z[7.6852,8.0964]
+FACE 1 EDGE 25: type=LINE, length=0.700567, center=(-7.4929,3.1750,7.7759), bbox=x[-7.8312,-7.1545] y[3.1750,3.1750] z[7.6852,7.8666]
+FACE 1 EDGE 26: type=LINE, length=0.050000, center=(-7.8489,3.1750,7.8489), bbox=x[-7.8666,-7.8312] y[3.1750,3.1750] z[7.8312,7.8666]
+FACE 1 EDGE 27: type=LINE, length=0.700567, center=(-7.7759,3.1750,7.4929), bbox=x[-7.8666,-7.6852] y[3.1750,3.1750] z[7.1545,7.8312]
+FACE 1 EDGE 28: type=CIRCLE, length=0.623720, center=(-7.8932,3.1750,6.9221), bbox=x[-8.0964,-7.6852] y[3.1750,3.1750] z[6.6856,7.1545]
+FACE 1 EDGE 29: type=LINE, length=0.700567, center=(-8.4437,3.1750,6.7314), bbox=x[-8.7910,-8.0964] y[3.1750,3.1750] z[6.6856,6.7771]
+FACE 1 EDGE 30: type=LINE, length=0.050000, center=(-8.8062,3.1750,6.7573), bbox=x[-8.8214,-8.7910] y[3.1750,3.1750] z[6.7374,6.7771]
+FACE 1 EDGE 31: type=LINE, length=0.700567, center=(-8.6874,3.1750,6.4138), bbox=x[-8.8214,-8.5533] y[3.1750,3.1750] z[6.0902,6.7374]
+FACE 1 EDGE 32: type=CIRCLE, length=0.623720, center=(-8.7291,3.1750,5.8326), bbox=x[-8.8998,-8.5533] y[3.1750,3.1750] z[5.5717,6.0902]
+FACE 1 EDGE 33: type=LINE, length=0.700567, center=(-9.2501,3.1750,5.5717), bbox=x[-9.6004,-8.8998] y[3.1750,3.1750] z[5.5717,5.5717]
+FACE 1 EDGE 34: type=LINE, length=0.050000, center=(-9.6129,3.1750,5.5500), bbox=x[-9.6254,-9.6004] y[3.1750,3.1750] z[5.5283,5.5717]
+FACE 1 EDGE 35: type=LINE, length=0.700567, center=(-9.4502,3.1750,5.2250), bbox=x[-9.6254,-9.2751] y[3.1750,3.1750] z[4.9216,5.5283]
+FACE 1 EDGE 36: type=CIRCLE, length=0.623720, center=(-9.4158,3.1750,4.6433), bbox=x[-9.5509,-9.2751] y[3.1750,3.1750] z[4.3623,4.9216]
+FACE 1 EDGE 37: type=LINE, length=0.700567, center=(-9.8982,3.1750,4.3166), bbox=x[-10.2455,-9.5509] y[3.1750,3.1750] z[4.2709,4.3623]
+FACE 1 EDGE 38: type=LINE, length=0.050000, center=(-10.2551,3.1750,4.2478), bbox=x[-10.2646,-10.2455] y[3.1750,3.1750] z[4.2247,4.2709]
+FACE 1 EDGE 39: type=LINE, length=0.700567, center=(-10.0514,3.1750,3.9468), bbox=x[-10.2646,-9.8382] y[3.1750,3.1750] z[3.6689,4.2247]
+FACE 1 EDGE 40: type=CIRCLE, length=0.623720, center=(-9.9413,3.1750,3.3746), bbox=x[-10.0386,-9.8382] y[3.1750,3.1750] z[3.0784,3.6689]
+FACE 1 EDGE 41: type=LINE, length=0.700567, center=(-10.3770,3.1750,2.9877), bbox=x[-10.7153,-10.0386] y[3.1750,3.1750] z[2.8970,3.0784]
+FACE 1 EDGE 42: type=LINE, length=0.050000, center=(-10.7218,3.1750,2.8729), bbox=x[-10.7282,-10.7153] y[3.1750,3.1750] z[2.8487,2.8970]
+FACE 1 EDGE 43: type=LINE, length=0.700567, center=(-10.4806,3.1750,2.6011), bbox=x[-10.7282,-10.2329] y[3.1750,3.1750] z[2.3534,2.8487]
+FACE 1 EDGE 44: type=CIRCLE, length=0.623720, center=(-10.2967,3.1750,2.0481), bbox=x[-10.3545,-10.2329] y[3.1750,3.1750] z[1.7417,2.3534]
+FACE 1 EDGE 45: type=LINE, length=0.700567, center=(-10.6782,3.1750,1.6077), bbox=x[-11.0018,-10.3545] y[3.1750,3.1750] z[1.4736,1.7417]
+FACE 1 EDGE 46: type=LINE, length=0.050000, center=(-11.0050,3.1750,1.4488), bbox=x[-11.0083,-11.0018] y[3.1750,3.1750] z[1.4241,1.4736]
+FACE 1 EDGE 47: type=LINE, length=0.700567, center=(-10.7304,3.1750,1.2108), bbox=x[-11.0083,-10.4525] y[3.1750,3.1750] z[0.9976,1.4241]
+FACE 1 EDGE 48: type=CIRCLE, length=0.623720, center=(-10.4760,3.1750,0.6866), bbox=x[-10.4933,-10.4525] y[3.1750,3.1750] z[0.3753,0.9976]
+FACE 1 EDGE 49: type=LINE, length=0.700567, center=(-10.7966,3.1750,0.2001), bbox=x[-11.1000,-10.4933] y[3.1750,3.1750] z[0.0250,0.3753]
+FACE 1 EDGE 50: type=LINE, length=0.050000, center=(-11.1000,3.1750,-0.0000), bbox=x[-11.1000,-11.1000] y[3.1750,3.1750] z[-0.0250,0.0250]
+FACE 1 EDGE 51: type=LINE, length=0.700567, center=(-10.7966,3.1750,-0.2001), bbox=x[-11.1000,-10.4933] y[3.1750,3.1750] z[-0.3753,-0.0250]
+FACE 1 EDGE 52: type=CIRCLE, length=0.623720, center=(-10.4760,3.1750,-0.6866), bbox=x[-10.4933,-10.4525] y[3.1750,3.1750] z[-0.9976,-0.3753]
+FACE 1 EDGE 53: type=LINE, length=0.700567, center=(-10.7304,3.1750,-1.2108), bbox=x[-11.0083,-10.4525] y[3.1750,3.1750] z[-1.4241,-0.9976]
+FACE 1 EDGE 54: type=LINE, length=0.050000, center=(-11.0050,3.1750,-1.4488), bbox=x[-11.0083,-11.0018] y[3.1750,3.1750] z[-1.4736,-1.4241]
+FACE 1 EDGE 55: type=LINE, length=0.700567, center=(-10.6782,3.1750,-1.6077), bbox=x[-11.0018,-10.3545] y[3.1750,3.1750] z[-1.7417,-1.4736]
+FACE 1 EDGE 56: type=CIRCLE, length=0.623720, center=(-10.2967,3.1750,-2.0481), bbox=x[-10.3545,-10.2329] y[3.1750,3.1750] z[-2.3534,-1.7417]
+FACE 1 EDGE 57: type=LINE, length=0.700567, center=(-10.4806,3.1750,-2.6011), bbox=x[-10.7282,-10.2329] y[3.1750,3.1750] z[-2.8487,-2.3534]
+FACE 1 EDGE 58: type=LINE, length=0.050000, center=(-10.7218,3.1750,-2.8729), bbox=x[-10.7282,-10.7153] y[3.1750,3.1750] z[-2.8970,-2.8487]
+FACE 1 EDGE 59: type=LINE, length=0.700567, center=(-10.3770,3.1750,-2.9877), bbox=x[-10.7153,-10.0386] y[3.1750,3.1750] z[-3.0784,-2.8970]
+FACE 1 EDGE 60: type=CIRCLE, length=0.623720, center=(-9.9413,3.1750,-3.3746), bbox=x[-10.0386,-9.8382] y[3.1750,3.1750] z[-3.6689,-3.0784]
+FACE 1 EDGE 61: type=LINE, length=0.700567, center=(-10.0514,3.1750,-3.9468), bbox=x[-10.2646,-9.8382] y[3.1750,3.1750] z[-4.2247,-3.6689]
+FACE 1 EDGE 62: type=LINE, length=0.050000, center=(-10.2551,3.1750,-4.2478), bbox=x[-10.2646,-10.2455] y[3.1750,3.1750] z[-4.2709,-4.2247]
+FACE 1 EDGE 63: type=LINE, length=0.700567, center=(-9.8982,3.1750,-4.3166), bbox=x[-10.2455,-9.5509] y[3.1750,3.1750] z[-4.3623,-4.2709]
+FACE 1 EDGE 64: type=CIRCLE, length=0.623720, center=(-9.4158,3.1750,-4.6433), bbox=x[-9.5509,-9.2751] y[3.1750,3.1750] z[-4.9216,-4.3623]
+FACE 1 EDGE 65: type=LINE, length=0.700567, center=(-9.4502,3.1750,-5.2250), bbox=x[-9.6254,-9.2751] y[3.1750,3.1750] z[-5.5283,-4.9216]
+FACE 1 EDGE 66: type=LINE, length=0.050000, center=(-9.6129,3.1750,-5.5500), bbox=x[-9.6254,-9.6004] y[3.1750,3.1750] z[-5.5717,-5.5283]
+FACE 1 EDGE 67: type=LINE, length=0.700567, center=(-9.2501,3.1750,-5.5717), bbox=x[-9.6004,-8.8998] y[3.1750,3.1750] z[-5.5717,-5.5717]
+FACE 1 EDGE 68: type=CIRCLE, length=0.623720, center=(-8.7291,3.1750,-5.8326), bbox=x[-8.8998,-8.5533] y[3.1750,3.1750] z[-6.0902,-5.5717]
+FACE 1 EDGE 69: type=LINE, length=0.700567, center=(-8.6874,3.1750,-6.4138), bbox=x[-8.8214,-8.5533] y[3.1750,3.1750] z[-6.7374,-6.0902]
+FACE 1 EDGE 70: type=LINE, length=0.050000, center=(-8.8062,3.1750,-6.7573), bbox=x[-8.8214,-8.7910] y[3.1750,3.1750] z[-6.7771,-6.7374]
+FACE 1 EDGE 71: type=LINE, length=0.700567, center=(-8.4437,3.1750,-6.7314), bbox=x[-8.7910,-8.0964] y[3.1750,3.1750] z[-6.7771,-6.6856]
+FACE 1 EDGE 72: type=CIRCLE, length=0.623720, center=(-7.8932,3.1750,-6.9221), bbox=x[-8.0964,-7.6852] y[3.1750,3.1750] z[-7.1545,-6.6856]
+FACE 1 EDGE 73: type=LINE, length=0.700567, center=(-7.7759,3.1750,-7.4929), bbox=x[-7.8666,-7.6852] y[3.1750,3.1750] z[-7.8312,-7.1545]
+FACE 1 EDGE 74: type=LINE, length=0.050000, center=(-7.8489,3.1750,-7.8489), bbox=x[-7.8666,-7.8312] y[3.1750,3.1750] z[-7.8666,-7.8312]
+FACE 1 EDGE 75: type=LINE, length=0.700567, center=(-7.4929,3.1750,-7.7759), bbox=x[-7.8312,-7.1545] y[3.1750,3.1750] z[-7.8666,-7.6852]
+FACE 1 EDGE 76: type=CIRCLE, length=0.623720, center=(-6.9221,3.1750,-7.8932), bbox=x[-7.1545,-6.6856] y[3.1750,3.1750] z[-8.0964,-7.6852]
+FACE 1 EDGE 77: type=LINE, length=0.700567, center=(-6.7314,3.1750,-8.4437), bbox=x[-6.7771,-6.6856] y[3.1750,3.1750] z[-8.7910,-8.0964]
+FACE 1 EDGE 78: type=LINE, length=0.050000, center=(-6.7573,3.1750,-8.8062), bbox=x[-6.7771,-6.7374] y[3.1750,3.1750] z[-8.8214,-8.7910]
+FACE 1 EDGE 79: type=LINE, length=0.700567, center=(-6.4138,3.1750,-8.6874), bbox=x[-6.7374,-6.0902] y[3.1750,3.1750] z[-8.8214,-8.5533]
+FACE 1 EDGE 80: type=CIRCLE, length=0.623720, center=(-5.8326,3.1750,-8.7291), bbox=x[-6.0902,-5.5717] y[3.1750,3.1750] z[-8.8998,-8.5533]
+FACE 1 EDGE 81: type=LINE, length=0.700567, center=(-5.5717,3.1750,-9.2501), bbox=x[-5.5717,-5.5717] y[3.1750,3.1750] z[-9.6004,-8.8998]
+FACE 1 EDGE 82: type=LINE, length=0.050000, center=(-5.5500,3.1750,-9.6129), bbox=x[-5.5717,-5.5283] y[3.1750,3.1750] z[-9.6254,-9.6004]
+FACE 1 EDGE 83: type=LINE, length=0.700567, center=(-5.2250,3.1750,-9.4502), bbox=x[-5.5283,-4.9216] y[3.1750,3.1750] z[-9.6254,-9.2751]
+FACE 1 EDGE 84: type=CIRCLE, length=0.623720, center=(-4.6433,3.1750,-9.4158), bbox=x[-4.9216,-4.3623] y[3.1750,3.1750] z[-9.5509,-9.2751]
+FACE 1 EDGE 85: type=LINE, length=0.700567, center=(-4.3166,3.1750,-9.8982), bbox=x[-4.3623,-4.2709] y[3.1750,3.1750] z[-10.2455,-9.5509]
+FACE 1 EDGE 86: type=LINE, length=0.050000, center=(-4.2478,3.1750,-10.2551), bbox=x[-4.2709,-4.2247] y[3.1750,3.1750] z[-10.2646,-10.2455]
+FACE 1 EDGE 87: type=LINE, length=0.700567, center=(-3.9468,3.1750,-10.0514), bbox=x[-4.2247,-3.6689] y[3.1750,3.1750] z[-10.2646,-9.8382]
+FACE 1 EDGE 88: type=CIRCLE, length=0.623720, center=(-3.3746,3.1750,-9.9413), bbox=x[-3.6689,-3.0784] y[3.1750,3.1750] z[-10.0386,-9.8382]
+FACE 1 EDGE 89: type=LINE, length=0.700567, center=(-2.9877,3.1750,-10.3770), bbox=x[-3.0784,-2.8970] y[3.1750,3.1750] z[-10.7153,-10.0386]
+FACE 1 EDGE 90: type=LINE, length=0.050000, center=(-2.8729,3.1750,-10.7218), bbox=x[-2.8970,-2.8487] y[3.1750,3.1750] z[-10.7282,-10.7153]
+FACE 1 EDGE 91: type=LINE, length=0.700567, center=(-2.6011,3.1750,-10.4806), bbox=x[-2.8487,-2.3534] y[3.1750,3.1750] z[-10.7282,-10.2329]
+FACE 1 EDGE 92: type=CIRCLE, length=0.623720, center=(-2.0481,3.1750,-10.2967), bbox=x[-2.3534,-1.7417] y[3.1750,3.1750] z[-10.3545,-10.2329]
+FACE 1 EDGE 93: type=LINE, length=0.700567, center=(-1.6077,3.1750,-10.6782), bbox=x[-1.7417,-1.4736] y[3.1750,3.1750] z[-11.0018,-10.3545]
+FACE 1 EDGE 94: type=LINE, length=0.050000, center=(-1.4488,3.1750,-11.0050), bbox=x[-1.4736,-1.4241] y[3.1750,3.1750] z[-11.0083,-11.0018]
+FACE 1 EDGE 95: type=LINE, length=0.700567, center=(-1.2108,3.1750,-10.7304), bbox=x[-1.4241,-0.9976] y[3.1750,3.1750] z[-11.0083,-10.4525]
+FACE 1 EDGE 96: type=CIRCLE, length=0.623720, center=(-0.6866,3.1750,-10.4760), bbox=x[-0.9976,-0.3753] y[3.1750,3.1750] z[-10.4933,-10.4525]
+FACE 1 EDGE 97: type=LINE, length=0.700567, center=(-0.2001,3.1750,-10.7966), bbox=x[-0.3753,-0.0250] y[3.1750,3.1750] z[-11.1000,-10.4933]
+FACE 1 EDGE 98: type=LINE, length=0.050000, center=(0.0000,3.1750,-11.1000), bbox=x[-0.0250,0.0250] y[3.1750,3.1750] z[-11.1000,-11.1000]
+FACE 1 EDGE 99: type=LINE, length=0.700567, center=(0.2001,3.1750,-10.7966), bbox=x[0.0250,0.3753] y[3.1750,3.1750] z[-11.1000,-10.4933]
+FACE 1 EDGE 100: type=CIRCLE, length=0.623720, center=(0.6866,3.1750,-10.4760), bbox=x[0.3753,0.9976] y[3.1750,3.1750] z[-10.4933,-10.4525]
+FACE 1 EDGE 101: type=LINE, length=0.700567, center=(1.2108,3.1750,-10.7304), bbox=x[0.9976,1.4241] y[3.1750,3.1750] z[-11.0083,-10.4525]
+FACE 1 EDGE 102: type=LINE, length=0.050000, center=(1.4488,3.1750,-11.0050), bbox=x[1.4241,1.4736] y[3.1750,3.1750] z[-11.0083,-11.0018]
+FACE 1 EDGE 103: type=LINE, length=0.700567, center=(1.6077,3.1750,-10.6782), bbox=x[1.4736,1.7417] y[3.1750,3.1750] z[-11.0018,-10.3545]
+FACE 1 EDGE 104: type=CIRCLE, length=0.623720, center=(2.0481,3.1750,-10.2967), bbox=x[1.7417,2.3534] y[3.1750,3.1750] z[-10.3545,-10.2329]
+FACE 1 EDGE 105: type=LINE, length=0.700567, center=(2.6011,3.1750,-10.4806), bbox=x[2.3534,2.8487] y[3.1750,3.1750] z[-10.7282,-10.2329]
+FACE 1 EDGE 106: type=LINE, length=0.050000, center=(2.8729,3.1750,-10.7218), bbox=x[2.8487,2.8970] y[3.1750,3.1750] z[-10.7282,-10.7153]
+FACE 1 EDGE 107: type=LINE, length=0.700567, center=(2.9877,3.1750,-10.3770), bbox=x[2.8970,3.0784] y[3.1750,3.1750] z[-10.7153,-10.0386]
+FACE 1 EDGE 108: type=CIRCLE, length=0.623720, center=(3.3746,3.1750,-9.9413), bbox=x[3.0784,3.6689] y[3.1750,3.1750] z[-10.0386,-9.8382]
+FACE 1 EDGE 109: type=LINE, length=0.700567, center=(3.9468,3.1750,-10.0514), bbox=x[3.6689,4.2247] y[3.1750,3.1750] z[-10.2646,-9.8382]
+FACE 1 EDGE 110: type=LINE, length=0.050000, center=(4.2478,3.1750,-10.2551), bbox=x[4.2247,4.2709] y[3.1750,3.1750] z[-10.2646,-10.2455]
+FACE 1 EDGE 111: type=LINE, length=0.700567, center=(4.3166,3.1750,-9.8982), bbox=x[4.2709,4.3623] y[3.1750,3.1750] z[-10.2455,-9.5509]
+FACE 1 EDGE 112: type=CIRCLE, length=0.623720, center=(4.6433,3.1750,-9.4158), bbox=x[4.3623,4.9216] y[3.1750,3.1750] z[-9.5509,-9.2751]
+FACE 1 EDGE 113: type=LINE, length=0.700567, center=(5.2250,3.1750,-9.4502), bbox=x[4.9216,5.5283] y[3.1750,3.1750] z[-9.6254,-9.2751]
+FACE 1 EDGE 114: type=LINE, length=0.050000, center=(5.5500,3.1750,-9.6129), bbox=x[5.5283,5.5717] y[3.1750,3.1750] z[-9.6254,-9.6004]
+FACE 1 EDGE 115: type=LINE, length=0.700567, center=(5.5717,3.1750,-9.2501), bbox=x[5.5717,5.5717] y[3.1750,3.1750] z[-9.6004,-8.8998]
+FACE 1 EDGE 116: type=CIRCLE, length=0.623720, center=(5.8326,3.1750,-8.7291), bbox=x[5.5717,6.0902] y[3.1750,3.1750] z[-8.8998,-8.5533]
+FACE 1 EDGE 117: type=LINE, length=0.700567, center=(6.4138,3.1750,-8.6874), bbox=x[6.0902,6.7374] y[3.1750,3.1750] z[-8.8214,-8.5533]
+FACE 1 EDGE 118: type=LINE, length=0.050000, center=(6.7573,3.1750,-8.8062), bbox=x[6.7374,6.7771] y[3.1750,3.1750] z[-8.8214,-8.7910]
+FACE 1 EDGE 119: type=LINE, length=0.700567, center=(6.7314,3.1750,-8.4437), bbox=x[6.6856,6.7771] y[3.1750,3.1750] z[-8.7910,-8.0964]
+FACE 1 EDGE 120: type=CIRCLE, length=0.623720, center=(6.9221,3.1750,-7.8932), bbox=x[6.6856,7.1545] y[3.1750,3.1750] z[-8.0964,-7.6852]
+FACE 1 EDGE 121: type=LINE, length=0.700567, center=(7.4929,3.1750,-7.7759), bbox=x[7.1545,7.8312] y[3.1750,3.1750] z[-7.8666,-7.6852]
+FACE 1 EDGE 122: type=LINE, length=0.050000, center=(7.8489,3.1750,-7.8489), bbox=x[7.8312,7.8666] y[3.1750,3.1750] z[-7.8666,-7.8312]
+FACE 1 EDGE 123: type=LINE, length=0.700567, center=(7.7759,3.1750,-7.4929), bbox=x[7.6852,7.8666] y[3.1750,3.1750] z[-7.8312,-7.1545]
+FACE 1 EDGE 124: type=CIRCLE, length=0.623720, center=(7.8932,3.1750,-6.9221), bbox=x[7.6852,8.0964] y[3.1750,3.1750] z[-7.1545,-6.6856]
+FACE 1 EDGE 125: type=LINE, length=0.700567, center=(8.4437,3.1750,-6.7314), bbox=x[8.0964,8.7910] y[3.1750,3.1750] z[-6.7771,-6.6856]
+FACE 1 EDGE 126: type=LINE, length=0.050000, center=(8.8062,3.1750,-6.7573), bbox=x[8.7910,8.8214] y[3.1750,3.1750] z[-6.7771,-6.7374]
+FACE 1 EDGE 127: type=LINE, length=0.700567, center=(8.6874,3.1750,-6.4138), bbox=x[8.5533,8.8214] y[3.1750,3.1750] z[-6.7374,-6.0902]
+FACE 1 EDGE 128: type=CIRCLE, length=0.623720, center=(8.7291,3.1750,-5.8326), bbox=x[8.5533,8.8998] y[3.1750,3.1750] z[-6.0902,-5.5717]
+FACE 1 EDGE 129: type=LINE, length=0.700567, center=(9.2501,3.1750,-5.5717), bbox=x[8.8998,9.6004] y[3.1750,3.1750] z[-5.5717,-5.5717]
+FACE 1 EDGE 130: type=LINE, length=0.050000, center=(9.6129,3.1750,-5.5500), bbox=x[9.6004,9.6254] y[3.1750,3.1750] z[-5.5717,-5.5283]
+FACE 1 EDGE 131: type=LINE, length=0.700567, center=(9.4502,3.1750,-5.2250), bbox=x[9.2751,9.6254] y[3.1750,3.1750] z[-5.5283,-4.9216]
+FACE 1 EDGE 132: type=CIRCLE, length=0.623720, center=(9.4158,3.1750,-4.6433), bbox=x[9.2751,9.5509] y[3.1750,3.1750] z[-4.9216,-4.3623]
+FACE 1 EDGE 133: type=LINE, length=0.700567, center=(9.8982,3.1750,-4.3166), bbox=x[9.5509,10.2455] y[3.1750,3.1750] z[-4.3623,-4.2709]
+FACE 1 EDGE 134: type=LINE, length=0.050000, center=(10.2551,3.1750,-4.2478), bbox=x[10.2455,10.2646] y[3.1750,3.1750] z[-4.2709,-4.2247]
+FACE 1 EDGE 135: type=LINE, length=0.700567, center=(10.0514,3.1750,-3.9468), bbox=x[9.8382,10.2646] y[3.1750,3.1750] z[-4.2247,-3.6689]
+FACE 1 EDGE 136: type=CIRCLE, length=0.623720, center=(9.9413,3.1750,-3.3746), bbox=x[9.8382,10.0386] y[3.1750,3.1750] z[-3.6689,-3.0784]
+FACE 1 EDGE 137: type=LINE, length=0.700567, center=(10.3770,3.1750,-2.9877), bbox=x[10.0386,10.7153] y[3.1750,3.1750] z[-3.0784,-2.8970]
+FACE 1 EDGE 138: type=LINE, length=0.050000, center=(10.7218,3.1750,-2.8729), bbox=x[10.7153,10.7282] y[3.1750,3.1750] z[-2.8970,-2.8487]
+FACE 1 EDGE 139: type=LINE, length=0.700567, center=(10.4806,3.1750,-2.6011), bbox=x[10.2329,10.7282] y[3.1750,3.1750] z[-2.8487,-2.3534]
+FACE 1 EDGE 140: type=CIRCLE, length=0.623720, center=(10.2967,3.1750,-2.0481), bbox=x[10.2329,10.3545] y[3.1750,3.1750] z[-2.3534,-1.7417]
+FACE 1 EDGE 141: type=LINE, length=0.700567, center=(10.6782,3.1750,-1.6077), bbox=x[10.3545,11.0018] y[3.1750,3.1750] z[-1.7417,-1.4736]
+FACE 1 EDGE 142: type=LINE, length=0.050000, center=(11.0050,3.1750,-1.4488), bbox=x[11.0018,11.0083] y[3.1750,3.1750] z[-1.4736,-1.4241]
+FACE 1 EDGE 143: type=LINE, length=0.700567, center=(10.7304,3.1750,-1.2108), bbox=x[10.4525,11.0083] y[3.1750,3.1750] z[-1.4241,-0.9976]
+FACE 1 EDGE 144: type=CIRCLE, length=0.623720, center=(10.4760,3.1750,-0.6866), bbox=x[10.4525,10.4933] y[3.1750,3.1750] z[-0.9976,-0.3753]
+FACE 1 EDGE 145: type=LINE, length=0.700567, center=(10.7966,3.1750,-0.2001), bbox=x[10.4933,11.1000] y[3.1750,3.1750] z[-0.3753,-0.0250]
+FACE 1 EDGE 146: type=LINE, length=0.050000, center=(11.1000,3.1750,0.0000), bbox=x[11.1000,11.1000] y[3.1750,3.1750] z[-0.0250,0.0250]
+FACE 1 EDGE 147: type=LINE, length=0.700567, center=(10.7966,3.1750,0.2001), bbox=x[10.4933,11.1000] y[3.1750,3.1750] z[0.0250,0.3753]
+FACE 1 EDGE 148: type=CIRCLE, length=0.623720, center=(10.4760,3.1750,0.6866), bbox=x[10.4525,10.4933] y[3.1750,3.1750] z[0.3753,0.9976]
+FACE 1 EDGE 149: type=LINE, length=0.700567, center=(10.7304,3.1750,1.2108), bbox=x[10.4525,11.0083] y[3.1750,3.1750] z[0.9976,1.4241]
+FACE 1 EDGE 150: type=LINE, length=0.050000, center=(11.0050,3.1750,1.4488), bbox=x[11.0018,11.0083] y[3.1750,3.1750] z[1.4241,1.4736]
+FACE 1 EDGE 151: type=LINE, length=0.700567, center=(10.6782,3.1750,1.6077), bbox=x[10.3545,11.0018] y[3.1750,3.1750] z[1.4736,1.7417]
+FACE 1 EDGE 152: type=CIRCLE, length=0.623720, center=(10.2967,3.1750,2.0481), bbox=x[10.2329,10.3545] y[3.1750,3.1750] z[1.7417,2.3534]
+FACE 1 EDGE 153: type=LINE, length=0.700567, center=(10.4806,3.1750,2.6011), bbox=x[10.2329,10.7282] y[3.1750,3.1750] z[2.3534,2.8487]
+FACE 1 EDGE 154: type=LINE, length=0.050000, center=(10.7218,3.1750,2.8729), bbox=x[10.7153,10.7282] y[3.1750,3.1750] z[2.8487,2.8970]
+FACE 1 EDGE 155: type=LINE, length=0.700567, center=(10.3770,3.1750,2.9877), bbox=x[10.0386,10.7153] y[3.1750,3.1750] z[2.8970,3.0784]
+FACE 1 EDGE 156: type=CIRCLE, length=0.623720, center=(9.9413,3.1750,3.3746), bbox=x[9.8382,10.0386] y[3.1750,3.1750] z[3.0784,3.6689]
+FACE 1 EDGE 157: type=LINE, length=0.700567, center=(10.0514,3.1750,3.9468), bbox=x[9.8382,10.2646] y[3.1750,3.1750] z[3.6689,4.2247]
+FACE 1 EDGE 158: type=LINE, length=0.050000, center=(10.2551,3.1750,4.2478), bbox=x[10.2455,10.2646] y[3.1750,3.1750] z[4.2247,4.2709]
+FACE 1 EDGE 159: type=LINE, length=0.700567, center=(9.8982,3.1750,4.3166), bbox=x[9.5509,10.2455] y[3.1750,3.1750] z[4.2709,4.3623]
+FACE 1 EDGE 160: type=CIRCLE, length=0.623720, center=(9.4158,3.1750,4.6433), bbox=x[9.2751,9.5509] y[3.1750,3.1750] z[4.3623,4.9216]
+FACE 1 EDGE 161: type=LINE, length=0.700567, center=(9.4502,3.1750,5.2250), bbox=x[9.2751,9.6254] y[3.1750,3.1750] z[4.9216,5.5283]
+FACE 1 EDGE 162: type=LINE, length=0.050000, center=(9.6129,3.1750,5.5500), bbox=x[9.6004,9.6254] y[3.1750,3.1750] z[5.5283,5.5717]
+FACE 1 EDGE 163: type=LINE, length=0.700567, center=(9.2501,3.1750,5.5717), bbox=x[8.8998,9.6004] y[3.1750,3.1750] z[5.5717,5.5717]
+FACE 1 EDGE 164: type=CIRCLE, length=0.623720, center=(8.7291,3.1750,5.8326), bbox=x[8.5533,8.8998] y[3.1750,3.1750] z[5.5717,6.0902]
+FACE 1 EDGE 165: type=LINE, length=0.700567, center=(8.6874,3.1750,6.4138), bbox=x[8.5533,8.8214] y[3.1750,3.1750] z[6.0902,6.7374]
+FACE 1 EDGE 166: type=LINE, length=0.050000, center=(8.8062,3.1750,6.7573), bbox=x[8.7910,8.8214] y[3.1750,3.1750] z[6.7374,6.7771]
+FACE 1 EDGE 167: type=LINE, length=0.700567, center=(8.4437,3.1750,6.7314), bbox=x[8.0964,8.7910] y[3.1750,3.1750] z[6.6856,6.7771]
+FACE 1 EDGE 168: type=CIRCLE, length=0.623720, center=(7.8932,3.1750,6.9221), bbox=x[7.6852,8.0964] y[3.1750,3.1750] z[6.6856,7.1545]
+FACE 1 EDGE 169: type=LINE, length=0.700567, center=(7.7759,3.1750,7.4929), bbox=x[7.6852,7.8666] y[3.1750,3.1750] z[7.1545,7.8312]
+FACE 1 EDGE 170: type=LINE, length=0.050000, center=(7.8489,3.1750,7.8489), bbox=x[7.8312,7.8666] y[3.1750,3.1750] z[7.8312,7.8666]
+FACE 1 EDGE 171: type=LINE, length=0.700567, center=(7.4929,3.1750,7.7759), bbox=x[7.1545,7.8312] y[3.1750,3.1750] z[7.6852,7.8666]
+FACE 1 EDGE 172: type=CIRCLE, length=0.623720, center=(6.9221,3.1750,7.8932), bbox=x[6.6856,7.1545] y[3.1750,3.1750] z[7.6852,8.0964]
+FACE 1 EDGE 173: type=LINE, length=0.700567, center=(6.7314,3.1750,8.4437), bbox=x[6.6856,6.7771] y[3.1750,3.1750] z[8.0964,8.7910]
+FACE 1 EDGE 174: type=LINE, length=0.050000, center=(6.7573,3.1750,8.8062), bbox=x[6.7374,6.7771] y[3.1750,3.1750] z[8.7910,8.8214]
+FACE 1 EDGE 175: type=LINE, length=0.700567, center=(6.4138,3.1750,8.6874), bbox=x[6.0902,6.7374] y[3.1750,3.1750] z[8.5533,8.8214]
+FACE 1 EDGE 176: type=CIRCLE, length=0.623720, center=(5.8326,3.1750,8.7291), bbox=x[5.5717,6.0902] y[3.1750,3.1750] z[8.5533,8.8998]
+FACE 1 EDGE 177: type=LINE, length=0.700567, center=(5.5717,3.1750,9.2501), bbox=x[5.5717,5.5717] y[3.1750,3.1750] z[8.8998,9.6004]
+FACE 1 EDGE 178: type=LINE, length=0.050000, center=(5.5500,3.1750,9.6129), bbox=x[5.5283,5.5717] y[3.1750,3.1750] z[9.6004,9.6254]
+FACE 1 EDGE 179: type=LINE, length=0.700567, center=(5.2250,3.1750,9.4502), bbox=x[4.9216,5.5283] y[3.1750,3.1750] z[9.2751,9.6254]
+FACE 1 EDGE 180: type=CIRCLE, length=0.623720, center=(4.6433,3.1750,9.4158), bbox=x[4.3623,4.9216] y[3.1750,3.1750] z[9.2751,9.5509]
+FACE 1 EDGE 181: type=LINE, length=0.700567, center=(4.3166,3.1750,9.8982), bbox=x[4.2709,4.3623] y[3.1750,3.1750] z[9.5509,10.2455]
+FACE 1 EDGE 182: type=LINE, length=0.050000, center=(4.2478,3.1750,10.2551), bbox=x[4.2247,4.2709] y[3.1750,3.1750] z[10.2455,10.2646]
+FACE 1 EDGE 183: type=LINE, length=0.700567, center=(3.9468,3.1750,10.0514), bbox=x[3.6689,4.2247] y[3.1750,3.1750] z[9.8382,10.2646]
+FACE 1 EDGE 184: type=CIRCLE, length=0.623720, center=(3.3746,3.1750,9.9413), bbox=x[3.0784,3.6689] y[3.1750,3.1750] z[9.8382,10.0386]
+FACE 1 EDGE 185: type=LINE, length=0.700567, center=(2.9877,3.1750,10.3770), bbox=x[2.8970,3.0784] y[3.1750,3.1750] z[10.0386,10.7153]
+FACE 1 EDGE 186: type=LINE, length=0.050000, center=(2.8729,3.1750,10.7218), bbox=x[2.8487,2.8970] y[3.1750,3.1750] z[10.7153,10.7282]
+FACE 1 EDGE 187: type=LINE, length=0.700567, center=(2.6011,3.1750,10.4806), bbox=x[2.3534,2.8487] y[3.1750,3.1750] z[10.2329,10.7282]
+FACE 1 EDGE 188: type=CIRCLE, length=0.623720, center=(2.0481,3.1750,10.2967), bbox=x[1.7417,2.3534] y[3.1750,3.1750] z[10.2329,10.3545]
+FACE 1 EDGE 189: type=LINE, length=0.700567, center=(1.6077,3.1750,10.6782), bbox=x[1.4736,1.7417] y[3.1750,3.1750] z[10.3545,11.0018]
+FACE 1 EDGE 190: type=LINE, length=0.050000, center=(1.4488,3.1750,11.0050), bbox=x[1.4241,1.4736] y[3.1750,3.1750] z[11.0018,11.0083]
+FACE 1 EDGE 191: type=LINE, length=0.700567, center=(1.2108,3.1750,10.7304), bbox=x[0.9976,1.4241] y[3.1750,3.1750] z[10.4525,11.0083]
+FACE 1 EDGE 192: type=CIRCLE, length=0.623720, center=(0.6866,3.1750,10.4760), bbox=x[0.3753,0.9976] y[3.1750,3.1750] z[10.4525,10.4933]
+Exported shape to: /home/adml/Research/Hackathon2026/IDETC26-Hackathon-Autodesk-neuralCAD-Edit/output/gpt-5.6-sol-ontology-full48/gpt-5.6-sol-ontology_cadquery-script_1787113969.520264/brep_end/1787113969.520264/tmp.step
+Exported STL to: /home/adml/Research/Hackathon2026/IDETC26-Hackathon-Autodesk-neuralCAD-Edit/output/gpt-5.6-sol-ontology-full48/gpt-5.6-sol-ontology_cadquery-script_1787113969.520264/brep_end/1787113969.520264/tmp.stl
+Exported PNG image to: /home/adml/Research/Hackathon2026/IDETC26-Hackathon-Autodesk-neuralCAD-Edit/output/gpt-5.6-sol-ontology-full48/gpt-5.6-sol-ontology_cadquery-script_1787113969.520264/brep_end/1787113969.520264/tmp.png
+Script completed.
+
+stderr: 
+
+Exported this iteration:
+tmp.step, tmp.stl, tmp.png, tmp_+Z.png, tmp_-Z.png, tmp_-X.png, tmp_+X.png, tmp_+Y.png, tmp_-Y.png, tmp_iso1.png, tmp_iso2.png

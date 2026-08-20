@@ -1,0 +1,2100 @@
+The planning stage produced model.json (hierarchical part → sections → features
+→ B-rep faces), aim.json (desired final state from the edit request), and
+operation.json (grounded edit operations, parameters, constraints, targets,
+and modeling plans). Use those artifacts when writing my_cad_function.
+
+Section ids look like R01. Feature ids look like F001. FACE N values are
+CadQuery Faces() indices from the STEP analysis. Bind them to actual STEP
+geometry by inspecting the loaded model (print faces and coordinates) before
+editing. If an operation needs boundary topology such as a chamfer or fillet
+edge, derive it in CadQuery from the grounded face(s).
+
+Implement each operation's modeling_plan steps. Load the start model from
+args["input_file"].
+
+model.json from the planning stage:
+
+{
+  "part": {
+    "id": "P001",
+    "name": "Pedestal-mounted hook support bracket",
+    "description": "Single-piece mechanical support bracket with an elongated mounting base, a curved upright hook/cradle region, paired elongated side slots, an upper head with a vertical boss and axial bore, and opposed lateral holes. The STEP model contains one connected solid; no separate functional components are represented.",
+    "source_views": [
+      "+Z",
+      "-Z",
+      "-X",
+      "+X",
+      "+Y",
+      "-Y",
+      "iso1"
+    ],
+    "solid_ids": [
+      "SOLID 0"
+    ],
+    "symmetry_note": "The base mounting holes form a bilateral paired arrangement. The two elongated side slots and the two lateral head holes are paired across the part thickness. The part is not globally mirror-symmetric because the curved hook opening and upright profile are directionally asymmetric.",
+    "semantic_orientation": {
+      "status": "inferred",
+      "description": "The elongated flange is interpreted as the bottom mounting base, and the boss-bearing head is the top. CAD Y increases from the mounting base toward the head. The broad faces normal to CAD Z are interpreted as front and back, while CAD X spans left to right along the base.",
+      "confidence": 0.84,
+      "view_sides": {
+        "+X": "right",
+        "-X": "left",
+        "+Y": "top",
+        "-Y": "bottom",
+        "+Z": "front",
+        "-Z": "back"
+      }
+    },
+    "sections": [
+      {
+        "id": "R01",
+        "name": "Mounting base",
+        "ontology_class": "cad:EndSection",
+        "description": "Elongated bottom flange that seats the bracket on an external structure and contains two mounting holes.",
+        "location": "At the bottom of the bracket, extending along CAD X at y=0 to 15 mm.",
+        "solid_ids": [
+          "SOLID 0"
+        ],
+        "colour": {
+          "R": 70,
+          "G": 130,
+          "B": 210
+        },
+        "section_functions": [
+          {
+            "ontology_class": "cad:MountFunction",
+            "name": "Mount bracket",
+            "description": "Provides the primary attachment region for fastening the bracket to a supporting structure.",
+            "primary": true,
+            "confidence": 0.98
+          },
+          {
+            "ontology_class": "cad:LocateFunction",
+            "name": "Locate bracket",
+            "description": "Establishes the installed position through its seating surfaces and paired fastener holes.",
+            "primary": false,
+            "confidence": 0.94
+          }
+        ],
+        "section_behaviors": [
+          {
+            "ontology_class": "cad:SpreadLoadBehavior",
+            "name": "Spread mounting load",
+            "description": "The elongated flange distributes fastener reactions over a broad mounting footprint.",
+            "confidence": 0.96
+          },
+          {
+            "ontology_class": "cad:CarryShearBehavior",
+            "name": "Carry base shear",
+            "description": "Carries transverse reaction loads between the upright and external mounting structure.",
+            "confidence": 0.91
+          }
+        ],
+        "feature_groups": [
+          {
+            "id": "G001",
+            "name": "Paired base mounting holes",
+            "ontology_class": "cad:RepeatedFeatureGroup",
+            "feature_class": "cad:ThroughHoleFeature",
+            "pattern_type": "cad:PairedPattern",
+            "member_count": 2,
+            "member_feature_ids": [
+              "F002",
+              "F003"
+            ],
+            "representative_feature_ids": [
+              "F002"
+            ],
+            "pattern_description": "Two radius-7.5 mm cylindrical holes with parallel CAD-Y axes, positioned near opposite ends of the elongated base.",
+            "confidence": 0.99
+          }
+        ],
+        "features": [
+          {
+            "id": "F001",
+            "name": "Elongated mounting flange",
+            "ontology_class": "cad:FlangeFeature",
+            "parent_feature_id": null,
+            "description": "Broad rectangular mounting flange with rounded outer corners and a planar underside and seating surface.",
+            "interface_type": "cad:MountingInterface",
+            "feature_functions": [
+              {
+                "ontology_class": "cad:MountFunction",
+                "name": "Provide mounting footprint",
+                "description": "Supports fastening and seating of the complete bracket.",
+                "primary": true,
+                "confidence": 0.99
+              }
+            ],
+            "feature_behaviors": [
+              {
+                "ontology_class": "cad:SpreadLoadBehavior",
+                "name": "Distribute mounting reactions",
+                "description": "Spreads compression and shear reactions around the two mounting holes.",
+                "confidence": 0.97
+              }
+            ],
+            "relationships": [
+              {
+                "target_feature_id": "F004",
+                "category": "cad:StructuralFeatureRelationship",
+                "relation": "cad:attachedTo",
+                "description": "The upright support is integrally attached to the mounting flange.",
+                "confidence": 0.99
+              },
+              {
+                "target_feature_id": "F002",
+                "category": "cad:StructuralFeatureRelationship",
+                "relation": "cad:surroundsFeature",
+                "description": "The flange material surrounds the first mounting hole.",
+                "confidence": 0.99
+              },
+              {
+                "target_feature_id": "F003",
+                "category": "cad:StructuralFeatureRelationship",
+                "relation": "cad:surroundsFeature",
+                "description": "The flange material surrounds the second mounting hole.",
+                "confidence": 0.99
+              }
+            ],
+            "brep_faces": [
+              {
+                "brep_id": "FACE 57",
+                "face_code": "FACE 57",
+                "entity_type": "cad:Face",
+                "geometry_type": "cad:PlanarSurface",
+                "semantic_role": "cad:MountingSeatRole",
+                "name": "Upper base seating surface",
+                "description": "Planar base surface at CAD y=15 mm surrounding the upright and mounting holes.",
+                "salience": "cad:PrimarySalience",
+                "confidence": 0.98,
+                "evidence": [
+                  "PLANE",
+                  "plane normal (0,1,0)",
+                  "bbox x=0..168 mm, z=-60..0 mm",
+                  "visual correspondence with the elongated base"
+                ]
+              },
+              {
+                "brep_id": "FACE 59",
+                "face_code": "FACE 59",
+                "entity_type": "cad:Face",
+                "geometry_type": "cad:PlanarSurface",
+                "semantic_role": "cad:MountingFaceRole",
+                "name": "Base underside",
+                "description": "Primary planar mounting face at CAD y=0 mm.",
+                "salience": "cad:PrimarySalience",
+                "confidence": 0.99,
+                "evidence": [
+                  "PLANE",
+                  "plane normal (0,-1,0)",
+                  "bbox x=0..168 mm, z=-60..0 mm",
+                  "four wires include mounting-hole openings"
+                ]
+              },
+              {
+                "brep_id": "FACE 61",
+                "face_code": "FACE 61",
+                "entity_type": "cad:Face",
+                "geometry_type": "cad:PlanarSurface",
+                "semantic_role": "cad:SideWallRole",
+                "name": "Long base edge wall",
+                "description": "Planar outer edge of the mounting flange at CAD z=-60 mm.",
+                "salience": "cad:SecondarySalience",
+                "confidence": 0.98,
+                "evidence": [
+                  "PLANE",
+                  "bbox x=9..159 mm, y=0..15 mm",
+                  "plane normal along -Z"
+                ]
+              },
+              {
+                "brep_id": "FACE 65",
+                "face_code": "FACE 65",
+                "entity_type": "cad:Face",
+                "geometry_type": "cad:PlanarSurface",
+                "semantic_role": "cad:SideWallRole",
+                "name": "Right base end wall",
+                "description": "Planar end wall at CAD x=168 mm.",
+                "salience": "cad:SecondarySalience",
+                "confidence": 0.99,
+                "evidence": [
+                  "PLANE",
+                  "plane normal (1,0,0)",
+                  "bbox y=0..15 mm"
+                ]
+              },
+              {
+                "brep_id": "FACE 66",
+                "face_code": "FACE 66",
+                "entity_type": "cad:Face",
+                "geometry_type": "cad:PlanarSurface",
+                "semantic_role": "cad:SideWallRole",
+                "name": "Left base end wall",
+                "description": "Planar end wall at CAD x=0 mm.",
+                "salience": "cad:SecondarySalience",
+                "confidence": 0.99,
+                "evidence": [
+                  "PLANE",
+                  "plane normal (-1,0,0)",
+                  "bbox y=0..15 mm"
+                ]
+              },
+              {
+                "brep_id": "FACE 58",
+                "face_code": "FACE 58",
+                "entity_type": "cad:Face",
+                "geometry_type": "cad:CylindricalSurface",
+                "semantic_role": "cad:OuterWallRole",
+                "name": "Rounded base corner 1",
+                "description": "Radius-9 mm rounded outer corner of the flange.",
+                "salience": "cad:SecondarySalience",
+                "confidence": 0.98,
+                "evidence": [
+                  "CYLINDER",
+                  "radius 9 mm",
+                  "axis parallel to CAD Y"
+                ]
+              },
+              {
+                "brep_id": "FACE 60",
+                "face_code": "FACE 60",
+                "entity_type": "cad:Face",
+                "geometry_type": "cad:CylindricalSurface",
+                "semantic_role": "cad:OuterWallRole",
+                "name": "Rounded base corner 2",
+                "description": "Radius-9 mm rounded outer corner of the flange.",
+                "salience": "cad:SecondarySalience",
+                "confidence": 0.98,
+                "evidence": [
+                  "CYLINDER",
+                  "radius 9 mm",
+                  "axis parallel to CAD Y"
+                ]
+              },
+              {
+                "brep_id": "FACE 62",
+                "face_code": "FACE 62",
+                "entity_type": "cad:Face",
+                "geometry_type": "cad:CylindricalSurface",
+                "semantic_role": "cad:OuterWallRole",
+                "name": "Rounded base corner 3",
+                "description": "Radius-9 mm rounded outer corner of the flange.",
+                "salience": "cad:SecondarySalience",
+                "confidence": 0.98,
+                "evidence": [
+                  "CYLINDER",
+                  "radius 9 mm",
+                  "axis parallel to CAD Y"
+                ]
+              },
+              {
+                "brep_id": "FACE 63",
+                "face_code": "FACE 63",
+                "entity_type": "cad:Face",
+                "geometry_type": "cad:CylindricalSurface",
+                "semantic_role": "cad:OuterWallRole",
+                "name": "Rounded base corner 4",
+                "description": "Radius-9 mm rounded outer corner of the flange.",
+                "salience": "cad:SecondarySalience",
+                "confidence": 0.98,
+                "evidence": [
+                  "CYLINDER",
+                  "radius 9 mm",
+                  "axis parallel to CAD Y"
+                ]
+              }
+            ],
+            "confidence": 0.99
+          },
+          {
+            "id": "F002",
+            "name": "Left base mounting hole",
+            "ontology_class": "cad:ThroughHoleFeature",
+            "parent_feature_id": null,
+            "description": "Through hole near one end of the base, centered at CAD x=15 mm and z=-30 mm.",
+            "interface_type": "cad:MountingInterface",
+            "feature_functions": [
+              {
+                "ontology_class": "cad:FasteningFunction",
+                "name": "Receive mounting fastener",
+                "description": "Provides passage and radial location for a mounting fastener.",
+                "primary": true,
+                "confidence": 0.99
+              }
+            ],
+            "feature_behaviors": [
+              {
+                "ontology_class": "cad:CarryShearBehavior",
+                "name": "React fastener shear",
+                "description": "The cylindrical bore wall can react transverse fastener load.",
+                "confidence": 0.95
+              }
+            ],
+            "relationships": [
+              {
+                "target_feature_id": "F003",
+                "category": "cad:GeometricFeatureRelationship",
+                "relation": "cad:parallelTo",
+                "description": "The two mounting-hole axes are parallel.",
+                "confidence": 1.0
+              },
+              {
+                "target_feature_id": "F003",
+                "category": "cad:GeometricFeatureRelationship",
+                "relation": "cad:offsetFrom",
+                "description": "The paired holes are separated along CAD X.",
+                "confidence": 1.0
+              }
+            ],
+            "brep_faces": [
+              {
+                "brep_id": "FACE 1",
+                "face_code": "FACE 1",
+                "entity_type": "cad:Face",
+                "geometry_type": "cad:CylindricalSurface",
+                "semantic_role": "cad:BoreWallRole",
+                "name": "Left mounting-hole bore wall",
+                "description": "Radius-7.5 mm cylindrical through-hole wall extending through the 15 mm base thickness.",
+                "salience": "cad:PrimarySalience",
+                "confidence": 1.0,
+                "evidence": [
+                  "CYLINDER",
+                  "radius 7.5 mm",
+                  "axis (0,-1,0)",
+                  "bbox y=0..15 mm",
+                  "center (15,7.5,-30) mm"
+                ]
+              }
+            ],
+            "confidence": 0.99
+          },
+          {
+            "id": "F003",
+            "name": "Right base mounting hole",
+            "ontology_class": "cad:ThroughHoleFeature",
+            "parent_feature_id": null,
+            "description": "Through hole near the opposite end of the base, centered at CAD x=153 mm and z=-30 mm.",
+            "interface_type": "cad:MountingInterface",
+            "feature_functions": [
+              {
+                "ontology_class": "cad:FasteningFunction",
+                "name": "Receive mounting fastener",
+                "description": "Provides passage and radial location for a second mounting fastener.",
+                "primary": true,
+                "confidence": 0.99
+              }
+            ],
+            "feature_behaviors": [
+              {
+                "ontology_class": "cad:CarryShearBehavior",
+                "name": "React fastener shear",
+                "description": "The cylindrical bore wall can react transverse fastener load.",
+                "confidence": 0.95
+              }
+            ],
+            "relationships": [
+              {
+                "target_feature_id": "F002",
+                "category": "cad:GeometricFeatureRelationship",
+                "relation": "cad:parallelTo",
+                "description": "The two mounting-hole axes are parallel.",
+                "confidence": 1.0
+              }
+            ],
+            "brep_faces": [
+              {
+                "brep_id": "FACE 0",
+                "face_code": "FACE 0",
+                "entity_type": "cad:Face",
+                "geometry_type": "cad:CylindricalSurface",
+                "semantic_role": "cad:BoreWallRole",
+                "name": "Right mounting-hole bore wall",
+                "description": "Radius-7.5 mm cylindrical through-hole wall extending through the 15 mm base thickness.",
+                "salience": "cad:PrimarySalience",
+                "confidence": 1.0,
+                "evidence": [
+                  "CYLINDER",
+                  "radius 7.5 mm",
+                  "axis (0,-1,0)",
+                  "bbox y=0..15 mm",
+                  "center (153,7.5,-30) mm"
+                ]
+              }
+            ],
+            "confidence": 0.99
+          }
+        ],
+        "unclassified_brep_faces": [],
+        "relationships": [
+          {
+            "target_section_id": "R02",
+            "category": "cad:StructuralFeatureRelationship",
+            "relation": "cad:attachedTo",
+            "description": "The upright support is integrally joined to the mounting base.",
+            "confidence": 0.99
+          }
+        ],
+        "confidence": 0.99
+      },
+      {
+        "id": "R02",
+        "name": "Curved upright and cradle",
+        "ontology_class": "cad:MainBodySection",
+        "description": "Load-bearing upright rising from the mounting base. It includes a large open hook-like clearance region and paired elongated side slots.",
+        "location": "Between the mounting flange and upper head, principally within CAD y=15 to 156 mm.",
+        "solid_ids": [
+          "SOLID 0"
+        ],
+        "colour": {
+          "R": 220,
+          "G": 135,
+          "B": 55
+        },
+        "section_functions": [
+          {
+            "ontology_class": "cad:SupportFunction",
+            "name": "Support upper head",
+            "description": "Carries loads between the upper interface head and the mounting base.",
+            "primary": true,
+            "confidence": 0.98
+          },
+          {
+            "ontology_class": "cad:ProvideClearanceFunction",
+            "name": "Provide central clearance",
+            "description": "The hook-shaped opening permits clearance for an external member or mechanism.",
+            "primary": false,
+            "confidence": 0.86
+          }
+        ],
+        "section_behaviors": [
+          {
+            "ontology_class": "cad:ResistBendingBehavior",
+            "name": "Resist upright bending",
+            "description": "The curved web reacts the bending moment generated between the upper head and base.",
+            "confidence": 0.98
+          },
+          {
+            "ontology_class": "cad:CarryShearBehavior",
+            "name": "Carry vertical and transverse shear",
+            "description": "The web transfers shear through the curved load path into the base.",
+            "confidence": 0.96
+          }
+        ],
+        "feature_groups": [
+          {
+            "id": "G002",
+            "name": "Paired elongated side slots",
+            "ontology_class": "cad:RepeatedFeatureGroup",
+            "feature_class": "cad:ElongatedSlotFeature",
+            "pattern_type": "cad:PairedPattern",
+            "member_count": 2,
+            "member_feature_ids": [
+              "F006",
+              "F007"
+            ],
+            "representative_feature_ids": [
+              "F006"
+            ],
+            "pattern_description": "Two aligned elongated slots are formed in the front and back side-wall portions. Their corresponding planar and radius-9 mm end faces are offset along CAD Z.",
+            "confidence": 0.96
+          }
+        ],
+        "features": [
+          {
+            "id": "F004",
+            "name": "Curved load-bearing support web",
+            "ontology_class": "cad:WebFeature",
+            "parent_feature_id": null,
+            "description": "Thick curved structural web connecting the base to the upper head around the central opening.",
+            "interface_type": null,
+            "feature_functions": [
+              {
+                "ontology_class": "cad:TransferLoadFunction",
+                "name": "Transfer head load to base",
+                "description": "Provides the principal structural load path from the upper head to the mounting flange.",
+                "primary": true,
+                "confidence": 0.99
+              }
+            ],
+            "feature_behaviors": [
+              {
+                "ontology_class": "cad:ResistBendingBehavior",
+                "name": "Resist bending",
+                "description": "Its depth and curved profile resist bending around the open cradle region.",
+                "confidence": 0.98
+              },
+              {
+                "ontology_class": "cad:CarryShearBehavior",
+                "name": "Carry shear",
+                "description": "Transfers shear through the upright into the mounting base.",
+                "confidence": 0.97
+              }
+            ],
+            "relationships": [
+              {
+                "target_feature_id": "F001",
+                "category": "cad:FunctionalFeatureRelationship",
+                "relation": "cad:transmitsLoadTo",
+                "description": "Transmits upper-interface loads into the mounting flange.",
+                "confidence": 0.98
+              },
+              {
+                "target_feature_id": "F008",
+                "category": "cad:StructuralFeatureRelationship",
+                "relation": "cad:supportsFeature",
+                "description": "Structurally supports the upper head block.",
+                "confidence": 0.99
+              },
+              {
+                "target_feature_id": "F005",
+                "category": "cad:StructuralFeatureRelationship",
+                "relation": "cad:surroundsFeature",
+                "description": "The curved web forms the material boundary around the open cradle clearance.",
+                "confidence": 0.93
+              }
+            ],
+            "brep_faces": [
+              {
+                "brep_id": "FACE 28",
+                "face_code": "FACE 28",
+                "entity_type": "cad:Face",
+                "geometry_type": "cad:PlanarSurface",
+                "semantic_role": "cad:SideWallRole",
+                "name": "Front broad support face",
+                "description": "Large planar broad face at CAD z=0 mm spanning the base and upright profile.",
+                "salience": "cad:PrimarySalience",
+                "confidence": 0.97,
+                "evidence": [
+                  "PLANE",
+                  "plane normal (0,0,1)",
+                  "area 10067.168298 mm^2",
+                  "bbox x=9..159 mm, y=0..156 mm"
+                ]
+              },
+              {
+                "brep_id": "FACE 52",
+                "face_code": "FACE 52",
+                "entity_type": "cad:Face",
+                "geometry_type": "cad:PlanarSurface",
+                "semantic_role": "cad:SideWallRole",
+                "name": "Back broad support face",
+                "description": "Large opposing planar broad face at CAD z=-42 mm.",
+                "salience": "cad:PrimarySalience",
+                "confidence": 0.97,
+                "evidence": [
+                  "PLANE",
+                  "plane normal (0,0,-1)",
+                  "area 7817.168298 mm^2",
+                  "bbox x=28.5..134.5 mm, y=15..156 mm"
+                ]
+              },
+              {
+                "brep_id": "FACE 45",
+                "face_code": "FACE 45",
+                "entity_type": "cad:Face",
+                "geometry_type": "cad:CylindricalSurface",
+                "semantic_role": "cad:OuterWallRole",
+                "name": "Main curved outer wall",
+                "description": "Radius-51 mm cylindrical surface forming the principal outer arch of the upright.",
+                "salience": "cad:PrimarySalience",
+                "confidence": 0.98,
+                "evidence": [
+                  "CYLINDER",
+                  "radius 51 mm",
+                  "axis parallel to CAD Z",
+                  "bbox y=69.278029..103.164861 mm"
+                ]
+              },
+              {
+                "brep_id": "FACE 46",
+                "face_code": "FACE 46",
+                "entity_type": "cad:Face",
+                "geometry_type": "cad:CylindricalSurface",
+                "semantic_role": "cad:TransitionSurfaceRole",
+                "name": "Upper web transition",
+                "description": "Radius-9 mm cylindrical transition between the curved upright and upper body.",
+                "salience": "cad:SecondarySalience",
+                "confidence": 0.91,
+                "evidence": [
+                  "CYLINDER",
+                  "radius 9 mm",
+                  "axis parallel to CAD Z",
+                  "bbox y=103.164861..111.311601 mm"
+                ]
+              }
+            ],
+            "confidence": 0.97
+          },
+          {
+            "id": "F005",
+            "name": "Open hook and cradle clearance",
+            "ontology_class": "cad:CradleFeature",
+            "parent_feature_id": null,
+            "description": "Large side-open, hook-shaped clearance bounded by multiple cylindrical and planar wall segments.",
+            "interface_type": "cad:ContactInterface",
+            "feature_functions": [
+              {
+                "ontology_class": "cad:ProvideClearanceFunction",
+                "name": "Provide mechanism clearance",
+                "description": "Accommodates an external member within the open curved region.",
+                "primary": true,
+                "confidence": 0.87
+              },
+              {
+                "ontology_class": "cad:SupportFunction",
+                "name": "Provide cradle support",
+                "description": "Curved boundary surfaces may support or capture an external member.",
+                "primary": false,
+                "confidence": 0.72
+              }
+            ],
+            "feature_behaviors": [
+              {
+                "ontology_class": "cad:ReactContactLoadBehavior",
+                "name": "React contact load",
+                "description": "The curved inner walls can react localized contact from an inserted member.",
+                "confidence": 0.76
+              },
+              {
+                "ontology_class": "cad:PermitTranslationBehavior",
+                "name": "Permit insertion",
+                "description": "The open side permits translation of a member into and out of the cradle.",
+                "confidence": 0.82
+              }
+            ],
+            "relationships": [
+              {
+                "target_feature_id": "F004",
+                "category": "cad:GeometricFeatureRelationship",
+                "relation": "cad:insideFeature",
+                "description": "The open clearance lies within the envelope of the curved support web.",
+                "confidence": 0.94
+              }
+            ],
+            "brep_faces": [
+              {
+                "brep_id": "FACE 41",
+                "face_code": "FACE 41",
+                "entity_type": "cad:Face",
+                "geometry_type": "cad:CylindricalSurface",
+                "semantic_role": "cad:CavityWallRole",
+                "name": "Rear lower cradle radius",
+                "description": "Partial radius-9 mm cylindrical boundary on the rear side-wall portion.",
+                "salience": "cad:RepresentativeSalience",
+                "confidence": 0.86,
+                "evidence": [
+                  "CYLINDER",
+                  "radius 9 mm",
+                  "bbox z=-42..-30 mm",
+                  "visual correspondence with open hook boundary"
+                ]
+              },
+              {
+                "brep_id": "FACE 42",
+                "face_code": "FACE 42",
+                "entity_type": "cad:Face",
+                "geometry_type": "cad:CylindricalSurface",
+                "semantic_role": "cad:CavityWallRole",
+                "name": "Front lower cradle radius",
+                "description": "Corresponding radius-9 mm cylindrical boundary on the front side-wall portion.",
+                "salience": "cad:RepresentativeSalience",
+                "confidence": 0.86,
+                "evidence": [
+                  "CYLINDER",
+                  "radius 9 mm",
+                  "bbox z=-12..0 mm",
+                  "paired geometry with FACE 41"
+                ]
+              },
+              {
+                "brep_id": "FACE 43",
+                "face_code": "FACE 43",
+                "entity_type": "cad:Face",
+                "geometry_type": "cad:PlanarSurface",
+                "semantic_role": "cad:CavityWallRole",
+                "name": "Rear inclined cradle wall",
+                "description": "Inclined planar wall segment bounding the rear portion of the open cradle.",
+                "salience": "cad:SecondarySalience",
+                "confidence": 0.86,
+                "evidence": [
+                  "PLANE",
+                  "bbox z=-42..-30 mm",
+                  "normal approximately (0.581,0.814,0)"
+                ]
+              },
+              {
+                "brep_id": "FACE 44",
+                "face_code": "FACE 44",
+                "entity_type": "cad:Face",
+                "geometry_type": "cad:PlanarSurface",
+                "semantic_role": "cad:CavityWallRole",
+                "name": "Front inclined cradle wall",
+                "description": "Paired inclined planar wall segment on the front portion of the cradle.",
+                "salience": "cad:SecondarySalience",
+                "confidence": 0.86,
+                "evidence": [
+                  "PLANE",
+                  "bbox z=-12..0 mm",
+                  "paired geometry with FACE 43"
+                ]
+              },
+              {
+                "brep_id": "FACE 47",
+                "face_code": "FACE 47",
+                "entity_type": "cad:Face",
+                "geometry_type": "cad:PlanarSurface",
+                "semantic_role": "cad:CavityWallRole",
+                "name": "Inclined inner hook wall",
+                "description": "Full-thickness inclined planar segment of the hook opening.",
+                "salience": "cad:PrimarySalience",
+                "confidence": 0.93,
+                "evidence": [
+                  "PLANE",
+                  "bbox z=-42..0 mm",
+                  "area 517.864472 mm^2",
+                  "normal approximately (-0.616,0.788,0)"
+                ]
+              },
+              {
+                "brep_id": "FACE 48",
+                "face_code": "FACE 48",
+                "entity_type": "cad:Face",
+                "geometry_type": "cad:CylindricalSurface",
+                "semantic_role": "cad:CavityWallRole",
+                "name": "Inner hook transition radius",
+                "description": "Radius-15 mm cylindrical transition in the hook opening.",
+                "salience": "cad:PrimarySalience",
+                "confidence": 0.94,
+                "evidence": [
+                  "CYLINDER",
+                  "radius 15 mm",
+                  "axis parallel to CAD Z",
+                  "bbox z=-42..0 mm"
+                ]
+              },
+              {
+                "brep_id": "FACE 49",
+                "face_code": "FACE 49",
+                "entity_type": "cad:Face",
+                "geometry_type": "cad:CylindricalSurface",
+                "semantic_role": "cad:CavityWallRole",
+                "name": "Main concave cradle wall",
+                "description": "Radius-27 mm cylindrical inner wall forming the principal concave cradle surface.",
+                "salience": "cad:PrimarySalience",
+                "confidence": 0.97,
+                "evidence": [
+                  "CYLINDER",
+                  "radius 27 mm",
+                  "axis parallel to CAD Z",
+                  "bbox x=69..96 mm, y=57..84 mm, z=-42..0 mm"
+                ]
+              },
+              {
+                "brep_id": "FACE 50",
+                "face_code": "FACE 50",
+                "entity_type": "cad:Face",
+                "geometry_type": "cad:CylindricalSurface",
+                "semantic_role": "cad:CavityWallRole",
+                "name": "Cradle mouth radius",
+                "description": "Radius-approximately-9 mm cylindrical surface rounding the mouth of the open cradle.",
+                "salience": "cad:PrimarySalience",
+                "confidence": 0.93,
+                "evidence": [
+                  "CYLINDER",
+                  "radius 9.000002 mm",
+                  "axis parallel to CAD Z",
+                  "bbox x=37.499998..46.5 mm"
+                ]
+              },
+              {
+                "brep_id": "FACE 51",
+                "face_code": "FACE 51",
+                "entity_type": "cad:Face",
+                "geometry_type": "cad:PlanarSurface",
+                "semantic_role": "cad:CavityWallRole",
+                "name": "Cradle mouth planar wall",
+                "description": "Planar full-thickness wall segment at the open mouth of the cradle.",
+                "salience": "cad:PrimarySalience",
+                "confidence": 0.92,
+                "evidence": [
+                  "PLANE",
+                  "plane y=45 mm",
+                  "bbox z=-42..0 mm"
+                ]
+              }
+            ],
+            "confidence": 0.89
+          },
+          {
+            "id": "F006",
+            "name": "Rear elongated side slot",
+            "ontology_class": "cad:ElongatedSlotFeature",
+            "parent_feature_id": null,
+            "description": "Rounded-end elongated slot passing through the rear side-wall thickness from CAD z=-42 to -32 mm.",
+            "interface_type": "cad:PinInterface",
+            "feature_functions": [
+              {
+                "ontology_class": "cad:GuideFunction",
+                "name": "Guide sliding pin",
+                "description": "Provides a guided elongated path for a pin or similar member.",
+                "primary": true,
+                "confidence": 0.88
+              }
+            ],
+            "feature_behaviors": [
+              {
+                "ontology_class": "cad:PermitTranslationBehavior",
+                "name": "Permit guided translation",
+                "description": "The elongated profile permits translation along the slot while constraining transverse movement.",
+                "confidence": 0.92
+              }
+            ],
+            "relationships": [
+              {
+                "target_feature_id": "F007",
+                "category": "cad:GeometricFeatureRelationship",
+                "relation": "cad:alignedWith",
+                "description": "The rear and front slots have aligned profiles.",
+                "confidence": 0.99
+              },
+              {
+                "target_feature_id": "F007",
+                "category": "cad:GeometricFeatureRelationship",
+                "relation": "cad:offsetFrom",
+                "description": "The slots are separated along CAD Z by the central thickness region.",
+                "confidence": 0.99
+              }
+            ],
+            "brep_faces": [
+              {
+                "brep_id": "FACE 14",
+                "face_code": "FACE 14",
+                "entity_type": "cad:Face",
+                "geometry_type": "cad:PlanarSurface",
+                "semantic_role": "cad:CavityWallRole",
+                "name": "Rear slot side wall 1",
+                "description": "Planar longitudinal side wall of the rear elongated slot.",
+                "salience": "cad:PrimarySalience",
+                "confidence": 0.98,
+                "evidence": [
+                  "PLANE",
+                  "x=122 mm",
+                  "bbox y=40.001372..70 mm, z=-42..-32 mm"
+                ]
+              },
+              {
+                "brep_id": "FACE 15",
+                "face_code": "FACE 15",
+                "entity_type": "cad:Face",
+                "geometry_type": "cad:CylindricalSurface",
+                "semantic_role": "cad:CavityWallRole",
+                "name": "Rear slot lower rounded end",
+                "description": "Radius-9 mm cylindrical lower end wall of the rear slot.",
+                "salience": "cad:PrimarySalience",
+                "confidence": 0.99,
+                "evidence": [
+                  "CYLINDER",
+                  "radius 9 mm",
+                  "axis parallel to CAD Z",
+                  "bbox z=-42..-32 mm"
+                ]
+              },
+              {
+                "brep_id": "FACE 16",
+                "face_code": "FACE 16",
+                "entity_type": "cad:Face",
+                "geometry_type": "cad:PlanarSurface",
+                "semantic_role": "cad:CavityWallRole",
+                "name": "Rear slot side wall 2",
+                "description": "Opposing planar longitudinal side wall of the rear elongated slot.",
+                "salience": "cad:PrimarySalience",
+                "confidence": 0.99,
+                "evidence": [
+                  "PLANE",
+                  "x=104 mm",
+                  "bbox y=40..70 mm, z=-42..-32 mm"
+                ]
+              },
+              {
+                "brep_id": "FACE 17",
+                "face_code": "FACE 17",
+                "entity_type": "cad:Face",
+                "geometry_type": "cad:CylindricalSurface",
+                "semantic_role": "cad:CavityWallRole",
+                "name": "Rear slot upper rounded end",
+                "description": "Radius-9 mm cylindrical upper end wall of the rear slot.",
+                "salience": "cad:PrimarySalience",
+                "confidence": 0.99,
+                "evidence": [
+                  "CYLINDER",
+                  "radius 9 mm",
+                  "axis parallel to CAD Z",
+                  "bbox y=70..79 mm"
+                ]
+              },
+              {
+                "brep_id": "FACE 18",
+                "face_code": "FACE 18",
+                "entity_type": "cad:Face",
+                "geometry_type": "cad:PlanarSurface",
+                "semantic_role": "cad:InterfaceFaceRole",
+                "name": "Rear slot opening face",
+                "description": "Planar annular/profile face surrounding the rear slot opening at CAD z=-32 mm.",
+                "salience": "cad:SecondarySalience",
+                "confidence": 0.93,
+                "evidence": [
+                  "PLANE",
+                  "z=-32 mm",
+                  "slot-shaped bbox x=104..122 mm, y=31..79 mm"
+                ]
+              }
+            ],
+            "confidence": 0.96
+          },
+          {
+            "id": "F007",
+            "name": "Front elongated side slot",
+            "ontology_class": "cad:ElongatedSlotFeature",
+            "parent_feature_id": null,
+            "description": "Rounded-end elongated slot passing through the front side-wall thickness from CAD z=-10 to 0 mm.",
+            "interface_type": "cad:PinInterface",
+            "feature_functions": [
+              {
+                "ontology_class": "cad:GuideFunction",
+                "name": "Guide sliding pin",
+                "description": "Works with the aligned rear slot to guide a transverse pin.",
+                "primary": true,
+                "confidence": 0.88
+              }
+            ],
+            "feature_behaviors": [
+              {
+                "ontology_class": "cad:PermitTranslationBehavior",
+                "name": "Permit guided translation",
+                "description": "Permits motion along the elongated axis while constraining transverse pin displacement.",
+                "confidence": 0.92
+              }
+            ],
+            "relationships": [
+              {
+                "target_feature_id": "F006",
+                "category": "cad:GeometricFeatureRelationship",
+                "relation": "cad:alignedWith",
+                "description": "The front slot is aligned with the rear slot.",
+                "confidence": 0.99
+              }
+            ],
+            "brep_faces": [
+              {
+                "brep_id": "FACE 19",
+                "face_code": "FACE 19",
+                "entity_type": "cad:Face",
+                "geometry_type": "cad:PlanarSurface",
+                "semantic_role": "cad:CavityWallRole",
+                "name": "Front slot side wall 1",
+                "description": "Planar longitudinal side wall of the front elongated slot.",
+                "salience": "cad:PrimarySalience",
+                "confidence": 0.98,
+                "evidence": [
+                  "PLANE",
+                  "x=122 mm",
+                  "bbox z=-10..0 mm"
+                ]
+              },
+              {
+                "brep_id": "FACE 20",
+                "face_code": "FACE 20",
+                "entity_type": "cad:Face",
+                "geometry_type": "cad:CylindricalSurface",
+                "semantic_role": "cad:CavityWallRole",
+                "name": "Front slot upper rounded end",
+                "description": "Radius-9 mm cylindrical upper end wall of the front slot.",
+                "salience": "cad:PrimarySalience",
+                "confidence": 0.99,
+                "evidence": [
+                  "CYLINDER",
+                  "radius 9 mm",
+                  "bbox y=70..79 mm, z=-10..0 mm"
+                ]
+              },
+              {
+                "brep_id": "FACE 21",
+                "face_code": "FACE 21",
+                "entity_type": "cad:Face",
+                "geometry_type": "cad:PlanarSurface",
+                "semantic_role": "cad:CavityWallRole",
+                "name": "Front slot side wall 2",
+                "description": "Opposing planar longitudinal side wall of the front elongated slot.",
+                "salience": "cad:PrimarySalience",
+                "confidence": 0.99,
+                "evidence": [
+                  "PLANE",
+                  "x=104 mm",
+                  "bbox y=40..70 mm, z=-10..0 mm"
+                ]
+              },
+              {
+                "brep_id": "FACE 22",
+                "face_code": "FACE 22",
+                "entity_type": "cad:Face",
+                "geometry_type": "cad:CylindricalSurface",
+                "semantic_role": "cad:CavityWallRole",
+                "name": "Front slot lower rounded end",
+                "description": "Radius-9 mm cylindrical lower end wall of the front slot.",
+                "salience": "cad:PrimarySalience",
+                "confidence": 0.99,
+                "evidence": [
+                  "CYLINDER",
+                  "radius 9 mm",
+                  "bbox y=31..40.001372 mm, z=-10..0 mm"
+                ]
+              },
+              {
+                "brep_id": "FACE 23",
+                "face_code": "FACE 23",
+                "entity_type": "cad:Face",
+                "geometry_type": "cad:PlanarSurface",
+                "semantic_role": "cad:InterfaceFaceRole",
+                "name": "Front slot opening face",
+                "description": "Planar profile face surrounding the front slot opening at CAD z=-10 mm.",
+                "salience": "cad:SecondarySalience",
+                "confidence": 0.93,
+                "evidence": [
+                  "PLANE",
+                  "z=-10 mm",
+                  "slot-shaped bbox x=104..122 mm, y=31..79 mm"
+                ]
+              }
+            ],
+            "confidence": 0.96
+          }
+        ],
+        "unclassified_brep_faces": [
+          {
+            "brep_ids": [
+              "FACE 31",
+              "FACE 32",
+              "FACE 33",
+              "FACE 34",
+              "FACE 35",
+              "FACE 36",
+              "FACE 37",
+              "FACE 38",
+              "FACE 39",
+              "FACE 40",
+              "FACE 53",
+              "FACE 54",
+              "FACE 55",
+              "FACE 56",
+              "FACE 64"
+            ],
+            "salience": "cad:SecondarySalience",
+            "description": "Planar side-wall, stepped-thickness, outer-wall, and blend surfaces belonging to the upright support and its transitions into the base and head. These faces are section-grounded but not assigned to a more specific feature because their boundaries participate in several merged structural regions.",
+            "confidence": 0.87
+          }
+        ],
+        "relationships": [
+          {
+            "target_section_id": "R01",
+            "category": "cad:FunctionalFeatureRelationship",
+            "relation": "cad:transmitsLoadTo",
+            "description": "The upright transmits head and cradle loads into the mounting base.",
+            "confidence": 0.98
+          },
+          {
+            "target_section_id": "R03",
+            "category": "cad:StructuralFeatureRelationship",
+            "relation": "cad:supportsFeature",
+            "description": "The upright supports the upper head and boss region.",
+            "confidence": 0.99
+          }
+        ],
+        "confidence": 0.95
+      },
+      {
+        "id": "R03",
+        "name": "Upper interface head",
+        "ontology_class": "cad:EndSection",
+        "description": "Upper block and boss region containing the axial bore, boss shoulder transitions, and two opposed lateral holes.",
+        "location": "At the upper end of the upright, centered around CAD x=67.5 mm and extending to y=180 mm.",
+        "solid_ids": [
+          "SOLID 0"
+        ],
+        "colour": {
+          "R": 80,
+          "G": 180,
+          "B": 105
+        },
+        "section_functions": [
+          {
+            "ontology_class": "cad:ConnectFunction",
+            "name": "Connect external member",
+            "description": "Provides axial and lateral interfaces for attaching or locating an external component.",
+            "primary": true,
+            "confidence": 0.92
+          },
+          {
+            "ontology_class": "cad:TransferLoadFunction",
+            "name": "Transfer interface load",
+            "description": "Transfers loads from the boss and lateral holes into the upright.",
+            "primary": false,
+            "confidence": 0.96
+          }
+        ],
+        "section_behaviors": [
+          {
+            "ontology_class": "cad:ReactBearingLoadBehavior",
+            "name": "React bore and pin bearing loads",
+            "description": "Cylindrical interface walls react radial loads from inserted shafts, fasteners, or pins.",
+            "confidence": 0.92
+          },
+          {
+            "ontology_class": "cad:DistributeStressBehavior",
+            "name": "Distribute boss stress",
+            "description": "The enlarged head and blended boss shoulder spread concentrated interface loads into the upright.",
+            "confidence": 0.95
+          }
+        ],
+        "feature_groups": [
+          {
+            "id": "G003",
+            "name": "Opposed lateral head holes",
+            "ontology_class": "cad:RepeatedFeatureGroup",
+            "feature_class": "cad:BlindHoleFeature",
+            "pattern_type": "cad:PairedPattern",
+            "member_count": 2,
+            "member_feature_ids": [
+              "F014",
+              "F015"
+            ],
+            "representative_feature_ids": [
+              "F014"
+            ],
+            "pattern_description": "Two radius-3 mm coaxial cylindrical hole segments enter the head from opposite CAD-X sides at y=137 mm and z=-21 mm.",
+            "confidence": 0.93
+          }
+        ],
+        "features": [
+          {
+            "id": "F008",
+            "name": "Upper head block",
+            "ontology_class": "cad:SupportFeature",
+            "parent_feature_id": null,
+            "description": "Enlarged upper structural block supporting the axial boss and lateral holes.",
+            "interface_type": null,
+            "feature_functions": [
+              {
+                "ontology_class": "cad:SupportFunction",
+                "name": "Support interface boss",
+                "description": "Provides material and stiffness around the boss and lateral holes.",
+                "primary": true,
+                "confidence": 0.98
+              }
+            ],
+            "feature_behaviors": [
+              {
+                "ontology_class": "cad:DistributeStressBehavior",
+                "name": "Spread concentrated interface load",
+                "description": "Distributes loads from the boss and lateral holes into the curved upright.",
+                "confidence": 0.96
+              }
+            ],
+            "relationships": [
+              {
+                "target_feature_id": "F009",
+                "category": "cad:StructuralFeatureRelationship",
+                "relation": "cad:supportsFeature",
+                "description": "The head block supports the raised boss.",
+                "confidence": 0.99
+              },
+              {
+                "target_feature_id": "F004",
+                "category": "cad:StructuralFeatureRelationship",
+                "relation": "cad:attachedTo",
+                "description": "The head block is integrally attached to the upright web.",
+                "confidence": 0.99
+              }
+            ],
+            "brep_faces": [],
+            "confidence": 0.96
+          },
+          {
+            "id": "F009",
+            "name": "Raised cylindrical boss",
+            "ontology_class": "cad:BossFeature",
+            "parent_feature_id": "F008",
+            "description": "Raised radius-12 mm cylindrical boss centered at CAD x=67.5 mm, z=-21 mm and aligned with CAD Y.",
+            "interface_type": "cad:ShaftInterface",
+            "feature_functions": [
+              {
+                "ontology_class": "cad:ConnectFunction",
+                "name": "Provide axial connection boss",
+                "description": "Provides an elevated annular interface around the axial bore.",
+                "primary": true,
+                "confidence": 0.95
+              }
+            ],
+            "feature_behaviors": [
+              {
+                "ontology_class": "cad:ReactBearingLoadBehavior",
+                "name": "React radial interface load",
+                "description": "The boss supplies radial wall thickness around the axial bore.",
+                "confidence": 0.94
+              }
+            ],
+            "relationships": [
+              {
+                "target_feature_id": "F010",
+                "category": "cad:GeometricFeatureRelationship",
+                "relation": "cad:surroundsFeature",
+                "description": "The boss surrounds the axial bore.",
+                "confidence": 1.0
+              },
+              {
+                "target_feature_id": "F010",
+                "category": "cad:GeometricFeatureRelationship",
+                "relation": "cad:coaxialWith",
+                "description": "The boss and axial bore share the CAD-Y axis through x=67.5 mm and z=-21 mm.",
+                "confidence": 1.0
+              }
+            ],
+            "brep_faces": [
+              {
+                "brep_id": "FACE 5",
+                "face_code": "FACE 5",
+                "entity_type": "cad:Face",
+                "geometry_type": "cad:CylindricalSurface",
+                "semantic_role": "cad:OuterWallRole",
+                "name": "Boss outer cylindrical wall",
+                "description": "Radius-12 mm outer boss wall extending toward the top end.",
+                "salience": "cad:PrimarySalience",
+                "confidence": 0.99,
+                "evidence": [
+                  "CYLINDER",
+                  "radius 12 mm",
+                  "axis (0,1,0)",
+                  "center near (67.5,171.5,-21) mm"
+                ]
+              },
+              {
+                "brep_id": "FACE 6",
+                "face_code": "FACE 6",
+                "entity_type": "cad:Face",
+                "geometry_type": "cad:PlanarSurface",
+                "semantic_role": "cad:SeatingFaceRole",
+                "name": "Boss end annulus",
+                "description": "Planar annular end face of the boss at CAD y=180 mm.",
+                "salience": "cad:PrimarySalience",
+                "confidence": 0.99,
+                "evidence": [
+                  "PLANE",
+                  "plane normal (0,1,0)",
+                  "two wires",
+                  "bbox x=58.5..76.5 mm, z=-30..-12 mm"
+                ]
+              }
+            ],
+            "confidence": 0.98
+          },
+          {
+            "id": "F010",
+            "name": "Axial boss bore",
+            "ontology_class": "cad:ThroughHoleFeature",
+            "parent_feature_id": "F009",
+            "description": "Central axial bore through the boss and upper head. The rendered views suggest internal threading, but the supplied B-rep deterministically reports only a cylindrical surface.",
+            "interface_type": "cad:ShaftInterface",
+            "feature_functions": [
+              {
+                "ontology_class": "cad:FittingFunction",
+                "name": "Receive axial member",
+                "description": "Receives a shaft, fastener, or fitting along the boss axis.",
+                "primary": true,
+                "confidence": 0.91
+              },
+              {
+                "ontology_class": "cad:LocateFunction",
+                "name": "Radially locate axial member",
+                "description": "The cylindrical bore establishes radial location around the CAD-Y axis.",
+                "primary": false,
+                "confidence": 0.94
+              }
+            ],
+            "feature_behaviors": [
+              {
+                "ontology_class": "cad:ReactBearingLoadBehavior",
+                "name": "React radial bearing load",
+                "description": "The cylindrical bore wall reacts radial contact from an inserted member.",
+                "confidence": 0.93
+              }
+            ],
+            "relationships": [
+              {
+                "target_feature_id": "F009",
+                "category": "cad:GeometricFeatureRelationship",
+                "relation": "cad:insideFeature",
+                "description": "The bore lies inside the raised boss.",
+                "confidence": 1.0
+              },
+              {
+                "target_feature_id": "F011",
+                "category": "cad:StructuralFeatureRelationship",
+                "relation": "cad:adjacentTo",
+                "description": "The bore opening is adjacent to the end chamfer.",
+                "confidence": 0.95
+              }
+            ],
+            "brep_faces": [
+              {
+                "brep_id": "FACE 29",
+                "face_code": "FACE 29",
+                "entity_type": "cad:Face",
+                "geometry_type": "cad:CylindricalSurface",
+                "semantic_role": "cad:BoreWallRole",
+                "name": "Axial bore wall",
+                "description": "Radius-7.0175 mm cylindrical bore wall centered at x=67.5 mm and z=-21 mm.",
+                "salience": "cad:PrimarySalience",
+                "confidence": 1.0,
+                "evidence": [
+                  "CYLINDER",
+                  "radius 7.0175 mm",
+                  "axis (0,-1,0)",
+                  "bbox y=153..180 mm",
+                  "center (67.5,166.5,-21) mm"
+                ]
+              }
+            ],
+            "confidence": 0.97
+          },
+          {
+            "id": "F011",
+            "name": "Boss end chamfer",
+            "ontology_class": "cad:ChamferFeature",
+            "parent_feature_id": "F009",
+            "description": "Conical 45-degree transition around the boss end.",
+            "interface_type": null,
+            "feature_functions": [
+              {
+                "ontology_class": "cad:GuideFunction",
+                "name": "Guide insertion",
+                "description": "Provides a lead-in around the boss end and removes a sharp outer edge.",
+                "primary": true,
+                "confidence": 0.92
+              }
+            ],
+            "feature_behaviors": [
+              {
+                "ontology_class": "cad:DistributeStressBehavior",
+                "name": "Reduce edge concentration",
+                "description": "The tapered edge reduces local sharp-edge stress and contact sensitivity.",
+                "confidence": 0.82
+              }
+            ],
+            "relationships": [
+              {
+                "target_feature_id": "F009",
+                "category": "cad:StructuralFeatureRelationship",
+                "relation": "cad:sharesBoundaryWith",
+                "description": "The chamfer forms the transition at the boss end.",
+                "confidence": 0.98
+              }
+            ],
+            "brep_faces": [
+              {
+                "brep_id": "FACE 4",
+                "face_code": "FACE 4",
+                "entity_type": "cad:Face",
+                "geometry_type": "cad:ConicalSurface",
+                "semantic_role": "cad:ChamferSurfaceRole",
+                "name": "Boss end chamfer surface",
+                "description": "Conical chamfer with semi-angle 0.785398 radians.",
+                "salience": "cad:PrimarySalience",
+                "confidence": 0.99,
+                "evidence": [
+                  "CONE",
+                  "cone semi-angle 0.785398 rad",
+                  "cone radius 10.5 mm",
+                  "bbox y=177..180 mm"
+                ]
+              }
+            ],
+            "confidence": 0.97
+          },
+          {
+            "id": "F012",
+            "name": "Boss shoulder blend",
+            "ontology_class": "cad:FilletFeature",
+            "parent_feature_id": "F009",
+            "description": "Compound toroidal and B-spline blend connecting the boss shoulder to the upper head.",
+            "interface_type": null,
+            "feature_functions": [
+              {
+                "ontology_class": "cad:DistributeStressFunction",
+                "name": "Distribute boss load",
+                "description": "Smoothly spreads boss loads into the surrounding head block.",
+                "primary": true,
+                "confidence": 0.97
+              }
+            ],
+            "feature_behaviors": [
+              {
+                "ontology_class": "cad:DistributeStressBehavior",
+                "name": "Reduce shoulder stress concentration",
+                "description": "The smooth blended surfaces avoid an abrupt boss-to-head transition.",
+                "confidence": 0.98
+              }
+            ],
+            "relationships": [
+              {
+                "target_feature_id": "F009",
+                "category": "cad:StructuralFeatureRelationship",
+                "relation": "cad:blendsInto",
+                "description": "Forms the blended lower shoulder of the raised boss.",
+                "confidence": 0.99
+              },
+              {
+                "target_feature_id": "F008",
+                "category": "cad:StructuralFeatureRelationship",
+                "relation": "cad:blendsInto",
+                "description": "Transitions the boss into the upper head block.",
+                "confidence": 0.99
+              }
+            ],
+            "brep_faces": [
+              {
+                "brep_id": "FACE 7",
+                "face_code": "FACE 7",
+                "entity_type": "cad:Face",
+                "geometry_type": "cad:ToroidalSurface",
+                "semantic_role": "cad:FilletSurfaceRole",
+                "name": "Boss shoulder toroidal blend 1",
+                "description": "Toroidal shoulder segment with major radius 16 mm and minor radius 4 mm.",
+                "salience": "cad:PrimarySalience",
+                "confidence": 0.98,
+                "evidence": [
+                  "TORUS",
+                  "major radius 16 mm",
+                  "minor radius 4 mm",
+                  "torus center (67.5,166,-21) mm"
+                ]
+              },
+              {
+                "brep_id": "FACE 8",
+                "face_code": "FACE 8",
+                "entity_type": "cad:Face",
+                "geometry_type": "cad:BSplineSurface",
+                "semantic_role": "cad:TransitionSurfaceRole",
+                "name": "Boss shoulder B-spline blend 1",
+                "description": "B-spline transition joining adjacent boss shoulder surfaces.",
+                "salience": "cad:SecondarySalience",
+                "confidence": 0.94,
+                "evidence": [
+                  "BSPLINE",
+                  "bbox y=161.969867..166 mm",
+                  "visual correspondence with the boss shoulder"
+                ]
+              },
+              {
+                "brep_id": "FACE 9",
+                "face_code": "FACE 9",
+                "entity_type": "cad:Face",
+                "geometry_type": "cad:ToroidalSurface",
+                "semantic_role": "cad:FilletSurfaceRole",
+                "name": "Boss shoulder toroidal blend 2",
+                "description": "Opposing toroidal shoulder segment with major radius 16 mm and minor radius 4 mm.",
+                "salience": "cad:PrimarySalience",
+                "confidence": 0.98,
+                "evidence": [
+                  "TORUS",
+                  "major radius 16 mm",
+                  "minor radius 4 mm",
+                  "paired with FACE 7"
+                ]
+              },
+              {
+                "brep_id": "FACE 10",
+                "face_code": "FACE 10",
+                "entity_type": "cad:Face",
+                "geometry_type": "cad:BSplineSurface",
+                "semantic_role": "cad:TransitionSurfaceRole",
+                "name": "Boss shoulder B-spline blend 2",
+                "description": "Opposing B-spline transition joining the boss shoulder surfaces.",
+                "salience": "cad:SecondarySalience",
+                "confidence": 0.94,
+                "evidence": [
+                  "BSPLINE",
+                  "bbox y=161.969898..166 mm",
+                  "paired with FACE 8"
+                ]
+              }
+            ],
+            "confidence": 0.97
+          },
+          {
+            "id": "F013",
+            "name": "Boss shoulder seating lands",
+            "ontology_class": "cad:SeatingInterface",
+            "parent_feature_id": "F009",
+            "description": "Two planar shoulder lands surrounding the blended boss base.",
+            "interface_type": "cad:SeatingInterface",
+            "feature_functions": [
+              {
+                "ontology_class": "cad:SupportFunction",
+                "name": "Support boss shoulder",
+                "description": "Provides planar material around the boss transition.",
+                "primary": true,
+                "confidence": 0.9
+              }
+            ],
+            "feature_behaviors": [
+              {
+                "ontology_class": "cad:SpreadLoadBehavior",
+                "name": "Spread boss reaction",
+                "description": "Spreads loads from the shoulder blend into the head block.",
+                "confidence": 0.9
+              }
+            ],
+            "relationships": [
+              {
+                "target_feature_id": "F012",
+                "category": "cad:StructuralFeatureRelationship",
+                "relation": "cad:adjacentTo",
+                "description": "The planar lands border the compound boss shoulder blend.",
+                "confidence": 0.97
+              }
+            ],
+            "brep_faces": [
+              {
+                "brep_id": "FACE 12",
+                "face_code": "FACE 12",
+                "entity_type": "cad:Face",
+                "geometry_type": "cad:PlanarSurface",
+                "semantic_role": "cad:SeatingFaceRole",
+                "name": "Boss shoulder land 1",
+                "description": "Planar shoulder land at CAD y=162 mm on one side of the boss blend.",
+                "salience": "cad:SecondarySalience",
+                "confidence": 0.94,
+                "evidence": [
+                  "PLANE",
+                  "y=162 mm",
+                  "normal (0,1,0)",
+                  "bbox x=73.067764..91.5 mm"
+                ]
+              },
+              {
+                "brep_id": "FACE 13",
+                "face_code": "FACE 13",
+                "entity_type": "cad:Face",
+                "geometry_type": "cad:PlanarSurface",
+                "semantic_role": "cad:SeatingFaceRole",
+                "name": "Boss shoulder land 2",
+                "description": "Opposing planar shoulder land at CAD y=162 mm.",
+                "salience": "cad:SecondarySalience",
+                "confidence": 0.94,
+                "evidence": [
+                  "PLANE",
+                  "y=162 mm",
+                  "normal (0,1,0)",
+                  "bbox x=43.5..61.932236 mm"
+                ]
+              }
+            ],
+            "confidence": 0.92
+          },
+          {
+            "id": "F014",
+            "name": "Right lateral head hole",
+            "ontology_class": "cad:BlindHoleFeature",
+            "parent_feature_id": "F008",
+            "description": "Radius-3 mm lateral cylindrical hole segment entering the upper head from the positive CAD-X side.",
+            "interface_type": "cad:PinInterface",
+            "feature_functions": [
+              {
+                "ontology_class": "cad:ReceivePinFunction",
+                "name": "Receive lateral pin",
+                "description": "Provides a lateral pin or locking-fastener interface.",
+                "primary": true,
+                "confidence": 0.84
+              }
+            ],
+            "feature_behaviors": [
+              {
+                "ontology_class": "cad:ReactBearingLoadBehavior",
+                "name": "React lateral pin load",
+                "description": "The cylindrical wall can react radial pin contact.",
+                "confidence": 0.85
+              }
+            ],
+            "relationships": [
+              {
+                "target_feature_id": "F015",
+                "category": "cad:GeometricFeatureRelationship",
+                "relation": "cad:coaxialWith",
+                "description": "The opposed lateral hole segments share the same CAD-X axis.",
+                "confidence": 1.0
+              }
+            ],
+            "brep_faces": [
+              {
+                "brep_id": "FACE 2",
+                "face_code": "FACE 2",
+                "entity_type": "cad:Face",
+                "geometry_type": "cad:CylindricalSurface",
+                "semantic_role": "cad:BoreWallRole",
+                "name": "Right lateral hole wall",
+                "description": "Radius-3 mm cylindrical hole wall centered at CAD y=137 mm and z=-21 mm.",
+                "salience": "cad:PrimarySalience",
+                "confidence": 0.98,
+                "evidence": [
+                  "CYLINDER",
+                  "radius 3 mm",
+                  "axis (1,0,0)",
+                  "bbox x=88.5..97.5 mm"
+                ]
+              }
+            ],
+            "confidence": 0.91
+          },
+          {
+            "id": "F015",
+            "name": "Left lateral head hole",
+            "ontology_class": "cad:BlindHoleFeature",
+            "parent_feature_id": "F008",
+            "description": "Radius-3 mm lateral cylindrical hole segment entering the upper head from the negative CAD-X side.",
+            "interface_type": "cad:PinInterface",
+            "feature_functions": [
+              {
+                "ontology_class": "cad:ReceivePinFunction",
+                "name": "Receive lateral pin",
+                "description": "Provides the opposed lateral pin or locking-fastener interface.",
+                "primary": true,
+                "confidence": 0.84
+              }
+            ],
+            "feature_behaviors": [
+              {
+                "ontology_class": "cad:ReactBearingLoadBehavior",
+                "name": "React lateral pin load",
+                "description": "The cylindrical wall can react radial pin contact.",
+                "confidence": 0.85
+              }
+            ],
+            "relationships": [
+              {
+                "target_feature_id": "F014",
+                "category": "cad:GeometricFeatureRelationship",
+                "relation": "cad:coaxialWith",
+                "description": "The opposed lateral hole segments share the same CAD-X axis.",
+                "confidence": 1.0
+              }
+            ],
+            "brep_faces": [
+              {
+                "brep_id": "FACE 3",
+                "face_code": "FACE 3",
+                "entity_type": "cad:Face",
+                "geometry_type": "cad:CylindricalSurface",
+                "semantic_role": "cad:BoreWallRole",
+                "name": "Left lateral hole wall",
+                "description": "Radius-3 mm cylindrical hole wall centered at CAD y=137 mm and z=-21 mm.",
+                "salience": "cad:PrimarySalience",
+                "confidence": 0.98,
+                "evidence": [
+                  "CYLINDER",
+                  "radius 3 mm",
+                  "axis (1,0,0)",
+                  "bbox x=37.5..46.5 mm"
+                ]
+              }
+            ],
+            "confidence": 0.91
+          }
+        ],
+        "unclassified_brep_faces": [
+          {
+            "brep_ids": [
+              "FACE 11",
+              "FACE 24",
+              "FACE 25",
+              "FACE 26",
+              "FACE 27",
+              "FACE 30"
+            ],
+            "salience": "cad:SecondarySalience",
+            "description": "Upper-head outer walls, lower face, and radius-6 mm transition surfaces that structurally join the head block to adjacent regions.",
+            "confidence": 0.9
+          }
+        ],
+        "relationships": [
+          {
+            "target_section_id": "R02",
+            "category": "cad:StructuralFeatureRelationship",
+            "relation": "cad:attachedTo",
+            "description": "The upper interface head is integrally attached to and supported by the curved upright.",
+            "confidence": 0.99
+          }
+        ],
+        "confidence": 0.96
+      }
+    ]
+  }
+}
+
+
+The multiview images generated from the code sent in your last response are attached. The CadQuery function and program output from the last iteration are also provided. First, judge whether the required actions identified have been done correctly and whether the current model satisfies the desired final state in aim.json. aim.json is attached immediately after the last-iteration images and code so you can check the current output against it.
+
+The required actions are:
+1. Create a fixation rod
+   Target: Top geometry of the existing model
+   Parameters: arm_length = 200 mm
+   Constraints: The fixation rod must be mounted from the top.
+
+If yes, report the operation is finished in your response.
+
+If not, analyse errors and update the code accordingly.
+
+Once you have generated the new function, it will be executed in CadQuery on the original CAD model. You will then be provided with the latest rendering of the CAD model created by your function, and any prints, debug or error messages. You will then have the opportunity to refine your function based on this feedback, and it will be re-executed.
+
+Continue this process until the task is complete, or you reach the maximum number of iterations. If the task involves editing an existing model, the path to that model's .step file is passed to your function as args["input_file"], and is also listed as brep_start_path_step in the task information. Load it from args["input_file"] rather than hard-coding a path. For these cases, you might need to print out debug information once the model is loaded in your first iteration.
+
+Return a json object with three fields. Do not include any other text outside of the json object in your response:
+'complete': true if the task has been completed. IMPORTANT: This should only be judged by looking at the output from the last iteration, not whether a function has been returned this iteration. If there is no valid output that corresponds to the instruction, the task is not complete. The first iteration can never be complete. If this is true, then the current function will NOT be executed, and the function from the last iteration will be used.
+'my_cad_function': CadQuery python function as a string. Use the same definition and arguments as the example.
+'error': a description of errors and misalignments within the current model compared to the desired target.
+        
+
+Instruction:
+
+Edit the existing model according to the provided instructions.
+
+Task information:
+
+request_text:
+
+Design a fixation rod mounted from the top with arm length 200mm to have ability to fix cutting product
+
+brep_start_path_step:
+
+/home/adml/Research/Hackathon2026/IDETC26-Hackathon-Autodesk-neuralCAD-Edit/data/edit_192_external/breps/4E22SJE7QVTSP2E3_1758737277.9100277.step
+
+Program output from last iteration:
+
+stdout: Loading function from: /home/adml/Research/Hackathon2026/IDETC26-Hackathon-Autodesk-neuralCAD-Edit/output/gpt-5.6-sol-ontology-full48/gpt-5.6-sol-ontology_cadquery-script_1787115063.100778/brep_end/1787115063.100778/temp_script.py
+Loaded STEP: /home/adml/Research/Hackathon2026/IDETC26-Hackathon-Autodesk-neuralCAD-Edit/data/edit_192_external/breps/4E22SJE7QVTSP2E3_1758737277.9100277.step
+Bracket valid: True
+Bracket solids: 1, faces: 67
+Bracket bbox: x=(0.000,168.000), y=(0.000,180.000), z=(-60.000,0.000)
+FACE 0: type=CYLINDER, center=(153.0000,7.5000,-30.0000), bbox=(145.5000,160.5000) x (0.0000,15.0000) x (-37.5000,-22.5000), area=706.8583
+FACE 1: type=CYLINDER, center=(15.0000,7.5000,-30.0000), bbox=(7.5000,22.5000) x (0.0000,15.0000) x (-37.5000,-22.5000), area=706.8583
+FACE 2: type=CYLINDER, center=(93.0000,137.0000,-21.0000), bbox=(88.5000,97.5000) x (134.0000,140.0000) x (-24.0000,-18.0000), area=169.6460
+FACE 3: type=CYLINDER, center=(42.0000,137.0000,-21.0000), bbox=(37.5000,46.5000) x (134.0000,140.0000) x (-24.0000,-18.0000), area=169.6460
+FACE 4: type=CONE, center=(67.5000,178.4286,-21.0000), bbox=(55.5000,79.5000) x (177.0000,180.0000) x (-33.0000,-9.0000), area=279.9016
+FACE 5: type=CYLINDER, center=(67.5001,171.4971,-21.0000), bbox=(55.5000,79.5000) x (165.9498,177.0000) x (-33.0000,-9.0000), area=829.8106
+FACE 6: type=PLANE, center=(67.5000,180.0000,-21.0000), bbox=(58.5000,76.5000) x (180.0000,180.0000) x (-30.0000,-12.0000), area=99.7603
+FACE 7: type=TORUS, center=(77.9645,163.3501,-21.0000), bbox=(71.6758,83.5000) x (162.0000,166.0000) x (-36.0000,-6.0000), area=205.4737
+FACE 8: type=BSPLINE, center=(67.4998,163.3976,-7.8408), bbox=(61.9322,73.0678) x (161.9699,166.0000) x (-9.7500,-5.4001), area=57.0748
+FACE 9: type=TORUS, center=(57.0355,163.3501,-21.0000), bbox=(51.5000,63.3242) x (162.0000,166.0000) x (-36.0000,-6.0000), area=205.4737
+FACE 10: type=BSPLINE, center=(67.4998,163.3977,-34.1592), bbox=(61.9322,73.0678) x (161.9699,166.0000) x (-36.5999,-32.2500), area=57.0748
+FACE 11: type=CYLINDER, center=(67.5000,159.6874,-39.9742), bbox=(37.5000,97.5000) x (156.0000,162.0000) x (-42.0000,-36.0000), area=519.9043
+FACE 12: type=PLANE, center=(85.7113,162.0000,-21.0000), bbox=(73.0678,91.5000) x (162.0000,162.0000) x (-36.0000,-6.0000), area=325.3475
+FACE 13: type=PLANE, center=(49.2887,162.0000,-21.0000), bbox=(43.5000,61.9322) x (162.0000,162.0000) x (-36.0000,-6.0000), area=325.3475
+FACE 14: type=PLANE, center=(122.0000,55.0007,-37.0000), bbox=(122.0000,122.0000) x (40.0014,70.0000) x (-42.0000,-32.0000), area=299.9863
+FACE 15: type=CYLINDER, center=(113.0004,34.2707,-37.0000), bbox=(104.0000,122.0000) x (31.0000,40.0014) x (-42.0000,-32.0000), area=282.7571
+FACE 16: type=PLANE, center=(104.0000,55.0000,-37.0000), bbox=(104.0000,104.0000) x (40.0000,70.0000) x (-42.0000,-32.0000), area=300.0000
+FACE 17: type=CYLINDER, center=(113.0000,75.7296,-37.0000), bbox=(104.0000,122.0000) x (70.0000,79.0000) x (-42.0000,-32.0000), area=282.7433
+FACE 18: type=PLANE, center=(113.0000,55.0000,-32.0000), bbox=(104.0000,122.0000) x (31.0000,79.0000) x (-32.0000,-32.0000), area=794.4690
+FACE 19: type=PLANE, center=(122.0000,55.0007,-5.0000), bbox=(122.0000,122.0000) x (40.0014,70.0000) x (-10.0000,0.0000), area=299.9863
+FACE 20: type=CYLINDER, center=(113.0000,75.7296,-5.0000), bbox=(104.0000,122.0000) x (70.0000,79.0000) x (-10.0000,0.0000), area=282.7433
+FACE 21: type=PLANE, center=(104.0000,55.0000,-5.0000), bbox=(104.0000,104.0000) x (40.0000,70.0000) x (-10.0000,0.0000), area=300.0000
+FACE 22: type=CYLINDER, center=(113.0004,34.2707,-5.0000), bbox=(104.0000,122.0000) x (31.0000,40.0014) x (-10.0000,0.0000), area=282.7571
+FACE 23: type=PLANE, center=(113.0000,55.0000,-10.0000), bbox=(104.0000,122.0000) x (31.0000,79.0000) x (-10.0000,-10.0000), area=794.4690
+FACE 24: type=CYLINDER, center=(67.5000,159.6874,-2.0258), bbox=(37.5000,97.5000) x (156.0000,162.0000) x (-6.0000,0.0000), area=519.9043
+FACE 25: type=CYLINDER, center=(39.4991,159.6533,-21.0000), bbox=(37.5000,43.5000) x (156.0000,162.0000) x (-42.0000,0.0000), area=354.7433
+FACE 26: type=CYLINDER, center=(95.5009,159.6533,-21.0000), bbox=(91.5000,97.5000) x (156.0000,162.0000) x (-42.0000,0.0000), area=354.7433
+FACE 27: type=PLANE, center=(97.5000,133.6047,-21.0000), bbox=(97.5000,97.5000) x (111.3116,156.0000) x (-42.0000,0.0000), area=1848.6384
+FACE 28: type=PLANE, center=(79.8473,68.5748,0.0000), bbox=(9.0000,159.0000) x (0.0000,156.0000) x (0.0000,0.0000), area=10067.1683
+FACE 29: type=CYLINDER, center=(67.5000,166.5000,-21.0000), bbox=(60.4825,74.5175) x (153.0000,180.0000) x (-28.0175,-13.9825), area=1190.4908
+FACE 30: type=PLANE, center=(67.5000,153.0000,-21.0000), bbox=(46.5000,88.5000) x (153.0000,153.0000) x (-30.0000,-12.0000), area=601.2913
+FACE 31: type=PLANE, center=(67.2743,18.6547,-12.0000), bbox=(46.5000,88.5000) x (0.0000,45.0000) x (-12.0000,-12.0000), area=1546.3371
+FACE 32: type=PLANE, center=(67.7777,117.8706,-12.0000), bbox=(46.5000,88.5000) x (75.6748,153.0000) x (-12.0000,-12.0000), area=2948.2651
+FACE 33: type=PLANE, center=(88.5000,21.9116,-21.0000), bbox=(88.5000,88.5000) x (0.0000,43.8232) x (-30.0000,-12.0000), area=788.8178
+FACE 34: type=PLANE, center=(67.2743,18.6547,-30.0000), bbox=(46.5000,88.5000) x (0.0000,45.0000) x (-30.0000,-30.0000), area=1546.3371
+FACE 35: type=PLANE, center=(46.5000,22.5000,-21.0000), bbox=(46.5000,46.5000) x (0.0000,45.0000) x (-30.0000,-12.0000), area=810.0000
+FACE 36: type=PLANE, center=(46.5000,118.0690,-21.0000), bbox=(46.5000,46.5000) x (84.0000,153.0000) x (-30.0000,-12.0000), area=1213.7257
+FACE 37: type=PLANE, center=(88.5000,113.8675,-21.0000), bbox=(88.5000,88.5000) x (75.6748,153.0000) x (-30.0000,-12.0000), area=1363.5784
+FACE 38: type=PLANE, center=(67.7777,117.8706,-30.0000), bbox=(46.5000,88.5000) x (75.6748,153.0000) x (-30.0000,-30.0000), area=2948.2651
+FACE 39: type=PLANE, center=(57.7500,84.0000,-6.0000), bbox=(46.5000,69.0000) x (84.0000,84.0000) x (-12.0000,0.0000), area=270.0000
+FACE 40: type=PLANE, center=(57.7500,84.0000,-36.0000), bbox=(46.5000,69.0000) x (84.0000,84.0000) x (-42.0000,-30.0000), area=270.0000
+FACE 41: type=CYLINDER, center=(69.1854,31.6075,-36.0000), bbox=(63.7720,74.5464) x (31.0000,32.9122) x (-42.0000,-30.0000), area=138.6513
+FACE 42: type=CYLINDER, center=(69.1854,31.6075,-6.0000), bbox=(63.7720,74.5464) x (31.0000,32.9122) x (-12.0000,0.0000), area=138.6513
+FACE 43: type=PLANE, center=(55.1360,38.8371,-36.0000), bbox=(46.5000,63.7720) x (32.6741,45.0000) x (-42.0000,-30.0000), area=254.6291
+FACE 44: type=PLANE, center=(55.1360,38.8371,-6.0000), bbox=(46.5000,63.7720) x (32.6741,45.0000) x (-12.0000,0.0000), area=254.6291
+FACE 45: type=CYLINDER, center=(119.1308,88.3098,-21.0000), bbox=(102.6750,130.5000) x (69.2780,103.1649) x (-42.0000,0.0000), area=1903.5963
+FACE 46: type=CYLINDER, center=(99.3022,106.7394,-21.0000), bbox=(97.5000,102.6750) x (103.1649,111.3116) x (-42.0000,0.0000), area=427.8334
+FACE 47: type=PLANE, center=(82.9285,39.4666,-21.0000), bbox=(74.5464,90.2396) x (32.9122,45.1835) x (-42.0000,0.0000), area=517.8645
+FACE 48: type=CYLINDER, center=(94.0256,50.6502,-21.0000), bbox=(90.2396,96.0000) x (45.1835,57.0000) x (-42.0000,0.0000), area=571.5192
+FACE 49: type=CYLINDER, center=(88.1292,72.2195,-21.0000), bbox=(69.0000,96.0000) x (57.0000,84.0000) x (-42.0000,0.0000), area=1389.0763
+FACE 50: type=CYLINDER, center=(40.7713,87.2689,-21.0000), bbox=(37.5000,46.5000) x (84.0000,92.9961) x (-42.0000,0.0000), area=593.5987
+FACE 51: type=PLANE, center=(42.0000,45.0000,-21.0000), bbox=(37.5000,46.5000) x (45.0000,45.0000) x (-42.0000,0.0000), area=378.0000
+FACE 52: type=PLANE, center=(78.6521,86.1538,-42.0000), bbox=(28.5000,134.5000) x (15.0000,156.0000) x (-42.0000,-42.0000), area=7817.1683
+FACE 53: type=PLANE, center=(37.5000,124.3630,-21.0000), bbox=(37.5000,37.5000) x (92.9961,156.0000) x (-42.0000,0.0000), area=2617.8880
+FACE 54: type=CYLINDER, center=(131.9535,16.4535,-21.0000), bbox=(130.5000,134.5000) x (15.0000,19.0000) x (-42.0000,0.0000), area=263.8938
+FACE 55: type=PLANE, center=(130.5000,44.1390,-21.0000), bbox=(130.5000,130.5000) x (19.0000,69.2780) x (-42.0000,0.0000), area=2111.6772
+FACE 56: type=CYLINDER, center=(34.2296,18.2704,-21.0000), bbox=(28.5000,37.5000) x (15.0000,24.0000) x (-42.0000,0.0000), area=593.7610
+FACE 57: type=PLANE, center=(86.1383,15.0000,-37.6979), bbox=(0.0000,168.0000) x (15.0000,15.0000) x (-60.0000,0.0000), area=5205.0398
+FACE 58: type=CYLINDER, center=(3.2704,7.5000,-3.2704), bbox=(0.0000,9.0000) x (0.0000,15.0000) x (-9.0000,0.0000), area=212.0575
+FACE 59: type=PLANE, center=(85.4014,0.0000,-30.7644), bbox=(0.0000,168.0000) x (0.0000,0.0000) x (-60.0000,0.0000), area=8901.0398
+FACE 60: type=CYLINDER, center=(3.2704,7.5000,-56.7296), bbox=(0.0000,9.0000) x (0.0000,15.0000) x (-60.0000,-51.0000), area=212.0575
+FACE 61: type=PLANE, center=(84.0000,7.5000,-60.0000), bbox=(9.0000,159.0000) x (0.0000,15.0000) x (-60.0000,-60.0000), area=2250.0000
+FACE 62: type=CYLINDER, center=(164.7296,7.5000,-56.7296), bbox=(159.0000,168.0000) x (0.0000,15.0000) x (-60.0000,-51.0000), area=212.0575
+FACE 63: type=CYLINDER, center=(164.7296,7.5000,-3.2704), bbox=(159.0000,168.0000) x (0.0000,15.0000) x (-9.0000,0.0000), area=212.0575
+FACE 64: type=PLANE, center=(37.5000,34.5000,-21.0000), bbox=(37.5000,37.5000) x (24.0000,45.0000) x (-42.0000,0.0000), area=882.0000
+FACE 65: type=PLANE, center=(168.0000,7.5000,-30.0000), bbox=(168.0000,168.0000) x (0.0000,15.0000) x (-51.0000,-9.0000), area=630.0000
+FACE 66: type=PLANE, center=(0.0000,7.5000,-30.0000), bbox=(0.0000,0.0000) x (0.0000,15.0000) x (-51.0000,-9.0000), area=630.0000
+Bound axial bore FACE 29 candidate at x=67.5000, z=-21.0000, diameter=14.0350
+Bound boss end FACE 6 candidate at y=180.0000
+Rod axis: (67.5000, Y, -21.0000)
+Rod shank diameter: 13.500 mm
+Rod arm endpoints: y=45.000 to y=245.000; exact length=200.000 mm
+Projection above boss end: 65.000 mm
+Rod valid: True, rod solids: 1
+Bracket/rod interference volume: 0.000000 mm^3
+Exported assembly to: /home/adml/Research/Hackathon2026/IDETC26-Hackathon-Autodesk-neuralCAD-Edit/output/gpt-5.6-sol-ontology-full48/gpt-5.6-sol-ontology_cadquery-script_1787115063.100778/brep_end/1787115063.100778/tmp.step
+Exported STL to: /home/adml/Research/Hackathon2026/IDETC26-Hackathon-Autodesk-neuralCAD-Edit/output/gpt-5.6-sol-ontology-full48/gpt-5.6-sol-ontology_cadquery-script_1787115063.100778/brep_end/1787115063.100778/tmp.stl
+Exported PNG image to: /home/adml/Research/Hackathon2026/IDETC26-Hackathon-Autodesk-neuralCAD-Edit/output/gpt-5.6-sol-ontology-full48/gpt-5.6-sol-ontology_cadquery-script_1787115063.100778/brep_end/1787115063.100778/tmp.png
+Script completed.
+
+stderr: /home/adml/Research/Hackathon2026/IDETC26-Hackathon-Autodesk-neuralCAD-Edit/.venv/lib/python3.12/site-packages/cadquery/utils.py:82: FutureWarning: save will be removed in the next release.
+  warn(f"{f.__name__} will be removed in the next release.", FutureWarning)
+
+
+Multi-view images from last iteration:
+
+View: +Z
+
+[IMAGE 0: /home/adml/Research/Hackathon2026/IDETC26-Hackathon-Autodesk-neuralCAD-Edit/output/gpt-5.6-sol-ontology-full48/gpt-5.6-sol-ontology_cadquery-script_1787115063.100778/brep_end/1787115063.100778/tmp_+Z.png]
+
+View: -Z
+
+[IMAGE 1: /home/adml/Research/Hackathon2026/IDETC26-Hackathon-Autodesk-neuralCAD-Edit/output/gpt-5.6-sol-ontology-full48/gpt-5.6-sol-ontology_cadquery-script_1787115063.100778/brep_end/1787115063.100778/tmp_-Z.png]
+
+View: -X
+
+[IMAGE 2: /home/adml/Research/Hackathon2026/IDETC26-Hackathon-Autodesk-neuralCAD-Edit/output/gpt-5.6-sol-ontology-full48/gpt-5.6-sol-ontology_cadquery-script_1787115063.100778/brep_end/1787115063.100778/tmp_-X.png]
+
+View: +X
+
+[IMAGE 3: /home/adml/Research/Hackathon2026/IDETC26-Hackathon-Autodesk-neuralCAD-Edit/output/gpt-5.6-sol-ontology-full48/gpt-5.6-sol-ontology_cadquery-script_1787115063.100778/brep_end/1787115063.100778/tmp_+X.png]
+
+View: +Y
+
+[IMAGE 4: /home/adml/Research/Hackathon2026/IDETC26-Hackathon-Autodesk-neuralCAD-Edit/output/gpt-5.6-sol-ontology-full48/gpt-5.6-sol-ontology_cadquery-script_1787115063.100778/brep_end/1787115063.100778/tmp_+Y.png]
+
+View: -Y
+
+[IMAGE 5: /home/adml/Research/Hackathon2026/IDETC26-Hackathon-Autodesk-neuralCAD-Edit/output/gpt-5.6-sol-ontology-full48/gpt-5.6-sol-ontology_cadquery-script_1787115063.100778/brep_end/1787115063.100778/tmp_-Y.png]
+
+View: iso1
+
+[IMAGE 6: /home/adml/Research/Hackathon2026/IDETC26-Hackathon-Autodesk-neuralCAD-Edit/output/gpt-5.6-sol-ontology-full48/gpt-5.6-sol-ontology_cadquery-script_1787115063.100778/brep_end/1787115063.100778/tmp_iso1.png]
+
+View: iso2
+
+[IMAGE 7: /home/adml/Research/Hackathon2026/IDETC26-Hackathon-Autodesk-neuralCAD-Edit/output/gpt-5.6-sol-ontology-full48/gpt-5.6-sol-ontology_cadquery-script_1787115063.100778/brep_end/1787115063.100778/tmp_iso2.png]
+
+CadQuery function from last iteration:
+
+def my_cad_function(args):
+    import os
+
+    input_file = os.path.expanduser(args["input_file"])
+    imported = cq.importers.importStep(input_file)
+    bracket = imported.val() if hasattr(imported, "val") else imported
+
+    print(f"Loaded STEP: {input_file}")
+    print(f"Bracket valid: {bracket.isValid()}")
+    print(f"Bracket solids: {len(bracket.Solids())}, faces: {len(bracket.Faces())}")
+    bb = bracket.BoundingBox()
+    print(f"Bracket bbox: x=({bb.xmin:.3f},{bb.xmax:.3f}), y=({bb.ymin:.3f},{bb.ymax:.3f}), z=({bb.zmin:.3f},{bb.zmax:.3f})")
+
+    # Inspect and bind the planning-stage FACE indices to the imported geometry.
+    faces = bracket.Faces()
+    for i, face in enumerate(faces):
+        fbb = face.BoundingBox()
+        c = face.Center()
+        try:
+            gtype = face.geomType()
+        except Exception:
+            gtype = "UNKNOWN"
+        print(
+            f"FACE {i}: type={gtype}, center=({c.x:.4f},{c.y:.4f},{c.z:.4f}), "
+            f"bbox=({fbb.xmin:.4f},{fbb.xmax:.4f}) x "
+            f"({fbb.ymin:.4f},{fbb.ymax:.4f}) x "
+            f"({fbb.zmin:.4f},{fbb.zmax:.4f}), area={face.Area():.4f}"
+        )
+
+    # Locate FACE 6 geometrically: planar top boss annulus near y=180 mm.
+    boss_end_face = None
+    best_score = 1.0e99
+    for face in faces:
+        fbb = face.BoundingBox()
+        try:
+            if face.geomType() != "PLANE":
+                continue
+        except Exception:
+            continue
+        dx = fbb.xmax - fbb.xmin
+        dy = fbb.ymax - fbb.ymin
+        dz = fbb.zmax - fbb.zmin
+        score = abs(fbb.ymax - 180.0) + abs(dy) * 10.0 + abs(dx - 18.0) + abs(dz - 18.0)
+        if score < best_score and dy < 0.05:
+            best_score = score
+            boss_end_face = face
+
+    # Locate FACE 29 geometrically: cylindrical axial bore, approximately
+    # 14.035 mm diameter and extending from y=153 to y=180 mm.
+    bore_face = None
+    best_bore_score = 1.0e99
+    for face in faces:
+        fbb = face.BoundingBox()
+        try:
+            if face.geomType() != "CYLINDER":
+                continue
+        except Exception:
+            continue
+        dx = fbb.xmax - fbb.xmin
+        dy = fbb.ymax - fbb.ymin
+        dz = fbb.zmax - fbb.zmin
+        score = abs(dx - 14.035) + abs(dz - 14.035) + abs(fbb.ymin - 153.0) + abs(fbb.ymax - 180.0)
+        if score < best_bore_score:
+            best_bore_score = score
+            bore_face = face
+
+    if bore_face is not None:
+        bbb = bore_face.BoundingBox()
+        axis_x = 0.5 * (bbb.xmin + bbb.xmax)
+        axis_z = 0.5 * (bbb.zmin + bbb.zmax)
+        measured_bore_diameter = 0.5 * ((bbb.xmax - bbb.xmin) + (bbb.zmax - bbb.zmin))
+        print(f"Bound axial bore FACE 29 candidate at x={axis_x:.4f}, z={axis_z:.4f}, diameter={measured_bore_diameter:.4f}")
+    else:
+        axis_x = 67.5
+        axis_z = -21.0
+        measured_bore_diameter = 14.035
+        print("Warning: axial bore was not detected; using grounded planning coordinates.")
+
+    if boss_end_face is not None:
+        tbb = boss_end_face.BoundingBox()
+        mounting_y = 0.5 * (tbb.ymin + tbb.ymax)
+        print(f"Bound boss end FACE 6 candidate at y={mounting_y:.4f}")
+    else:
+        mounting_y = 180.0
+        print("Warning: boss end annulus was not detected; using grounded y=180 mm.")
+
+    # Sliding shank sized below the reported 14.035 mm bore diameter.
+    rod_diameter = min(13.50, measured_bore_diameter - 0.40)
+    rod_radius = rod_diameter / 2.0
+    arm_length = 200.0
+
+    # The lower end is directed toward the open cradle. The exact 200 mm arm
+    # extends from y=45 to y=245, with 65 mm projection above FACE 6.
+    lower_y = 45.0
+    upper_y = lower_y + arm_length
+    chamfer = 1.0
+    tip_radius = rod_radius - chamfer
+
+    # Construct an exact-overall-length rod with integral conical lead-ins.
+    lower_leadin = cq.Solid.makeCone(
+        tip_radius, rod_radius, chamfer,
+        cq.Vector(axis_x, lower_y, axis_z), cq.Vector(0, 1, 0)
+    )
+    shank = cq.Solid.makeCylinder(
+        rod_radius, arm_length - 2.0 * chamfer,
+        cq.Vector(axis_x, lower_y + chamfer, axis_z), cq.Vector(0, 1, 0)
+    )
+    upper_leadin = cq.Solid.makeCone(
+        rod_radius, tip_radius, chamfer,
+        cq.Vector(axis_x, upper_y - chamfer, axis_z), cq.Vector(0, 1, 0)
+    )
+    rod = lower_leadin.fuse(shank).fuse(upper_leadin)
+
+    # Add an integral adjustment/locking collar above the existing boss. It is
+    # part of the movable rod component and does not alter the bracket.
+    collar_radius = 12.0
+    collar_y0 = mounting_y + 3.0
+    collar_height = 8.0
+    collar = cq.Solid.makeCylinder(
+        collar_radius, collar_height,
+        cq.Vector(axis_x, collar_y0, axis_z), cq.Vector(0, 1, 0)
+    )
+    rod = rod.fuse(collar)
+
+    print(f"Rod axis: ({axis_x:.4f}, Y, {axis_z:.4f})")
+    print(f"Rod shank diameter: {rod_diameter:.3f} mm")
+    print(f"Rod arm endpoints: y={lower_y:.3f} to y={upper_y:.3f}; exact length={arm_length:.3f} mm")
+    print(f"Projection above boss end: {upper_y - mounting_y:.3f} mm")
+    print(f"Rod valid: {rod.isValid()}, rod solids: {len(rod.Solids())}")
+
+    try:
+        interference = bracket.intersect(rod)
+        interference_volume = interference.Volume()
+        print(f"Bracket/rod interference volume: {interference_volume:.6f} mm^3")
+    except Exception as exc:
+        print(f"Interference check unavailable: {exc}")
+
+    # Preserve the original bracket and return the fixation rod as a separate,
+    # adjustable assembly component rather than fusing it to SOLID 0.
+    assembly = cq.Assembly(name="bracket_with_fixation_rod")
+    assembly.add(bracket, name="original_bracket", color=cq.Color(0.55, 0.62, 0.70))
+    assembly.add(rod, name="fixation_rod_200mm", color=cq.Color(0.85, 0.65, 0.15))
+    return assembly
+
+aim.json (desired final state). Check the last-iteration images, CadQuery function, and program output against this:
+
+{
+  "request": "Design a fixation rod mounted from the top with arm length 200mm to have ability to fix cutting product",
+  "request_wording": {
+    "action_words": [
+      "Design",
+      "fixation",
+      "rod",
+      "mounted",
+      "from",
+      "arm",
+      "length",
+      "200mm"
+    ],
+    "referenced_feature_words": [
+      "top"
+    ],
+    "intention_words": [
+      "ability",
+      "fix",
+      "cutting",
+      "product"
+    ],
+    "grammatical_words": [
+      "a",
+      "the",
+      "with",
+      "to",
+      "have",
+      "to"
+    ]
+  },
+  "actions": [
+    {
+      "operation": "Create a fixation rod",
+      "parameters": {
+        "arm_length": "200 mm"
+      },
+      "target": "Top geometry of the existing model",
+      "relational_constraint": "The fixation rod must be mounted from the top.",
+      "unresolved_reference": "Identify which top face, surface, or feature of the existing CAD model is the mounting geometry and determine the intended mounting location on it."
+    }
+  ],
+  "intention": [
+    "Enable fixation of the cutting product."
+  ]
+}
+
+Iterations remaining: 9

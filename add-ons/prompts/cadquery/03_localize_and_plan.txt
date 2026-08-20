@@ -1,45 +1,316 @@
-Now use all the given information:
-1. model.json file
-2. operation.json file
-3. Multiview images
+You are given:
 
-Decide which sections of the original model should be modified, removed, interacted with or if new sections should be created. Use as much information from the Multiview images, model.json files and operation.json as possible.
+1. aim.json, which defines the desired changes, preservation targets, predicted
+   final geometry, functions, behaviors, and validation criteria.
+2. model.json, which describes the original model as:
 
-Make this decision from several perspectives. If target clearly identify geometry, locate the corresponding section(s) and face(s) in model.json. If there is no clear geometry identified, use the referenced features and relational_constraint to identify potential sections and features. Additionally, consider the intention of the edit. Based on the function and behavior associated with each section and features, decide which section require the action the most. Then, find the corresponding section and face code from model.json.
+   Part -> Section -> Feature -> B-rep Face
 
-Plan out the modeling procedure needed to perform each action. Describe them in professional CAD modelling languages from choosing the plane, draw sketches to extrusion, add chamfers. Be thorough and detailed.
+3. Labeled multi-view images of the original part.
+4. cadquery_operation_ontology.ttl, which defines the permitted operations and
+   the exact required parameters for each operation.
 
-face_code values in model.json are visual labels from shaded renders. Brep_id is the CadQuery Faces() index from the STEP analysis report (for example FACE 0).
+Generate operation.json: a compact, executable plan describing HOW to transform
+the current model into the final state specified by aim.json.
 
-Edit operation.json accordingly. Keep the previous request_wording and actions, and add localization plus steps.
 
-OUTPUT FORMAT (JSON, operation.json, no markdown fences, use this schema):
+==================================================
+CORE RULES
+==================================================
+
+1. Aim and preservation authority
+
+- Every planned operation must satisfy a change target or necessary dependency
+  in aim.json.
+- Do not create operations for outcomes already satisfied by model.json.
+- Respect all preservation targets and avoid modifying unrelated geometry.
+- Do not introduce new design requirements.
+
+2. Geometry authority
+
+- Use model.json for semantic Part, Section, Feature, and FACE grounding.
+- Use only IDs present in model.json. Never invent an ID, dimension, axis,
+  location, or topology.
+- FACE is the lowest explicit model-reference level. If an operation needs
+  edges, wires, or vertices, the execution stage must derive them
+  programmatically from grounded faces.
+
+3. Ontology authority
+
+- Every step must select exactly one operation that exists in
+  cadquery_operation_ontology.ttl.
+- Use the operation's exact unique name in `ontology_operation`.
+- Keys in `required_parameters` must exactly match all and only the required
+  parameter names declared by that ontology operation.
+- Do not rename, omit, combine, or invent required parameters.
+
+4. Confidence
+
+- Every operation, step, and required-parameter grounding must have a
+  confidence value from 0.0 to 1.0.
+- Confidence reflects certainty in the interpretation and grounding.
+
+
+==================================================
+1. SUMMARIZE THE AIM
+==================================================
+
+- `request_id`: copy from aim.json.
+- `operation_ontology.id`: use `cqop:CadQueryOperationOntology`.
+- `operation_ontology.version`: use the supplied ontology version.
+- `aim_summary.goal`: concise restatement of `aim.primary_aim`.
+- `aim_summary.change_targets`: list the relevant target IDs from
+  `aim.targets_to_change`.
+- `aim_summary.preserve_targets`: list exact Section/Feature IDs or concise
+  reference labels from `aim.targets_to_preserve`.
+- `aim_summary.expected_outcome`: one concise summary of the predicted final
+  geometry, function, and behavior.
+
+Do not copy the full aim.json into this summary.
+
+
+==================================================
+2. CREATE THE OPERATIONS PLAN
+==================================================
+
+Create one higher-level operation for each distinct requested transformation,
+such as creating a feature, removing a feature, resizing geometry, replacing an
+edge treatment, transforming geometry, patterning a feature, or inserting a
+component.
+
+For each operation:
+
+- `operation_id`: unique ID such as `OP01`.
+- `summary`: concise description of the transformation.
+- `confidence`: confidence that this operation is required and correctly
+  interpreted.
+- `depends_on_operation_ids`: earlier operations whose results are required.
+
+Keep the plan minimal. A higher-level operation may contain several ontology
+steps, but do not combine independent requested transformations into one
+operation.
+
+Use aim.json change-target IDs, model.json names/classes/functions, face roles,
+surface types, and semantic orientation to resolve the relevant geometry.
+Multi-view images may disambiguate the geometry, but model IDs must still be
+copied exactly.
+
+CAD view labels such as +X or -Z are camera directions, not automatically
+semantic front, back, top, bottom, left, or right. Use
+`model.part.semantic_orientation`. If it is unresolved or has confidence below
+0.6, do not treat a semantic direction as certain.
+
+
+==================================================
+3. CREATE ONTOLOGY-GROUNDED STEPS
+==================================================
+
+Each step performs exactly one ontology operation.
+
+For every step:
+
+- `step_id`: unique ID such as `S01`.
+- `step_index`: execution order within its higher-level operation, starting
+  at 1.
+- `ontology_operation`: exact unique ontology operation name.
+- `description`: concise statement of what this step does.
+- `depends_on_step_ids`: earlier steps whose outputs it consumes.
+- `output.name`: unique output name for downstream steps.
+- `output.cadquery_type`: expected CadQuery result type.
+- `confidence`: confidence in operation selection and step grounding.
+
+Select the ontology operation whose meaning, reference geometry, preconditions,
+and effect best match the step. Do not place several ontology operations in one
+step.
+
+
+==================================================
+4. GROUND EVERY REQUIRED PARAMETER
+==================================================
+
+`required_parameters` is an object, not an array. Each key is an exact
+required-parameter name from the selected ontology operation. Its value records
+one selected binding:
+
+- `value`: executable CadQuery expression, exact model ID/list of IDs, literal
+  value, prior output name, or `null` when unresolved.
+- `unit`: exact request/model unit for dimensional values; otherwise an empty
+  string.
+- `source_type`: exactly one allowed value.
+- `cadquery_type`: runtime type expected by the operation, such as `cq.Face`,
+  `cq.Vector`, `cq.Plane`, `cq.Workplane`, `cq.Shape`, `float`, `int`,
+  or `bool`.
+- `model_reference`: the exact Part, Section, Feature, FACE, and solid IDs
+  supporting the binding. Leave unused fields empty.
+- `source_step_id`: populated only for `previous_step_output`; otherwise an
+  empty string.
+- `confidence`: confidence in this selected binding.
+
+Use `source_type` as follows:
+
+- `model_json_entity`: the value directly identifies existing model geometry.
+  Use only IDs from model.json.
+- `cadquery_object`: the value is a CadQuery-native expression or object
+  derived from grounded model geometry, such as an axis, vector,
+  plane, workplane, selector, wire, or path. Record the supporting model IDs.
+- `request_value`: the value is an explicit dimensional, discrete, Boolean, or
+  enum requirement from aim.json.
+- `previous_step_output`: the value consumes geometry created by an earlier
+  step. Record its `source_step_id` and output name.
+- `unresolved`: the parameter cannot be grounded without an unsupported
+  assumption. Set `value` to `null`, retain the expected CadQuery type, and
+  lower confidence.
+
+Important grounding rules:
+
+- Use exact values and units from aim.json; never silently choose a missing
+  dimension.
+- A derived CadQuery axis, plane, or vector must cite the FACE/Feature/Section
+  from which it was derived.
+- A target-body, face, profile, axis, direction, extent, or placement parameter
+  must be grounded independently; do not assume one grounding supplies another.
+- When a later step uses newly created geometry, use
+  `previous_step_output`, not an invented original-model ID.
+- If the ontology requires boundary topology below FACE level, bind the
+  supporting FACE IDs and use a CadQuery expression that derives the boundary
+  during execution.
+
+
+==================================================
+5. SET ONTOLOGY CONFORMANCE
+==================================================
+
+Set `ontology_conformant` to `true` only when:
+
+1. `ontology_operation` exactly names an operation in the supplied ontology;
+2. all and only its required parameter names are present;
+3. every parameter uses an allowed source type and expected CadQuery type;
+4. every model reference uses valid model.json IDs; and
+5. no required parameter remains unresolved.
+
+Otherwise set it to `false`. Keep unresolved parameters present rather than
+omitting them.
+
+
+==================================================
+6. EXPECTED RESULT AND VALIDATION
+==================================================
+
+For each higher-level operation:
+
+- `expected_result.geometry`: final geometric state produced by the operation.
+- `expected_result.function`: function supported by that result, or an empty
+  string when not applicable.
+- `expected_result.behavior`: physical behavior supported by that result, or
+  an empty string when not applicable.
+
+These statements must agree with aim.json and must not introduce new
+requirements.
+
+Create concise validation criteria for relevant categories:
+
+- `geometry`: feature existence/absence, dimension, location, topology, or
+  relationship;
+- `function`: intended engineering purpose is supported;
+- `behavior`: intended physical response is supported;
+- `preservation`: specified original geometry remains unchanged.
+
+Each criterion describes a checkable final outcome, not an implementation step.
+
+
+==================================================
+FINAL CHECK
+==================================================
+
+Before returning operation.json, verify that:
+
+1. Every operation contributes to aim.json and the plan contains no unnecessary
+   transformations.
+2. Operation and step dependencies are complete and acyclic.
+3. Every step selects exactly one operation from ontology version 1.2.0.
+4. Required-parameter keys exactly match the selected operation's contract.
+5. Every parameter has one allowed grounding and a confidence value.
+6. Every model ID exists in model.json.
+7. Request values and units are copied exactly.
+8. Previous-step geometry is referenced through step outputs.
+9. No missing geometry or dimension is silently invented.
+10. Semantic camera directions are handled through model.json orientation.
+11. Expected results and validation criteria agree with aim.json.
+12. Preservation targets remain protected.
+13. No fields outside the required JSON structure are added.
+14. The output is valid JSON.
+
+==================================================
+OUTPUT
+==================================================
+
+Return ONLY valid JSON.
+Do not use Markdown fences.
+
+Use exactly the following structure:
 {
-  "request": "",
-  "request_wording": {
-    "action_words": ["..."],
-    "referenced_feature_words": ["..."],
-    "intention_words": ["..."],
-    "grammatical_words": ["..."]
+  "request_id": "",
+  "operation_ontology": {
+    "id": "cqop:CadQueryOperationOntology",
+    "version": "1.2.0"
   },
-  "actions": [
+  "aim_summary": {
+    "goal": "",
+    "change_targets": [],
+    "preserve_targets": [],
+    "expected_outcome": ""
+  },
+  "operations_plan": [
     {
-      "operation": "...",
-      "parameters": {
-        "parameter_name": "..."
-      },
-      "target": "...",
-      "relational_constraint": "...",
-      "unresolved_reference": "...",
-      "target section code": ["..."],
-      "target face code": ["..."],
+      "operation_id": "",
+      "summary": "",
+      "confidence": null,
+      "depends_on_operation_ids": [],
       "steps": [
-        "...",
-        "..."
+        {
+          "step_id": "",
+          "step_index": null,
+          "ontology_operation": "",
+          "description": "",
+          "required_parameters": {
+            "<ontology_parameter_name>": {
+              "value": null,
+              "unit": "",
+              "source_type": "model_json_entity|cadquery_object|request_value|previous_step_output|unresolved",
+              "cadquery_type": "",
+              "model_reference": {
+                "part_id": "",
+                "section_ids": [],
+                "feature_ids": [],
+                "face_ids": [],
+                "solid_ids": []
+              },
+              "source_step_id": "",
+              "confidence": null
+            }
+          },
+          "ontology_conformant": null,
+          "depends_on_step_ids": [],
+          "output": {
+            "name": "",
+            "cadquery_type": ""
+          },
+          "confidence": null
+        }
+      ],
+      "expected_result": {
+        "geometry": "",
+        "function": "",
+        "behavior": ""
+      },
+      "validation_criteria": [
+        {
+          "category": "geometry|function|behavior|preservation",
+          "description": ""
+        }
       ]
     }
-  ],
-  "intention": ["..."]
+  ]
 }
-
-The model.json, operation.json, and labeled multi-view images follow.
+aim.json, model.json, labeled multi-view images, and
+cadquery_operation_ontology.ttl follow.

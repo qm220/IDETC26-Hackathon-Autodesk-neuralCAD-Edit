@@ -1,0 +1,213 @@
+def my_cad_function(args):
+    import os
+    import random
+    import cadquery as cq
+
+    input_file = os.path.expanduser(args["input_file"])
+    imported = cq.importers.importStep(input_file)
+    root = imported.val() if hasattr(imported, "val") else imported
+    solids = list(root.Solids())
+    if len(solids) != 1:
+        raise ValueError(f"Expected one input solid, found {len(solids)}")
+
+    original = solids[0]
+    original_edges = list(original.Edges())
+    edge_count = len(original_edges)
+    nominal_radius = 0.2
+
+    def valid_single(shape):
+        try:
+            return shape is not None and shape.isValid() and len(shape.Solids()) == 1
+        except Exception:
+            return False
+
+    def edge_type(edge):
+        try:
+            return edge.geomType()
+        except Exception:
+            return "UNKNOWN"
+
+    def point_distance_to_edge(point, edge):
+        try:
+            vertex = cq.Vertex.makeVertex(point.x, point.y, point.z)
+            return vertex.distance(edge)
+        except Exception:
+            return 1.0e100
+
+    def carrier_error(candidate, reference):
+        errors = []
+        for parameter in (0.08, 0.25, 0.5, 0.75, 0.92):
+            try:
+                point = candidate.positionAt(parameter)
+            except Exception:
+                point = candidate.Center()
+            errors.append(point_distance_to_edge(point, reference))
+        return max(errors)
+
+    def descendant_edges(shape, reference, tolerance=2.0e-5):
+        reference_type = edge_type(reference)
+        matches = []
+        for edge in shape.Edges():
+            if edge_type(edge) != reference_type:
+                continue
+            error = carrier_error(edge, reference)
+            if error <= tolerance:
+                matches.append(edge)
+        return matches
+
+    def apply_fillet(shape, edges, radius):
+        if not edges:
+            return shape
+        try:
+            candidate = shape.fillet(radius, edges)
+            if valid_single(candidate):
+                return candidate
+        except Exception:
+            pass
+        return None
+
+    def remaining_indices(shape):
+        return [
+            index for index, reference in enumerate(original_edges)
+            if descendant_edges(shape, reference)
+        ]
+
+    def run_sequential(order, radius):
+        shape = original
+        explicit = set()
+
+        # Several passes are necessary because an earlier blend can split an
+        # original carrier into multiple shorter descendant edges.
+        for pass_number in range(5):
+            progress = False
+            for index in order:
+                descendants = descendant_edges(shape, original_edges[index])
+                if not descendants:
+                    continue
+
+                candidate = apply_fillet(shape, descendants, radius)
+                if candidate is not None:
+                    shape = candidate
+                    explicit.add(index)
+                    progress = True
+                    continue
+
+                # If a complete split carrier cannot be processed as one
+                # contour, process its pieces and remap after every operation.
+                piece_progress = False
+                while True:
+                    descendants = descendant_edges(shape, original_edges[index])
+                    if not descendants:
+                        break
+                    descendants.sort(key=lambda edge: edge.Length(), reverse=True)
+                    accepted = False
+                    for edge in descendants:
+                        candidate = apply_fillet(shape, [edge], radius)
+                        if candidate is not None:
+                            shape = candidate
+                            explicit.add(index)
+                            progress = True
+                            piece_progress = True
+                            accepted = True
+                            break
+                    if not accepted:
+                        break
+                if piece_progress:
+                    continue
+
+            if not progress:
+                break
+
+        remaining = remaining_indices(shape)
+        return shape, explicit, remaining
+
+    print(f"Input valid: {original.isValid()}")
+    print(f"Original edges: {edge_count}")
+    for index, edge in enumerate(original_edges):
+        center = edge.Center()
+        print(
+            f"EDGE {index}: type={edge_type(edge)}, length={edge.Length():.9g}, "
+            f"center=({center.x:.6g},{center.y:.6g},{center.z:.6g})"
+        )
+
+    # First retry the literal operation. The second value differs from 0.2 mm
+    # by only one nanometre and avoids exact-tolerance degeneracies in OCC while
+    # representing the requested nominal 0.2 mm engineering radius.
+    radii = (nominal_radius, nominal_radius - 1.0e-6)
+    for radius in radii:
+        direct = apply_fillet(original, original_edges, radius)
+        if direct is not None:
+            print(f"Direct all-edge fillet succeeded at nominal R=0.2 mm (kernel radius {radius:.6f} mm)")
+            print(f"Result faces: {len(direct.Faces())}")
+            print(f"Result edges: {len(direct.Edges())}")
+            return cq.Workplane(obj=direct)
+
+    # The previous attempt showed a repeatable conflict set. Prioritize those
+    # carriers in several orders, then explore deterministic global orders.
+    conflict = [11, 14, 16, 17, 29, 31, 32, 33]
+    normal = list(range(edge_count))
+    lengths = [edge.Length() for edge in original_edges]
+    types = [edge_type(edge) for edge in original_edges]
+
+    orders = [
+        conflict + [i for i in normal if i not in conflict],
+        list(reversed(conflict)) + [i for i in reversed(normal) if i not in conflict],
+        normal,
+        list(reversed(normal)),
+        sorted(normal, key=lambda i: lengths[i]),
+        sorted(normal, key=lambda i: lengths[i], reverse=True),
+        sorted(normal, key=lambda i: (types[i], lengths[i])),
+        sorted(normal, key=lambda i: (types[i], -lengths[i])),
+    ]
+
+    rng = random.Random(20260417)
+    for _ in range(10):
+        order = normal[:]
+        rng.shuffle(order)
+        orders.append(order)
+
+    best_shape = original
+    best_remaining = normal[:]
+    best_explicit = set()
+    best_radius = nominal_radius
+
+    for radius in radii:
+        for order_number, order in enumerate(orders):
+            shape, explicit, remaining = run_sequential(order, radius)
+            covered = edge_count - len(remaining)
+            print(
+                f"Sequential radius {radius:.6f}, order {order_number}: "
+                f"covered={covered}/{edge_count}, explicit={len(explicit)}, "
+                f"remaining={remaining}"
+            )
+            if len(remaining) < len(best_remaining):
+                best_shape = shape
+                best_remaining = remaining
+                best_explicit = explicit
+                best_radius = radius
+            if not remaining:
+                print(
+                    f"All {edge_count} original edge carriers were rounded or "
+                    f"consumed by adjacent nominal R=0.2 mm blends"
+                )
+                print(f"Kernel radius: {radius:.6f} mm")
+                print(f"Result valid: {shape.isValid()}")
+                print(f"Result faces: {len(shape.Faces())}")
+                print(f"Result edges: {len(shape.Edges())}")
+                return cq.Workplane(obj=shape)
+
+    # Return the best valid diagnostic result instead of suppressing rendering.
+    # The next iteration can use the printed persistent carrier set to target
+    # any remaining OCC corner conflicts.
+    if not valid_single(best_shape):
+        raise ValueError("No valid single-solid fillet result was produced")
+
+    print(
+        f"Best result uses kernel radius {best_radius:.6f} mm and covers "
+        f"{edge_count - len(best_remaining)}/{edge_count} original edge carriers"
+    )
+    print(f"Explicitly processed indices: {sorted(best_explicit)}")
+    print(f"Persistent original carrier indices: {best_remaining}")
+    print(f"Best result faces: {len(best_shape.Faces())}")
+    print(f"Best result edges: {len(best_shape.Edges())}")
+    return cq.Workplane(obj=best_shape)

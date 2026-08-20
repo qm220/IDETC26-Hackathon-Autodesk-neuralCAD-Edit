@@ -1,0 +1,29 @@
+def my_cad_function(args):
+    input_file = os.path.expanduser(args["input_file"])
+    model = cq.importers.importStep(input_file)
+    original = model.val()
+
+    rib_thickness = 1.5
+    clevis_center_x = 6.1226
+    rib_x0 = clevis_center_x - rib_thickness / 2.0
+
+    rib_plane = cq.Plane(
+        origin=(rib_x0, 0.0, 0.0),
+        xDir=(0.0, 1.0, 0.0),
+        normal=(1.0, 0.0, 0.0)
+    )
+
+    rib = (
+        cq.Workplane(rib_plane)
+        .polyline([
+            (0.05, -1.04),
+            (0.05, 1.08),
+            (3.65, -0.65),
+            (3.65, -1.04)
+        ])
+        .close()
+        .extrude(rib_thickness)
+    )
+
+    result_shape = original.fuse(rib.val()).clean()
+    return cq.Workplane("XY").newObject([result_shape])

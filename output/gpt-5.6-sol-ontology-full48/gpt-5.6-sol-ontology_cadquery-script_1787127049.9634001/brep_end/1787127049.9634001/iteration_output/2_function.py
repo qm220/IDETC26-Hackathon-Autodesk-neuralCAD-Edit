@@ -1,0 +1,73 @@
+def my_cad_function(args):
+    import os
+    import math
+
+    input_file = os.path.expanduser(args["input_file"])
+    body = cq.importers.importStep(input_file).val()
+
+    target_face = None
+    target_score = float("inf")
+    for index, face in enumerate(body.Faces()):
+        bb = face.BoundingBox()
+        center = bb.center
+        print(
+            f"FACE {index}: type={face.geomType()}, "
+            f"center=({center.x:.6f},{center.y:.6f},{center.z:.6f}), "
+            f"bbox=({bb.xmin:.6f},{bb.xmax:.6f}) "
+            f"({bb.ymin:.6f},{bb.ymax:.6f}) "
+            f"({bb.zmin:.6f},{bb.zmax:.6f})"
+        )
+        if face.geomType() == "CYLINDER":
+            score = (
+                abs(center.x)
+                + abs(center.z - 10.0)
+                + abs((bb.xmax - bb.xmin) - 20.0)
+                + abs((bb.zmax - bb.zmin) - 20.0)
+                + abs((bb.ymax - bb.ymin) - 15.0)
+            )
+            if score < target_score:
+                target_score = score
+                target_face = face
+
+    if target_face is None or target_score > 0.1:
+        raise ValueError("Could not bind the Sketch4 cylindrical bore")
+
+    bb = target_face.BoundingBox()
+    center_x = (bb.xmin + bb.xmax) / 2.0
+    center_z = (bb.zmin + bb.zmax) / 2.0
+    radius = ((bb.xmax - bb.xmin) + (bb.zmax - bb.zmin)) / 4.0
+    y_min = bb.ymin
+    thickness = bb.ymax - bb.ymin
+
+    plug = cq.Solid.makeCylinder(
+        radius,
+        thickness,
+        cq.Vector(center_x, y_min, center_z),
+        cq.Vector(0, 1, 0),
+    )
+    restored = body.fuse(plug).clean()
+
+    margin = 1.0
+    vertices = [
+        cq.Vector(
+            center_x + radius * math.cos(2.0 * math.pi * i / 6.0),
+            y_min - margin,
+            center_z + radius * math.sin(2.0 * math.pi * i / 6.0),
+        )
+        for i in range(6)
+    ]
+    hex_wire = cq.Wire.makePolygon(vertices, close=True)
+    if len(hex_wire.Edges()) != 6:
+        raise ValueError("Hexagonal profile does not have six sides")
+
+    cutter = cq.Solid.extrudeLinear(
+        hex_wire,
+        [],
+        cq.Vector(0, thickness + 2.0 * margin, 0),
+    )
+    result = restored.cut(cutter).clean()
+
+    if not result.isValid() or len(result.Solids()) != 1:
+        raise ValueError("Invalid result after hexagonal through-all cut")
+
+    return cq.Workplane("XY").newObject([result])

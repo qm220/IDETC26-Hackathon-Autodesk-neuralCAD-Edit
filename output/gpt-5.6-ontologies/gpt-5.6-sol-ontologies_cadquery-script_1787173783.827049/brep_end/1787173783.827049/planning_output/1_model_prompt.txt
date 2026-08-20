@@ -1,0 +1,1702 @@
+You are given, in this order:
+
+1. Labeled multi-view images of the original mechanical part.
+2. A CadQuery STEP/B-rep analysis report.
+3. The Hierarchical CAD Model Ontology in Turtle.
+
+Generate a compact, ontology-grounded model.json using exactly this hierarchy:
+
+Part -> Section -> Feature -> B-rep Face
+
+Include only fields present in the required JSON schema.
+
+
+==================================================
+GROUNDING RULES
+==================================================
+
+1. CadQuery is the geometric authority.
+
+- Copy source-view labels, solid IDs, FACE IDs, and surface types from the
+  supplied inputs.
+- Use reported dimensions, centroids, axes, bounding boxes, and topology only
+  to interpret and assign geometry; do not output those properties.
+- Never invent, rename, or alter a solid ID or FACE ID.
+
+2. The ontology is the semantic authority.
+
+- Every `ontology_class`, `geometry_type`, and `semantic_role` must be an exact
+  `cad:` class from the supplied ontology.
+- Use the most specific applicable class. If uncertain, use a valid parent
+  class rather than inventing a class.
+- Human-readable `name` values may be descriptive and need not equal a class
+  label.
+
+3. Images support semantic interpretation.
+
+- Infer sections, features, functions and face roles from all views together with the CadQuery report.
+- Identify the object and decide its semantic orientation if it is clear. If successful, associate front, back, left, right, top and bottom semantic views with +X, -X, +Y, -Y, +Z and -Z. 
+- A label such as +X or -Z is a CAD view direction, not automatically the
+  object's semantic right, left, front, back, top, or bottom.
+- Use `unknown` for unresolved view sides and lower confidence for uncertain
+  interpretations.
+
+4. Confidence values are numbers from 0.0 to 1.0.
+
+- Function confidence measures confidence in the functional interpretation.
+- Feature confidence measures confidence in the feature identification and
+  ontology classification.
+- Face confidence measures confidence that the FACE belongs to that Feature.
+
+
+==================================================
+REQUIRED CONTENT
+==================================================
+
+PART
+
+- `id`: unique part ID.
+- `name`: concise part name.
+- `ontology_class`: always `cad:Part`.
+- `source_views`: all supplied view identifiers.
+- `solid_ids`: exact CadQuery solid IDs belonging to the Part.
+- `semantic_orientation.status`: `resolved`, `partial`, or `unknown`.
+- `semantic_orientation.confidence`: confidence in the overall orientation.
+- `semantic_orientation.view_sides`: map each of +X, -X, +Y, -Y, +Z, and -Z
+  to `right`, `left`, `front`, `back`, `top`, `bottom`, or `unknown`.
+- `part_functions`: the Part's engineering purposes.
+
+SECTIONS
+
+- Divide the Part into a small number of major functional or structural
+  regions. A Section is larger than an individual hole, rib, fillet, chamfer,
+  or face.
+- Give each Section a unique ID such as `R01`, a concise name, the most
+  specific valid Section class, its exact solid IDs, and its engineering
+  functions.
+- Avoid unnecessary fragmentation.
+
+FEATURES
+
+- Within each Section, identify Features needed to understand or edit the
+  model, such as holes, slots, pockets, bosses, ribs, walls, flanges, lugs,
+  hubs, teeth, fillets, chamfers, or interfaces.
+- Give each Feature a unique ID such as `F001`, a concise name, the most
+  specific valid Feature class, its engineering functions, and confidence.
+- A repeated set may be one Feature containing all corresponding faces unless
+  individual instances need separate semantic identities.
+
+FUNCTIONS
+
+- Use valid subclasses of `cad:EngineeringFunction` for all part, section, and
+  feature functions.
+- A function states purpose, such as support, mount, locate, guide, connect,
+  transfer load, transmit torque, provide clearance, protect, or contain. Do
+  not use a geometry label as a function.
+- Set `primary` to `true` for a main function and `false` for a secondary one.
+
+B-REP FACES
+
+- Assign every CadQuery FACE ID exactly once to the Feature it realizes.
+- `cadquery_face_id`: exact FACE ID from the report.
+- `geometry_type`: the matching ontology Surface class.
+- `semantic_role`: the most specific valid ontology FaceRole class.
+- `feature_assignment_confidence`: confidence in the face-to-feature
+  assignment.
+- Use geometry, topology, visual correspondence, and repeated patterns to make
+  assignments. If no Feature is certain, assign the face to the best-supported
+  Feature with lower confidence; do not omit or invent FACE IDs.
+- Do not output edges, wires, or vertices.
+
+
+==================================================
+FINAL CHECK
+==================================================
+
+Before returning the JSON, verify that:
+
+1. Every output field exists in the required structure below.
+2. Every solid ID and FACE ID exists in the CadQuery report.
+3. Every FACE ID is assigned once and only once.
+4. Every Section belongs to the Part and every Feature belongs to one Section.
+5. Every ontology value is an exact class from the supplied ontology.
+6. Every function describes engineering purpose rather than shape.
+7. Uncertainty is reflected in the relevant confidence field.
+8. No descriptions, behaviors, relationships, colours, locations, feature
+   groups, evidence, salience, unclassified-face blocks, or other extra fields
+   are added.
+9. The result is valid JSON.
+
+
+==================================================
+OUTPUT
+==================================================
+
+Return ONLY valid JSON.
+Do not use Markdown fences.
+
+Ontology class, role, function, behavior, and relation values MUST use the
+cad: prefix from the Hierarchical CAD Model Ontology (for example
+cad:ThroughHoleFeature, cad:BoreWallRole, cad:MountFunction, cad:coaxialWith).
+Colours must be visually distinct across sections.
+
+In semantic_orientation, also fill view_sides so each CAD camera label maps to
+the most likely human-semantic side of the object (or "unknown").
+
+{
+  "part": {
+    "id": "",
+    "name": "",
+    "ontology_class": "cad:Part",
+    "source_views": [],
+    "solid_ids": [],
+    "semantic_orientation": {
+      "status": "",
+      "confidence": null,
+      "view_sides": {
+        "+X": "right|left|front|back|top|bottom|unknown",
+        "-X": "right|left|front|back|top|bottom|unknown",
+        "+Y": "right|left|front|back|top|bottom|unknown",
+        "-Y": "right|left|front|back|top|bottom|unknown",
+        "+Z": "right|left|front|back|top|bottom|unknown",
+        "-Z": "right|left|front|back|top|bottom|unknown"
+      }
+    },
+    "part_functions": [
+      {
+        "ontology_class": "",
+        "name": "",
+        "primary": null,
+        "confidence": null
+      }
+    ],
+    "sections": [
+      {
+        "id": "",
+        "name": "",
+        "ontology_class": "",
+        "solid_ids": [],
+        "section_functions": [
+          {
+            "ontology_class": "",
+            "name": "",
+            "primary": null,
+            "confidence": null
+          }
+        ],
+        "features": [
+          {
+            "id": "",
+            "name": "",
+            "ontology_class": "",
+            "feature_functions": [
+              {
+                "ontology_class": "",
+                "name": "",
+                "primary": null,
+                "confidence": null
+              }
+            ],
+            "brep_faces": [
+              {
+                "cadquery_face_id": "",
+                "geometry_type": "",
+                "semantic_role": "",
+                "feature_assignment_confidence": null
+              }
+            ],
+            "confidence": null
+          }
+        ]
+      }
+    ]
+  }
+}
+Labeled multi-view images of the original part follow, then the CadQuery
+STEP/B-rep analysis report, then the Hierarchical CAD Model Ontology Turtle.
+
+
+View: +Z
+
+[IMAGE 0: /home/adml/Research/Hackathon2026/IDETC26-Hackathon-Autodesk-neuralCAD-Edit/data/edit_192_external/breps/4S7JQK6ZQMAD25GL_1758863329.0408635_+Z.jpg]
+
+View: -Z
+
+[IMAGE 1: /home/adml/Research/Hackathon2026/IDETC26-Hackathon-Autodesk-neuralCAD-Edit/data/edit_192_external/breps/4S7JQK6ZQMAD25GL_1758863329.0408635_-Z.jpg]
+
+View: -X
+
+[IMAGE 2: /home/adml/Research/Hackathon2026/IDETC26-Hackathon-Autodesk-neuralCAD-Edit/data/edit_192_external/breps/4S7JQK6ZQMAD25GL_1758863329.0408635_-X.jpg]
+
+View: +X
+
+[IMAGE 3: /home/adml/Research/Hackathon2026/IDETC26-Hackathon-Autodesk-neuralCAD-Edit/data/edit_192_external/breps/4S7JQK6ZQMAD25GL_1758863329.0408635_+X.jpg]
+
+View: +Y
+
+[IMAGE 4: /home/adml/Research/Hackathon2026/IDETC26-Hackathon-Autodesk-neuralCAD-Edit/data/edit_192_external/breps/4S7JQK6ZQMAD25GL_1758863329.0408635_+Y.jpg]
+
+View: -Y
+
+[IMAGE 5: /home/adml/Research/Hackathon2026/IDETC26-Hackathon-Autodesk-neuralCAD-Edit/data/edit_192_external/breps/4S7JQK6ZQMAD25GL_1758863329.0408635_-Y.jpg]
+
+View: iso1
+
+[IMAGE 6: /home/adml/Research/Hackathon2026/IDETC26-Hackathon-Autodesk-neuralCAD-Edit/data/edit_192_external/breps/4S7JQK6ZQMAD25GL_1758863329.0408635_iso1.jpg]
+
+CadQuery STEP/B-rep analysis report:
+
+=== SUMMARY ===
+Input: /home/adml/Research/Hackathon2026/IDETC26-Hackathon-Autodesk-neuralCAD-Edit/data/edit_192_external/breps/4S7JQK6ZQMAD25GL_1758863329.0408635.step
+Valid: True
+Volume: 127190.395181 mm^3
+Area: 17118.563438 mm^2
+Center of mass: None
+BBox: x=(-5.889907,59.654953) y=(2.159763,34.059328) z=(-24.899423,77.619310) lens=(65.544860,31.899566,102.518733) center=(26.882523,18.109545,26.359944) diag=125.792693
+Counts: solids=2 shells=2 faces=15 wires=16 edges=30 vertices=20
+Face types: {'PLANE': 7, 'BSPLINE': 6, 'TORUS': 2}
+
+=== FACE COLOR LEGEND (PNG views, not stored in STEP) ===
+PLANE: rgb=(0.72, 0.72, 0.72)
+CYLINDER: rgb=(0.2, 0.45, 0.85)
+CONE: rgb=(0.95, 0.55, 0.15)
+SPHERE: rgb=(0.2, 0.7, 0.35)
+TORUS: rgb=(0.85, 0.2, 0.25)
+BSPLINE: rgb=(0.55, 0.3, 0.8)
+BEZIER: rgb=(0.7, 0.4, 0.85)
+OTHER: rgb=(0.9, 0.8, 0.2)
+
+=== SOLIDS ===
+SOLID 0: volume=126577.393971 mm^3  area=16706.435125 mm^2  faces=11  edges=24  com=None
+  bbox: x=(-5.889907,59.654953) y=(2.159763,34.059328) z=(-24.899423,77.619310) lens=(65.544860,31.899566,102.518733) center=(26.882523,18.109545,26.359944) diag=125.792693
+SOLID 1: volume=612.957310 mm^3  area=412.128313 mm^2  faces=4  edges=6  com=None
+  bbox: x=(25.423274,30.420234) y=(15.069459,29.133459) z=(44.238419,58.299324) lens=(4.996959,14.064000,14.060906) center=(27.921754,22.101459,51.268871) diag=20.505482
+
+=== FACES ===
+FACE 0:
+  type: PLANE
+  area: 229.601413
+  center: (25.100211,17.469490,50.852238)
+  n_wires: 1
+  n_edges: 4
+  n_vertices: 4
+  normal: (0.999720,-0.000000,-0.023648)
+  plane_origin: (25.299693,50.000000,59.285214)
+  plane_normal: (-0.999720,0.000000,0.023648)
+  bbox: x=(24.929596,25.299694) y=(10.000000,27.979324) z=(43.639587,59.285214) lens=(0.370098,17.979324,15.645628) center=(25.114645,18.989662,51.462400) diag=23.836500
+FACE 1:
+  type: PLANE
+  area: 95.738389
+  center: (27.585878,19.007866,43.576752)
+  n_wires: 1
+  n_edges: 4
+  n_vertices: 4
+  normal: (0.023648,-0.000000,0.999720)
+  plane_origin: (24.929596,50.000000,43.639587)
+  plane_normal: (-0.023648,0.000000,-0.999720)
+  bbox: x=(24.929596,30.242269) y=(10.000000,28.034385) z=(43.513915,43.639587) lens=(5.312673,18.034385,0.125672) center=(27.585932,19.017192,43.576751) diag=18.801046
+FACE 2:
+  type: PLANE
+  area: 229.499683
+  center: (30.412856,17.466704,50.725373)
+  n_wires: 1
+  n_edges: 4
+  n_vertices: 4
+  normal: (-0.999720,-0.000000,0.023648)
+  plane_origin: (30.242269,50.000000,43.513915)
+  plane_normal: (0.999720,0.000000,-0.023648)
+  bbox: x=(30.242269,30.612366) y=(10.000000,27.978521) z=(43.513915,59.159543) lens=(0.370098,17.978521,15.645628) center=(30.427318,18.989260,51.336729) diag=23.835894
+FACE 3:
+  type: PLANE
+  area: 59.211795
+  center: (27.955523,15.571146,59.222390)
+  n_wires: 1
+  n_edges: 4
+  n_vertices: 4
+  normal: (-0.023648,-0.000000,-0.999720)
+  plane_origin: (30.612366,50.000000,59.159543)
+  plane_normal: (0.023648,0.000000,0.999720)
+  bbox: x=(25.299693,30.612366) y=(10.000000,21.159548) z=(59.159543,59.285214) lens=(5.312673,11.159548,0.125672) center=(27.956030,15.579774,59.222378) diag=12.360251
+FACE 4:
+  type: PLANE
+  area: 83.166612
+  center: (27.770981,10.000000,51.399565)
+  n_wires: 1
+  n_edges: 4
+  n_vertices: 4
+  normal: (-0.000000,1.000000,-0.000000)
+  plane_origin: (27.770981,10.000000,51.399565)
+  plane_normal: (0.000000,-1.000000,0.000000)
+  bbox: x=(24.929596,30.612366) y=(10.000000,10.000000) z=(43.513915,59.285214) lens=(5.682770,0.000000,15.771299) center=(27.770981,10.000000,51.399565) diag=16.763882
+FACE 5:
+  type: BSPLINE
+  area: 1192.845683
+  center: (26.886254,7.560534,74.066960)
+  n_wires: 1
+  n_edges: 4
+  n_vertices: 4
+  normal: (-0.000008,0.004006,0.999992)
+  bbox: x=(-2.564002,56.336381) y=(2.318673,15.580210) z=(68.751940,77.619310) lens=(58.900384,13.261537,8.867370) center=(26.886189,8.949442,73.185625) diag=61.022568
+FACE 6:
+  type: BSPLINE
+  area: 4692.218538
+  center: (26.827525,26.832953,28.418801)
+  n_wires: 2
+  n_edges: 8
+  n_vertices: 8
+  normal: (-0.002061,0.973414,0.229042)
+  bbox: x=(-2.785616,56.524156) y=(13.053631,34.059328) z=(-18.964467,69.904260) lens=(59.309773,21.005697,88.868727) center=(26.869270,23.556480,25.469897) diag=108.887736
+FACE 7:
+  type: BSPLINE
+  area: 2421.918724
+  center: (-1.097537,13.726775,25.805336)
+  n_wires: 1
+  n_edges: 4
+  n_vertices: 4
+  normal: (-0.992417,-0.050525,-0.112053)
+  bbox: x=(-5.889907,4.859100) y=(2.311390,30.959182) z=(-20.442212,74.004246) lens=(10.749007,28.647791,94.446458) center=(-0.515403,16.635286,26.781017) diag=99.279255
+FACE 8:
+  type: BSPLINE
+  area: 1650.525115
+  center: (26.876768,11.806611,-18.200744)
+  n_wires: 1
+  n_edges: 4
+  n_vertices: 4
+  normal: (0.001291,-0.609742,-0.792599)
+  bbox: x=(2.462984,51.296087) y=(2.988421,23.588967) z=(-24.899423,-5.506403) lens=(48.833103,20.600546,19.393020) center=(26.879535,13.288694,-15.202913) diag=56.437077
+FACE 9:
+  type: BSPLINE
+  area: 3629.769288
+  center: (26.896558,2.318533,31.569104)
+  n_wires: 1
+  n_edges: 4
+  n_vertices: 4
+  normal: (0.002117,-0.999998,0.000004)
+  bbox: x=(2.721661,51.070719) y=(2.159763,3.295713) z=(-6.230280,69.821846) lens=(48.349059,1.135951,76.052126) center=(26.896190,2.727738,31.795783) diag=90.126842
+FACE 10:
+  type: BSPLINE
+  area: 2421.939887
+  center: (54.842824,13.844930,25.805325)
+  n_wires: 1
+  n_edges: 4
+  n_vertices: 4
+  normal: (0.992622,-0.046322,-0.112053)
+  bbox: x=(48.844956,59.654953) y=(2.408875,31.057837) z=(-20.442212,74.004246) lens=(10.809997,28.648961,94.446458) center=(54.249955,16.733356,26.781017) diag=99.286215
+FACE 11:
+  type: TORUS
+  area: 127.508985
+  center: (26.225736,22.101459,51.295291)
+  n_wires: 1
+  n_edges: 4
+  n_vertices: 3
+  normal: (-0.823473,0.000000,0.567355)
+  torus_major_radius: 4.282455
+  torus_minor_radius: 3.000000
+  torus_center: (28.524548,22.101459,51.240913)
+  bbox: x=(25.423274,27.491179) y=(15.069459,29.133459) z=(44.239258,58.299324) lens=(2.067904,14.064000,14.060067) center=(26.457226,22.101459,51.269291) diag=19.993944
+FACE 12:
+  type: PLANE
+  area: 57.614979
+  center: (25.525387,22.101459,51.311858)
+  n_wires: 1
+  n_edges: 1
+  n_vertices: 1
+  normal: (-0.999720,0.000000,0.023648)
+  plane_origin: (25.525387,22.101459,51.311858)
+  plane_normal: (-0.999720,0.000000,0.023648)
+  bbox: x=(25.424113,25.626660) y=(17.819004,26.383914) z=(47.030601,55.593115) lens=(0.202546,8.564909,8.562514) center=(25.525387,22.101459,51.311858) diag=12.112611
+FACE 13:
+  type: TORUS
+  area: 175.931403
+  center: (29.102506,22.101459,51.227241)
+  n_wires: 1
+  n_edges: 4
+  n_vertices: 3
+  normal: (0.690187,0.000000,-0.723631)
+  torus_major_radius: 4.032000
+  torus_minor_radius: 3.000000
+  torus_center: (27.324883,22.101459,51.269291)
+  bbox: x=(27.158588,30.420234) y=(15.069459,29.133459) z=(44.238419,58.299324) lens=(3.261646,14.064000,14.060906) center=(28.789411,22.101459,51.268871) diag=20.153002
+FACE 14:
+  type: PLANE
+  area: 51.072947
+  center: (30.324044,22.101459,51.198346)
+  n_wires: 1
+  n_edges: 1
+  n_vertices: 1
+  normal: (0.999720,0.000000,-0.023648)
+  plane_origin: (30.324044,22.101459,51.198346)
+  plane_normal: (0.999720,0.000000,-0.023648)
+  bbox: x=(30.228694,30.419394) y=(18.069459,26.133459) z=(47.167473,55.229218) lens=(0.190701,8.064000,8.061745) center=(30.324044,22.101459,51.198346) diag=11.404218
+
+
+Hierarchical CAD Model Ontology Turtle:
+
+@prefix cad: <https://example.org/cad-model-hierarchy#> .
+@prefix dcterms: <http://purl.org/dc/terms/> .
+@prefix owl: <http://www.w3.org/2002/07/owl#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+
+<https://example.org/cad-model-hierarchy> a owl:Ontology ;
+    rdfs:label "Hierarchical CAD Model Ontology v0.5 — Face Grounding Only" ;
+    dcterms:description """CAD model ontology tailored to semantic grounding for CAD editing.
+The core semantic hierarchy is:
+Part -> Section -> Section Function / Section Behavior ->
+Feature -> Feature Function / Feature Behavior / Feature Relationships ->
+B-rep Faces.
+
+CadQuery/STEP-derived face topology and geometry remain deterministic evidence.
+VLM-derived semantic section, feature, function, behavior, face role, and
+relationship assertions are layered on top of exact B-rep face identifiers.
+Boundary-level topology is intentionally excluded from this version.""" ;
+    owl:versionInfo "0.5" .
+
+cad:Assembly a owl:Class ;
+    rdfs:label "Assembly" ;
+    rdfs:subClassOf cad:CADModel .
+
+cad:BSplineCurve a owl:Class ;
+    rdfs:label "B-Spline Curve" ;
+    rdfs:subClassOf cad:Curve .
+
+cad:BSplineSurface a owl:Class ;
+    rdfs:label "B-Spline Surface" ;
+    rdfs:subClassOf cad:Surface .
+
+cad:BaseFeature a owl:Class ;
+    rdfs:label "Base Feature" ;
+    rdfs:subClassOf cad:MaterialFeature .
+
+cad:BearingInterface a owl:Class ;
+    rdfs:label "Bearing Interface" ;
+    rdfs:subClassOf cad:InterfaceFeature .
+
+cad:BezierCurve a owl:Class ;
+    rdfs:label "Bezier Curve" ;
+    rdfs:subClassOf cad:Curve .
+
+cad:BezierSurface a owl:Class ;
+    rdfs:label "Bezier Surface" ;
+    rdfs:subClassOf cad:Surface .
+
+cad:BlindHoleFeature a owl:Class ;
+    rdfs:label "Blind Hole Feature" ;
+    rdfs:subClassOf cad:HoleFeature .
+
+cad:BoreWallRole a owl:Class ;
+    rdfs:label "Bore Wall" ;
+    rdfs:subClassOf cad:FaceRole .
+
+cad:BossFeature a owl:Class ;
+    rdfs:label "Boss Feature" ;
+    rdfs:subClassOf cad:MaterialFeature .
+
+cad:CarryCompressionBehavior a owl:Class ;
+    rdfs:label "Carry Compression" ;
+    rdfs:subClassOf cad:PhysicalBehavior .
+
+cad:CarryShearBehavior a owl:Class ;
+    rdfs:label "Carry Shear" ;
+    rdfs:subClassOf cad:PhysicalBehavior .
+
+cad:CarryTensionBehavior a owl:Class ;
+    rdfs:label "Carry Tension" ;
+    rdfs:subClassOf cad:PhysicalBehavior .
+
+cad:CavityFeature a owl:Class ;
+    rdfs:label "Cavity Feature" ;
+    rdfs:subClassOf cad:RemovalFeature .
+
+cad:CavityWallRole a owl:Class ;
+    rdfs:label "Cavity Wall" ;
+    rdfs:subClassOf cad:FaceRole .
+
+cad:CentralSection a owl:Class ;
+    rdfs:label "Central Section" ;
+    rdfs:subClassOf cad:Section .
+
+cad:ChamferFeature a owl:Class ;
+    rdfs:label "Chamfer Feature" ;
+    rdfs:subClassOf cad:TransitionFeature .
+
+cad:ChamferSurfaceRole a owl:Class ;
+    rdfs:label "Chamfer Surface" ;
+    rdfs:subClassOf cad:FaceRole .
+
+cad:CircularCurve a owl:Class ;
+    rdfs:label "Circular Curve" ;
+    rdfs:subClassOf cad:Curve .
+
+cad:CircularPattern a owl:Class ;
+    rdfs:label "Circular Pattern" ;
+    rdfs:subClassOf cad:Pattern .
+
+cad:Component a owl:Class ;
+    rdfs:label "Component" ;
+    rdfs:subClassOf cad:MechanicalArtifact .
+
+cad:ConicalSurface a owl:Class ;
+    rdfs:label "Conical Surface" ;
+    rdfs:subClassOf cad:Surface .
+
+cad:ConnectFunction a owl:Class ;
+    rdfs:label "Connect" ;
+    rdfs:subClassOf cad:EngineeringFunction .
+
+cad:ConstrainMotionFunction a owl:Class ;
+    rdfs:label "Constrain Motion" ;
+    rdfs:subClassOf cad:EngineeringFunction .
+
+cad:ConstrainRotationBehavior a owl:Class ;
+    rdfs:label "Constrain Rotation" ;
+    rdfs:subClassOf cad:PhysicalBehavior .
+
+cad:ConstrainTranslationBehavior a owl:Class ;
+    rdfs:label "Constrain Translation" ;
+    rdfs:subClassOf cad:PhysicalBehavior .
+
+cad:ContactInterface a owl:Class ;
+    rdfs:label "Contact Interface" ;
+    rdfs:subClassOf cad:InterfaceFeature .
+
+cad:ContainFunction a owl:Class ;
+    rdfs:label "Contain" ;
+    rdfs:subClassOf cad:EngineeringFunction .
+
+cad:CounterboreFeature a owl:Class ;
+    rdfs:label "Counterbore Feature" ;
+    rdfs:subClassOf cad:HoleFeature .
+
+cad:CountersinkFeature a owl:Class ;
+    rdfs:label "Countersink Feature" ;
+    rdfs:subClassOf cad:HoleFeature .
+
+cad:CradleFeature a owl:Class ;
+    rdfs:label "Cradle Feature" ;
+    rdfs:subClassOf cad:CompoundFeature .
+
+cad:CutoutFeature a owl:Class ;
+    rdfs:label "Cutout Feature" ;
+    rdfs:subClassOf cad:RemovalFeature .
+
+cad:CylindricalSurface a owl:Class ;
+    rdfs:label "Cylindrical Surface" ;
+    rdfs:subClassOf cad:Surface .
+
+cad:DirectCADAssertion a owl:Class ;
+    rdfs:label "Direct CAD Assertion" ;
+    rdfs:subClassOf cad:Assertion .
+
+cad:DistributeStressBehavior a owl:Class ;
+    rdfs:label "Distribute Stress" ;
+    rdfs:subClassOf cad:PhysicalBehavior .
+
+cad:DistributeStressFunction a owl:Class ;
+    rdfs:label "Distribute Stress" ;
+    rdfs:subClassOf cad:EngineeringFunction .
+
+cad:ElectricalInterface a owl:Class ;
+    rdfs:label "Electrical Interface" ;
+    rdfs:subClassOf cad:InterfaceFeature .
+
+cad:EllipticalCurve a owl:Class ;
+    rdfs:label "Elliptical Curve" ;
+    rdfs:subClassOf cad:Curve .
+
+cad:ElongatedSlotFeature a owl:Class ;
+    rdfs:label "Elongated Slot Feature" ;
+    rdfs:subClassOf cad:SlotFeature .
+
+cad:EndSection a owl:Class ;
+    rdfs:label "End Section" ;
+    rdfs:subClassOf cad:Section .
+
+cad:EngageFunction a owl:Class ;
+    rdfs:label "Engage" ;
+    rdfs:subClassOf cad:EngineeringFunction .
+
+cad:FasteningFunction a owl:Class ;
+    rdfs:label "Fastening" ;
+    rdfs:subClassOf cad:EngineeringFunction .
+
+cad:FilletFeature a owl:Class ;
+    rdfs:label "Fillet Feature" ;
+    rdfs:subClassOf cad:TransitionFeature .
+
+cad:FilletSurfaceRole a owl:Class ;
+    rdfs:label "Fillet Surface" ;
+    rdfs:subClassOf cad:FaceRole .
+
+cad:FittingFunction a owl:Class ;
+    rdfs:label "Fitting" ;
+    rdfs:subClassOf cad:EngineeringFunction .
+
+cad:FlangeFeature a owl:Class ;
+    rdfs:label "Flange Feature" ;
+    rdfs:subClassOf cad:MaterialFeature .
+
+cad:ForkFeature a owl:Class ;
+    rdfs:label "Fork Feature" ;
+    rdfs:subClassOf cad:CompoundFeature .
+
+cad:FunctionalFeatureRelationship a owl:Class ;
+    rdfs:label "Functional Feature Relationship" ;
+    rdfs:subClassOf cad:FeatureRelationship .
+
+cad:GeometricFeatureRelationship a owl:Class ;
+    rdfs:label "Geometric Feature Relationship" ;
+    rdfs:subClassOf cad:FeatureRelationship .
+
+cad:GripFunction a owl:Class ;
+    rdfs:label "Grip" ;
+    rdfs:subClassOf cad:EngineeringFunction .
+
+cad:GrooveFeature a owl:Class ;
+    rdfs:label "Groove Feature" ;
+    rdfs:subClassOf cad:RemovalFeature .
+
+cad:GuideFunction a owl:Class ;
+    rdfs:label "Guide" ;
+    rdfs:subClassOf cad:EngineeringFunction .
+
+cad:HierarchyUsageNote a owl:NamedIndividual ;
+    rdfs:label "Hierarchy Usage Note" .
+
+cad:HousingFeature a owl:Class ;
+    rdfs:label "Housing Feature" ;
+    rdfs:subClassOf cad:CompoundFeature .
+
+cad:HubFeature a owl:Class ;
+    rdfs:label "Hub Feature" ;
+    rdfs:subClassOf cad:MaterialFeature .
+
+cad:InnerWallRole a owl:Class ;
+    rdfs:label "Inner Wall" ;
+    rdfs:subClassOf cad:FaceRole .
+
+cad:InterfaceFaceRole a owl:Class ;
+    rdfs:label "Interface Face" ;
+    rdfs:subClassOf cad:FaceRole .
+
+cad:InteriorSection a owl:Class ;
+    rdfs:label "Interior Section" ;
+    rdfs:subClassOf cad:Section .
+
+cad:LineCurve a owl:Class ;
+    rdfs:label "Line Curve" ;
+    rdfs:subClassOf cad:Curve .
+
+cad:LinearPattern a owl:Class ;
+    rdfs:label "Linear Pattern" ;
+    rdfs:subClassOf cad:Pattern .
+
+cad:LocateFunction a owl:Class ;
+    rdfs:label "Locate" ;
+    rdfs:subClassOf cad:EngineeringFunction .
+
+cad:LugFeature a owl:Class ;
+    rdfs:label "Lug Feature" ;
+    rdfs:subClassOf cad:MaterialFeature .
+
+cad:MainBodySection a owl:Class ;
+    rdfs:label "Main Body Section" ;
+    rdfs:subClassOf cad:Section .
+
+cad:MirrorPattern a owl:Class ;
+    rdfs:label "Mirror Pattern" ;
+    rdfs:subClassOf cad:Pattern .
+
+cad:MountFunction a owl:Class ;
+    rdfs:label "Mount" ;
+    rdfs:subClassOf cad:EngineeringFunction .
+
+cad:MountingFaceRole a owl:Class ;
+    rdfs:label "Mounting Face" ;
+    rdfs:subClassOf cad:FaceRole .
+
+cad:MountingInterface a owl:Class ;
+    rdfs:label "Mounting Interface" ;
+    rdfs:subClassOf cad:InterfaceFeature .
+
+cad:MountingSeatRole a owl:Class ;
+    rdfs:label "Mounting Seat" ;
+    rdfs:subClassOf cad:FaceRole .
+
+cad:OpenSlotFeature a owl:Class ;
+    rdfs:label "Open Slot Feature" ;
+    rdfs:subClassOf cad:SlotFeature .
+
+cad:OuterSection a owl:Class ;
+    rdfs:label "Outer Section" ;
+    rdfs:subClassOf cad:Section .
+
+cad:OuterWallRole a owl:Class ;
+    rdfs:label "Outer Wall" ;
+    rdfs:subClassOf cad:FaceRole .
+
+cad:PairedPattern a owl:Class ;
+    rdfs:label "Paired Pattern" ;
+    rdfs:subClassOf cad:Pattern .
+
+cad:PermitRotationBehavior a owl:Class ;
+    rdfs:label "Permit Rotation" ;
+    rdfs:subClassOf cad:PhysicalBehavior .
+
+cad:PermitTranslationBehavior a owl:Class ;
+    rdfs:label "Permit Translation" ;
+    rdfs:subClassOf cad:PhysicalBehavior .
+
+cad:PinInterface a owl:Class ;
+    rdfs:label "Pin Interface" ;
+    rdfs:subClassOf cad:InterfaceFeature .
+
+cad:PlanarSurface a owl:Class ;
+    rdfs:label "Planar Surface" ;
+    rdfs:subClassOf cad:Surface .
+
+cad:PocketFeature a owl:Class ;
+    rdfs:label "Pocket Feature" ;
+    rdfs:subClassOf cad:RemovalFeature .
+
+cad:PrimarySalience a cad:SemanticSalience ;
+    rdfs:label "primary" .
+
+cad:ProtectFunction a owl:Class ;
+    rdfs:label "Protect" ;
+    rdfs:subClassOf cad:EngineeringFunction .
+
+cad:ProvideClearanceFunction a owl:Class ;
+    rdfs:label "Provide Clearance" ;
+    rdfs:subClassOf cad:EngineeringFunction .
+
+cad:ReactBearingLoadBehavior a owl:Class ;
+    rdfs:label "React Bearing Load" ;
+    rdfs:subClassOf cad:PhysicalBehavior .
+
+cad:ReactContactLoadBehavior a owl:Class ;
+    rdfs:label "React Contact Load" ;
+    rdfs:subClassOf cad:PhysicalBehavior .
+
+cad:ReceivePinFunction a owl:Class ;
+    rdfs:label "Receive Pin" ;
+    rdfs:subClassOf cad:EngineeringFunction .
+
+cad:ReduceMassFunction a owl:Class ;
+    rdfs:label "Reduce Mass" ;
+    rdfs:subClassOf cad:EngineeringFunction .
+
+cad:ReelFeature a owl:Class ;
+    rdfs:label "Reel Feature" ;
+    rdfs:subClassOf cad:CompoundFeature .
+
+cad:RepeatedFeatureGroup a owl:Class ;
+    rdfs:label "Repeated Feature Group" ;
+    rdfs:subClassOf cad:FeatureGroup .
+
+cad:RepresentativeSalience a cad:SemanticSalience ;
+    rdfs:label "representative" .
+
+cad:ResistBendingBehavior a owl:Class ;
+    rdfs:label "Resist Bending" ;
+    rdfs:subClassOf cad:PhysicalBehavior .
+
+cad:ResistTorsionBehavior a owl:Class ;
+    rdfs:label "Resist Torsion" ;
+    rdfs:subClassOf cad:PhysicalBehavior .
+
+cad:RibFeature a owl:Class ;
+    rdfs:label "Rib Feature" ;
+    rdfs:subClassOf cad:MaterialFeature .
+
+cad:RootSurfaceRole a owl:Class ;
+    rdfs:label "Root Surface" ;
+    rdfs:subClassOf cad:FaceRole .
+
+cad:SeatingFaceRole a owl:Class ;
+    rdfs:label "Seating Face" ;
+    rdfs:subClassOf cad:FaceRole .
+
+cad:SeatingInterface a owl:Class ;
+    rdfs:label "Seating Interface" ;
+    rdfs:subClassOf cad:InterfaceFeature .
+
+cad:SecondarySalience a cad:SemanticSalience ;
+    rdfs:label "secondary" .
+
+cad:ShaftFeature a owl:Class ;
+    rdfs:label "Shaft Feature" ;
+    rdfs:subClassOf cad:MaterialFeature .
+
+cad:ShaftInterface a owl:Class ;
+    rdfs:label "Shaft Interface" ;
+    rdfs:subClassOf cad:InterfaceFeature .
+
+cad:ShellFeature a owl:Class ;
+    rdfs:label "Shell Feature" ;
+    rdfs:subClassOf cad:MaterialFeature .
+
+cad:SideWallRole a owl:Class ;
+    rdfs:label "Side Wall" ;
+    rdfs:subClassOf cad:FaceRole .
+
+cad:Solid a owl:Class ;
+    rdfs:label "Solid" ;
+    rdfs:subClassOf cad:Body .
+
+cad:SphericalSurface a owl:Class ;
+    rdfs:label "Spherical Surface" ;
+    rdfs:subClassOf cad:Surface .
+
+cad:SplineFeature a owl:Class ;
+    rdfs:label "Spline Feature" ;
+    rdfs:subClassOf cad:CompoundFeature .
+
+cad:SplineInterface a owl:Class ;
+    rdfs:label "Spline Interface" ;
+    rdfs:subClassOf cad:InterfaceFeature .
+
+cad:SpokeFeature a owl:Class ;
+    rdfs:label "Spoke Feature" ;
+    rdfs:subClassOf cad:MaterialFeature .
+
+cad:SpreadLoadBehavior a owl:Class ;
+    rdfs:label "Spread Load" ;
+    rdfs:subClassOf cad:PhysicalBehavior .
+
+cad:StructuralFeatureRelationship a owl:Class ;
+    rdfs:label "Structural Feature Relationship" ;
+    rdfs:subClassOf cad:FeatureRelationship .
+
+cad:SupportFaceRole a owl:Class ;
+    rdfs:label "Support Face" ;
+    rdfs:subClassOf cad:FaceRole .
+
+cad:SupportFeature a owl:Class ;
+    rdfs:label "Support Feature" ;
+    rdfs:subClassOf cad:MaterialFeature .
+
+cad:SupportFunction a owl:Class ;
+    rdfs:label "Support" ;
+    rdfs:subClassOf cad:EngineeringFunction .
+
+cad:TaperFeature a owl:Class ;
+    rdfs:label "Taper Feature" ;
+    rdfs:subClassOf cad:TransitionFeature .
+
+cad:ThroughHoleFeature a owl:Class ;
+    rdfs:label "Through Hole Feature" ;
+    rdfs:subClassOf cad:HoleFeature .
+
+cad:ToothFeature a owl:Class ;
+    rdfs:label "Tooth Feature" ;
+    rdfs:subClassOf cad:MaterialFeature .
+
+cad:ToothFlankRole a owl:Class ;
+    rdfs:label "Tooth Flank" ;
+    rdfs:subClassOf cad:FaceRole .
+
+cad:ToothTipRole a owl:Class ;
+    rdfs:label "Tooth Tip" ;
+    rdfs:subClassOf cad:FaceRole .
+
+cad:ToroidalSurface a owl:Class ;
+    rdfs:label "Toroidal Surface" ;
+    rdfs:subClassOf cad:Surface .
+
+cad:TransferLoadFunction a owl:Class ;
+    rdfs:label "Transfer Load" ;
+    rdfs:subClassOf cad:EngineeringFunction .
+
+cad:TransitionSurfaceRole a owl:Class ;
+    rdfs:label "Transition Surface" ;
+    rdfs:subClassOf cad:FaceRole .
+
+cad:TransmitTorqueFunction a owl:Class ;
+    rdfs:label "Transmit Torque" ;
+    rdfs:subClassOf cad:EngineeringFunction .
+
+cad:UnclassifiedSalience a cad:SemanticSalience ;
+    rdfs:label "unclassified" .
+
+cad:VLMInferredAssertion a owl:Class ;
+    rdfs:label "VLM-Inferred Assertion" ;
+    rdfs:subClassOf cad:Assertion .
+
+cad:WallFeature a owl:Class ;
+    rdfs:label "Wall Feature" ;
+    rdfs:subClassOf cad:MaterialFeature .
+
+cad:WebFeature a owl:Class ;
+    rdfs:label "Web Feature" ;
+    rdfs:subClassOf cad:MaterialFeature .
+
+cad:adjacentTo a owl:ObjectProperty,
+        owl:SymmetricProperty ;
+    rdfs:label "adjacentTo" ;
+    rdfs:domain cad:Feature ;
+    rdfs:range cad:Feature .
+
+cad:alignedWith a owl:ObjectProperty,
+        owl:SymmetricProperty ;
+    rdfs:label "alignedWith" ;
+    rdfs:domain cad:Feature ;
+    rdfs:range cad:Feature .
+
+cad:assertsObject a owl:ObjectProperty ;
+    rdfs:label "assertsObject" ;
+    rdfs:domain cad:Assertion ;
+    rdfs:range owl:Thing .
+
+cad:assertsSubject a owl:ObjectProperty ;
+    rdfs:label "assertsSubject" ;
+    rdfs:domain cad:Assertion ;
+    rdfs:range owl:Thing .
+
+cad:attachedTo a owl:ObjectProperty ;
+    rdfs:label "attachedTo" ;
+    rdfs:domain cad:Feature ;
+    rdfs:range cad:Feature .
+
+cad:bboxXMax a owl:DatatypeProperty ;
+    rdfs:label "bboxXMax" ;
+    rdfs:range xsd:double .
+
+cad:bboxXMin a owl:DatatypeProperty ;
+    rdfs:label "bboxXMin" ;
+    rdfs:range xsd:double .
+
+cad:bboxYMax a owl:DatatypeProperty ;
+    rdfs:label "bboxYMax" ;
+    rdfs:range xsd:double .
+
+cad:bboxYMin a owl:DatatypeProperty ;
+    rdfs:label "bboxYMin" ;
+    rdfs:range xsd:double .
+
+cad:bboxZMax a owl:DatatypeProperty ;
+    rdfs:label "bboxZMax" ;
+    rdfs:range xsd:double .
+
+cad:bboxZMin a owl:DatatypeProperty ;
+    rdfs:label "bboxZMin" ;
+    rdfs:range xsd:double .
+
+cad:behaviorText a owl:DatatypeProperty ;
+    rdfs:label "behaviorText" ;
+    rdfs:domain cad:PhysicalBehavior ;
+    rdfs:range xsd:string .
+
+cad:blendsInto a owl:ObjectProperty ;
+    rdfs:label "blendsInto" ;
+    rdfs:domain cad:Feature ;
+    rdfs:range cad:Feature .
+
+cad:brepId a owl:DatatypeProperty ;
+    rdfs:label "brepId" ;
+    rdfs:domain cad:TopologicalEntity ;
+    rdfs:range xsd:string .
+
+cad:cadLocationText a owl:DatatypeProperty ;
+    rdfs:label "cadLocationText" ;
+    rdfs:domain cad:Section ;
+    rdfs:range xsd:string .
+
+cad:coaxialWith a owl:ObjectProperty,
+        owl:SymmetricProperty ;
+    rdfs:label "coaxialWith" ;
+    rdfs:domain cad:Feature ;
+    rdfs:range cad:Feature .
+
+cad:concentricWith a owl:ObjectProperty,
+        owl:SymmetricProperty ;
+    rdfs:label "concentricWith" ;
+    rdfs:domain cad:Feature ;
+    rdfs:range cad:Feature .
+
+cad:confidence a owl:DatatypeProperty ;
+    rdfs:label "confidence" ;
+    rdfs:range xsd:double .
+
+cad:constrainsFeature a owl:ObjectProperty ;
+    rdfs:label "constrainsFeature" ;
+    rdfs:domain cad:Feature ;
+    rdfs:range cad:Feature .
+
+cad:containsFeature a owl:ObjectProperty ;
+    rdfs:label "containsFeature" ;
+    rdfs:domain cad:Feature ;
+    rdfs:range cad:Feature .
+
+cad:derivedFrom a owl:ObjectProperty ;
+    rdfs:label "derivedFrom" ;
+    rdfs:domain cad:Assertion ;
+    rdfs:range cad:DataSource .
+
+cad:description a owl:DatatypeProperty ;
+    rdfs:label "description" ;
+    rdfs:range xsd:string .
+
+cad:dx a owl:DatatypeProperty ;
+    rdfs:label "dx" ;
+    rdfs:range xsd:double .
+
+cad:dy a owl:DatatypeProperty ;
+    rdfs:label "dy" ;
+    rdfs:range xsd:double .
+
+cad:dz a owl:DatatypeProperty ;
+    rdfs:label "dz" ;
+    rdfs:range xsd:double .
+
+cad:edgeCode a owl:DatatypeProperty ;
+    rdfs:label "edgeCode" ;
+    rdfs:range xsd:string .
+
+cad:edgeCount a owl:DatatypeProperty ;
+    rdfs:label "edgeCount" ;
+    rdfs:range xsd:integer .
+
+cad:edgeCountOnFace a owl:DatatypeProperty ;
+    rdfs:label "edgeCountOnFace" ;
+    rdfs:domain cad:Face ;
+    rdfs:range xsd:integer .
+
+cad:engagesWith a owl:ObjectProperty,
+        owl:SymmetricProperty ;
+    rdfs:label "engagesWith" ;
+    rdfs:domain cad:Feature ;
+    rdfs:range cad:Feature .
+
+cad:entityIndex a owl:DatatypeProperty ;
+    rdfs:label "entityIndex" ;
+    rdfs:range xsd:integer .
+
+cad:faceAdjacentTo a owl:ObjectProperty,
+        owl:SymmetricProperty ;
+    rdfs:label "faceAdjacentTo" ;
+    rdfs:domain cad:Face ;
+    rdfs:range cad:Face .
+
+cad:faceCode a owl:DatatypeProperty ;
+    rdfs:label "faceCode" ;
+    rdfs:domain cad:Face ;
+    rdfs:range xsd:string .
+
+cad:faceCount a owl:DatatypeProperty ;
+    rdfs:label "faceCount" ;
+    rdfs:range xsd:integer .
+
+cad:faceOfFeature a owl:ObjectProperty ;
+    rdfs:label "faceOfFeature" ;
+    rdfs:domain cad:Face ;
+    rdfs:range cad:Feature ;
+    owl:inverseOf cad:hasFace .
+
+cad:featureId a owl:DatatypeProperty ;
+    rdfs:label "featureId" ;
+    rdfs:domain cad:Feature ;
+    rdfs:range xsd:string .
+
+cad:featureOfSection a owl:ObjectProperty ;
+    rdfs:label "featureOfSection" ;
+    rdfs:domain cad:Feature ;
+    rdfs:range cad:Section ;
+    owl:inverseOf cad:hasFeature .
+
+cad:featureType a owl:DatatypeProperty ;
+    rdfs:label "featureType" ;
+    rdfs:domain cad:Feature ;
+    rdfs:range xsd:string .
+
+cad:functionText a owl:DatatypeProperty ;
+    rdfs:label "functionText" ;
+    rdfs:domain cad:EngineeringFunction ;
+    rdfs:range xsd:string .
+
+cad:geometryDescription a owl:DatatypeProperty ;
+    rdfs:label "geometryDescription" ;
+    rdfs:domain cad:Section ;
+    rdfs:range xsd:string .
+
+cad:geometryType a owl:DatatypeProperty ;
+    rdfs:label "geometryType" ;
+    rdfs:range xsd:string .
+
+cad:guidesFeature a owl:ObjectProperty ;
+    rdfs:label "guidesFeature" ;
+    rdfs:domain cad:Feature ;
+    rdfs:range cad:Feature .
+
+cad:hasArea a owl:DatatypeProperty ;
+    rdfs:label "hasArea" ;
+    rdfs:range xsd:double .
+
+cad:hasAxis a owl:ObjectProperty ;
+    rdfs:label "hasAxis" ;
+    rdfs:range cad:Axis .
+
+cad:hasBody a owl:ObjectProperty ;
+    rdfs:label "hasBody" ;
+    rdfs:domain cad:CADModel ;
+    rdfs:range cad:Body .
+
+cad:hasBoundingBox a owl:ObjectProperty ;
+    rdfs:label "hasBoundingBox" ;
+    rdfs:range cad:BoundingBox .
+
+cad:hasCADReferenceFrame a owl:ObjectProperty ;
+    rdfs:label "hasCADReferenceFrame" ;
+    rdfs:domain cad:CADModel ;
+    rdfs:range cad:CADReferenceFrame .
+
+cad:hasCentroid a owl:ObjectProperty ;
+    rdfs:label "hasCentroid" ;
+    rdfs:domain cad:TopologicalEntity ;
+    rdfs:range cad:Point .
+
+cad:hasDirection a owl:ObjectProperty ;
+    rdfs:label "hasDirection" ;
+    rdfs:domain cad:Axis ;
+    rdfs:range cad:Direction .
+
+cad:hasFaceRole a owl:ObjectProperty ;
+    rdfs:label "hasFaceRole" ;
+    rdfs:domain cad:Face ;
+    rdfs:range cad:FaceRole .
+
+cad:hasFeatureGroup a owl:ObjectProperty ;
+    rdfs:label "hasFeatureGroup" ;
+    rdfs:domain cad:Section ;
+    rdfs:range cad:FeatureGroup .
+
+cad:hasFeatureRelationship a owl:ObjectProperty ;
+    rdfs:label "hasFeatureRelationship" ;
+    rdfs:domain cad:Feature ;
+    rdfs:range cad:FeatureRelationship .
+
+cad:hasGeometricSignature a owl:ObjectProperty ;
+    rdfs:label "hasGeometricSignature" ;
+    rdfs:domain cad:TopologicalEntity ;
+    rdfs:range cad:GeometricSignature .
+
+cad:hasGeometry a owl:ObjectProperty ;
+    rdfs:label "hasGeometry" ;
+    rdfs:domain cad:TopologicalEntity ;
+    rdfs:range cad:GeometricEntity .
+
+cad:hasLength a owl:DatatypeProperty ;
+    rdfs:label "hasLength" ;
+    rdfs:range xsd:double .
+
+cad:hasMajorRadius a owl:DatatypeProperty ;
+    rdfs:label "hasMajorRadius" ;
+    rdfs:range xsd:double .
+
+cad:hasMemberFeature a owl:ObjectProperty ;
+    rdfs:label "hasMemberFeature" ;
+    rdfs:domain cad:FeatureGroup ;
+    rdfs:range cad:Feature .
+
+cad:hasMinorRadius a owl:DatatypeProperty ;
+    rdfs:label "hasMinorRadius" ;
+    rdfs:range xsd:double .
+
+cad:hasPattern a owl:ObjectProperty ;
+    rdfs:label "hasPattern" ;
+    rdfs:domain cad:FeatureGroup ;
+    rdfs:range cad:Pattern .
+
+cad:hasRadius a owl:DatatypeProperty ;
+    rdfs:label "hasRadius" ;
+    rdfs:range xsd:double .
+
+cad:hasRepresentativeFeature a owl:ObjectProperty ;
+    rdfs:label "hasRepresentativeFeature" ;
+    rdfs:domain cad:FeatureGroup ;
+    rdfs:range cad:Feature .
+
+cad:hasSalience a owl:ObjectProperty ;
+    rdfs:label "hasSalience" ;
+    rdfs:domain cad:TopologicalEntity ;
+    rdfs:range cad:SemanticSalience .
+
+cad:hasSemanticReferenceFrame a owl:ObjectProperty ;
+    rdfs:label "hasSemanticReferenceFrame" ;
+    rdfs:domain cad:CADModel ;
+    rdfs:range cad:SemanticReferenceFrame .
+
+cad:hasSemiAngle a owl:DatatypeProperty ;
+    rdfs:label "hasSemiAngle" ;
+    rdfs:range xsd:double .
+
+cad:hasShell a owl:ObjectProperty ;
+    rdfs:label "hasShell" ;
+    rdfs:domain cad:Body ;
+    rdfs:range cad:Shell .
+
+cad:hasUnclassifiedFace a owl:ObjectProperty ;
+    rdfs:label "hasUnclassifiedFace" ;
+    dcterms:description "Face confidently assigned to a Section but not to a specific Feature." ;
+    rdfs:domain cad:Section ;
+    rdfs:range cad:Face .
+
+cad:hasViewReferenceFrame a owl:ObjectProperty ;
+    rdfs:label "hasViewReferenceFrame" ;
+    rdfs:domain cad:ViewObservation ;
+    rdfs:range cad:ViewReferenceFrame .
+
+cad:hasVolume a owl:DatatypeProperty ;
+    rdfs:label "hasVolume" ;
+    rdfs:range xsd:double .
+
+cad:insideFeature a owl:ObjectProperty ;
+    rdfs:label "insideFeature" ;
+    rdfs:domain cad:Feature ;
+    rdfs:range cad:Feature .
+
+cad:locatesFeature a owl:ObjectProperty ;
+    rdfs:label "locatesFeature" ;
+    rdfs:domain cad:Feature ;
+    rdfs:range cad:Feature .
+
+cad:locationText a owl:DatatypeProperty ;
+    rdfs:label "locationText" ;
+    rdfs:domain cad:Section ;
+    rdfs:range xsd:string .
+
+cad:matchConfidence a owl:DatatypeProperty ;
+    rdfs:label "matchConfidence" ;
+    rdfs:domain cad:TopologicalEntity ;
+    rdfs:range xsd:double .
+
+cad:matchEvidence a owl:DatatypeProperty ;
+    rdfs:label "matchEvidence" ;
+    rdfs:domain cad:TopologicalEntity ;
+    rdfs:range xsd:string .
+
+cad:memberCount a owl:DatatypeProperty ;
+    rdfs:label "memberCount" ;
+    rdfs:domain cad:FeatureGroup ;
+    rdfs:range xsd:integer .
+
+cad:mountsTo a owl:ObjectProperty ;
+    rdfs:label "mountsTo" ;
+    rdfs:domain cad:Feature ;
+    rdfs:range cad:Feature .
+
+cad:name a owl:DatatypeProperty ;
+    rdfs:label "name" ;
+    rdfs:range xsd:string .
+
+cad:observedInView a owl:ObjectProperty ;
+    rdfs:label "observedInView" ;
+    rdfs:range cad:ViewObservation .
+
+cad:offsetFrom a owl:ObjectProperty,
+        owl:SymmetricProperty ;
+    rdfs:label "offsetFrom" ;
+    rdfs:domain cad:Feature ;
+    rdfs:range cad:Feature .
+
+cad:parallelTo a owl:ObjectProperty,
+        owl:SymmetricProperty ;
+    rdfs:label "parallelTo" ;
+    rdfs:domain cad:Feature ;
+    rdfs:range cad:Feature .
+
+cad:partId a owl:DatatypeProperty ;
+    rdfs:label "partId" ;
+    rdfs:domain cad:Part ;
+    rdfs:range xsd:string .
+
+cad:partOfFeature a owl:ObjectProperty ;
+    rdfs:label "partOfFeature" ;
+    rdfs:domain cad:Feature ;
+    rdfs:range cad:Feature ;
+    owl:inverseOf cad:hasSubFeature .
+
+cad:patternDescription a owl:DatatypeProperty ;
+    rdfs:label "patternDescription" ;
+    rdfs:domain cad:Pattern ;
+    rdfs:range xsd:string .
+
+cad:perpendicularTo a owl:ObjectProperty,
+        owl:SymmetricProperty ;
+    rdfs:label "perpendicularTo" ;
+    rdfs:domain cad:Feature ;
+    rdfs:range cad:Feature .
+
+cad:primaryFunction a owl:DatatypeProperty ;
+    rdfs:label "primaryFunction" ;
+    rdfs:domain cad:EngineeringFunction ;
+    rdfs:range xsd:boolean .
+
+cad:providesClearanceFor a owl:ObjectProperty ;
+    rdfs:label "providesClearanceFor" ;
+    rdfs:domain cad:Feature ;
+    rdfs:range cad:Feature .
+
+cad:relationshipCategory a owl:DatatypeProperty ;
+    rdfs:label "relationshipCategory" ;
+    rdfs:domain cad:FeatureRelationship ;
+    rdfs:range xsd:string .
+
+cad:relationshipDescription a owl:DatatypeProperty ;
+    rdfs:label "relationshipDescription" ;
+    rdfs:domain cad:FeatureRelationship ;
+    rdfs:range xsd:string .
+
+cad:relationshipSource a owl:ObjectProperty ;
+    rdfs:label "relationshipSource" ;
+    rdfs:domain cad:FeatureRelationship ;
+    rdfs:range cad:Feature .
+
+cad:relationshipTarget a owl:ObjectProperty ;
+    rdfs:label "relationshipTarget" ;
+    rdfs:domain cad:FeatureRelationship ;
+    rdfs:range cad:Feature .
+
+cad:relationshipType a owl:DatatypeProperty ;
+    rdfs:label "relationshipType" ;
+    rdfs:domain cad:FeatureRelationship ;
+    rdfs:range xsd:string .
+
+cad:rgbB a owl:DatatypeProperty ;
+    rdfs:label "rgbB" ;
+    rdfs:domain cad:Section ;
+    rdfs:range xsd:integer .
+
+cad:rgbG a owl:DatatypeProperty ;
+    rdfs:label "rgbG" ;
+    rdfs:domain cad:Section ;
+    rdfs:range xsd:integer .
+
+cad:rgbR a owl:DatatypeProperty ;
+    rdfs:label "rgbR" ;
+    rdfs:domain cad:Section ;
+    rdfs:range xsd:integer .
+
+cad:sectionId a owl:DatatypeProperty ;
+    rdfs:label "sectionId" ;
+    rdfs:domain cad:Section ;
+    rdfs:range xsd:string .
+
+cad:sectionOf a owl:ObjectProperty ;
+    rdfs:label "sectionOf" ;
+    rdfs:domain cad:Section ;
+    rdfs:range cad:Part ;
+    owl:inverseOf cad:hasSection .
+
+cad:semanticLocationText a owl:DatatypeProperty ;
+    rdfs:label "semanticLocationText" ;
+    rdfs:domain cad:Section ;
+    rdfs:range xsd:string .
+
+cad:semanticRoleText a owl:DatatypeProperty ;
+    rdfs:label "semanticRoleText" ;
+    rdfs:domain cad:TopologicalEntity ;
+    rdfs:range xsd:string .
+
+cad:sharesBoundaryWith a owl:ObjectProperty,
+        owl:SymmetricProperty ;
+    rdfs:label "sharesBoundaryWith" ;
+    rdfs:domain cad:Feature ;
+    rdfs:range cad:Feature .
+
+cad:shellCount a owl:DatatypeProperty ;
+    rdfs:label "shellCount" ;
+    rdfs:range xsd:integer .
+
+cad:solidCount a owl:DatatypeProperty ;
+    rdfs:label "solidCount" ;
+    rdfs:range xsd:integer .
+
+cad:sourceFile a owl:DatatypeProperty ;
+    rdfs:label "sourceFile" ;
+    rdfs:range xsd:string .
+
+cad:sourceType a owl:DatatypeProperty ;
+    rdfs:label "sourceType" ;
+    rdfs:range xsd:string .
+
+cad:sourceView a owl:DatatypeProperty ;
+    rdfs:label "sourceView" ;
+    rdfs:domain cad:Part ;
+    rdfs:range xsd:string .
+
+cad:supportsFeature a owl:ObjectProperty ;
+    rdfs:label "supportsFeature" ;
+    rdfs:domain cad:Feature ;
+    rdfs:range cad:Feature .
+
+cad:surroundsFeature a owl:ObjectProperty ;
+    rdfs:label "surroundsFeature" ;
+    rdfs:domain cad:Feature ;
+    rdfs:range cad:Feature .
+
+cad:symmetryNote a owl:DatatypeProperty ;
+    rdfs:label "symmetryNote" ;
+    rdfs:domain cad:Part ;
+    rdfs:range xsd:string .
+
+cad:transmitsLoadTo a owl:ObjectProperty ;
+    rdfs:label "transmitsLoadTo" ;
+    rdfs:domain cad:Feature ;
+    rdfs:range cad:Feature .
+
+cad:vertexCount a owl:DatatypeProperty ;
+    rdfs:label "vertexCount" ;
+    rdfs:range xsd:integer .
+
+cad:vertexCountOnEntity a owl:DatatypeProperty ;
+    rdfs:label "vertexCountOnEntity" ;
+    rdfs:range xsd:integer .
+
+cad:wireCount a owl:DatatypeProperty ;
+    rdfs:label "wireCount" ;
+    rdfs:range xsd:integer .
+
+cad:x a owl:DatatypeProperty ;
+    rdfs:label "x" ;
+    rdfs:range xsd:double .
+
+cad:y a owl:DatatypeProperty ;
+    rdfs:label "y" ;
+    rdfs:range xsd:double .
+
+cad:z a owl:DatatypeProperty ;
+    rdfs:label "z" ;
+    rdfs:range xsd:double .
+
+cad:BoundingBox a owl:Class ;
+    rdfs:label "Bounding Box" ;
+    rdfs:subClassOf cad:GeometricEntity .
+
+cad:CADReferenceFrame a owl:Class ;
+    rdfs:label "CAD Reference Frame" ;
+    rdfs:subClassOf cad:ReferenceFrame .
+
+cad:DataSource a owl:Class ;
+    rdfs:label "Data Source" .
+
+cad:Direction a owl:Class ;
+    rdfs:label "Direction" ;
+    rdfs:subClassOf cad:GeometricEntity .
+
+cad:EntityRole a owl:Class ;
+    rdfs:label "Entity Role" .
+
+cad:GeometricSignature a owl:Class ;
+    rdfs:label "Geometric Signature" ;
+    dcterms:description "Deterministic geometry/topology metadata extracted from CAD or CadQuery." .
+
+cad:Point a owl:Class ;
+    rdfs:label "Point" ;
+    rdfs:subClassOf cad:GeometricEntity .
+
+cad:SemanticReferenceFrame a owl:Class ;
+    rdfs:label "Semantic Reference Frame" ;
+    rdfs:subClassOf cad:ReferenceFrame .
+
+cad:Shell a owl:Class ;
+    rdfs:label "Shell" ;
+    rdfs:subClassOf cad:TopologicalEntity .
+
+cad:ViewReferenceFrame a owl:Class ;
+    rdfs:label "View Reference Frame" ;
+    rdfs:subClassOf cad:ReferenceFrame .
+
+cad:hasFace a owl:ObjectProperty ;
+    rdfs:label "hasFace" ;
+    rdfs:domain cad:Feature ;
+    rdfs:range cad:Face .
+
+cad:hasFeatureBehavior a owl:ObjectProperty ;
+    rdfs:label "hasFeatureBehavior" ;
+    rdfs:domain cad:Feature ;
+    rdfs:range cad:FeatureBehavior .
+
+cad:hasFeatureFunction a owl:ObjectProperty ;
+    rdfs:label "hasFeatureFunction" ;
+    rdfs:domain cad:Feature ;
+    rdfs:range cad:FeatureFunction .
+
+cad:hasSectionBehavior a owl:ObjectProperty ;
+    rdfs:label "hasSectionBehavior" ;
+    rdfs:domain cad:Section ;
+    rdfs:range cad:SectionBehavior .
+
+cad:hasSectionFunction a owl:ObjectProperty ;
+    rdfs:label "hasSectionFunction" ;
+    rdfs:domain cad:Section ;
+    rdfs:range cad:SectionFunction .
+
+cad:hasSubFeature a owl:ObjectProperty ;
+    rdfs:label "hasSubFeature" ;
+    rdfs:domain cad:Feature ;
+    rdfs:range cad:Feature .
+
+cad:Axis a owl:Class ;
+    rdfs:label "Axis" ;
+    rdfs:subClassOf cad:GeometricEntity .
+
+cad:FeatureBehavior a owl:Class ;
+    rdfs:label "Feature Behavior" ;
+    dcterms:description "Physical/mechanical behavior of an individual Feature." ;
+    rdfs:subClassOf cad:PhysicalBehavior .
+
+cad:FeatureFunction a owl:Class ;
+    rdfs:label "Feature Function" ;
+    dcterms:description "Engineering purpose of an individual Feature." ;
+    rdfs:subClassOf cad:EngineeringFunction .
+
+cad:MechanicalArtifact a owl:Class ;
+    rdfs:label "Mechanical Artifact" .
+
+cad:SectionBehavior a owl:Class ;
+    rdfs:label "Section Behavior" ;
+    dcterms:description "Physical/mechanical behavior of an entire Section." ;
+    rdfs:subClassOf cad:PhysicalBehavior .
+
+cad:SectionFunction a owl:Class ;
+    rdfs:label "Section Function" ;
+    dcterms:description "Engineering purpose of an entire Section." ;
+    rdfs:subClassOf cad:EngineeringFunction .
+
+cad:SlotFeature a owl:Class ;
+    rdfs:label "Slot Feature" ;
+    rdfs:subClassOf cad:RemovalFeature .
+
+cad:ViewObservation a owl:Class ;
+    rdfs:label "View Observation" .
+
+cad:hasFeature a owl:ObjectProperty ;
+    rdfs:label "hasFeature" ;
+    rdfs:domain cad:Section ;
+    rdfs:range cad:Feature .
+
+cad:hasSection a owl:ObjectProperty ;
+    rdfs:label "hasSection" ;
+    rdfs:domain cad:Part ;
+    rdfs:range cad:Section .
+
+cad:Body a owl:Class ;
+    rdfs:label "Body" ;
+    rdfs:subClassOf cad:TopologicalEntity .
+
+cad:ReferenceFrame a owl:Class ;
+    rdfs:label "Reference Frame" .
+
+cad:TransitionFeature a owl:Class ;
+    rdfs:label "Transition Feature" ;
+    rdfs:subClassOf cad:Feature .
+
+cad:HoleFeature a owl:Class ;
+    rdfs:label "Hole Feature" ;
+    rdfs:subClassOf cad:RemovalFeature .
+
+cad:Assertion a owl:Class ;
+    rdfs:label "Assertion" .
+
+cad:CADModel a owl:Class ;
+    rdfs:label "CAD Model" ;
+    rdfs:subClassOf cad:MechanicalArtifact .
+
+cad:CompoundFeature a owl:Class ;
+    rdfs:label "Compound Feature" ;
+    rdfs:subClassOf cad:Feature .
+
+cad:Curve a owl:Class ;
+    rdfs:label "Curve" ;
+    rdfs:subClassOf cad:GeometricEntity .
+
+cad:Part a owl:Class ;
+    rdfs:label "Part" ;
+    rdfs:subClassOf [ a owl:Restriction ;
+            owl:onProperty cad:hasSection ;
+            owl:someValuesFrom cad:Section ],
+        cad:CADModel .
+
+cad:SemanticSalience a owl:Class ;
+    rdfs:label "Semantic Salience" .
+
+cad:FeatureGroup a owl:Class ;
+    rdfs:label "Feature Group" .
+
+cad:Pattern a owl:Class ;
+    rdfs:label "Pattern" .
+
+cad:RemovalFeature a owl:Class ;
+    rdfs:label "Removal Feature" ;
+    rdfs:subClassOf cad:Feature .
+
+cad:GeometricEntity a owl:Class ;
+    rdfs:label "Geometric Entity" .
+
+cad:Surface a owl:Class ;
+    rdfs:label "Surface" ;
+    rdfs:subClassOf cad:GeometricEntity .
+
+cad:Face a owl:Class ;
+    rdfs:label "B-rep Face" ;
+    rdfs:subClassOf cad:TopologicalEntity .
+
+cad:InterfaceFeature a owl:Class ;
+    rdfs:label "Interface Feature" ;
+    rdfs:subClassOf cad:Feature .
+
+cad:FeatureRelationship a owl:Class ;
+    rdfs:label "Feature Relationship" ;
+    dcterms:description """
+    Reified relationship between two Features. Used when confidence,
+    evidence, category, or a natural-language description must be stored.
+    """ .
+
+cad:TopologicalEntity a owl:Class ;
+    rdfs:label "Topological Entity" .
+
+cad:MaterialFeature a owl:Class ;
+    rdfs:label "Material Feature" ;
+    rdfs:subClassOf cad:Feature .
+
+cad:PhysicalBehavior a owl:Class ;
+    rdfs:label "Physical Behavior" .
+
+cad:FaceRole a owl:Class ;
+    rdfs:label "Face Role" ;
+    rdfs:subClassOf cad:EntityRole .
+
+cad:EngineeringFunction a owl:Class ;
+    rdfs:label "Engineering Function" .
+
+cad:Section a owl:Class ;
+    rdfs:label "Section" ;
+    dcterms:description """
+    A major semantically meaningful region of a part. A Section is larger
+    than an individual engineering feature and contains one or more Features.
+    Examples include mounting flange, clevis ear, hub region, spoke network,
+    housing shell, or support cradle.
+    """ ;
+    rdfs:subClassOf [ a owl:Restriction ;
+            owl:onProperty cad:hasFeature ;
+            owl:someValuesFrom cad:Feature ],
+        [ a owl:Restriction ;
+            owl:onProperty cad:hasSectionFunction ;
+            owl:someValuesFrom cad:SectionFunction ],
+        [ a owl:Restriction ;
+            owl:onProperty cad:hasSectionBehavior ;
+            owl:someValuesFrom cad:SectionBehavior ] .
+
+cad:Feature a owl:Class ;
+    rdfs:label "Feature" ;
+    dcterms:description """
+    Semantically meaningful engineering or geometric feature contained in
+    a Section. Features are the primary entities used to ground edit requests.
+    """ ;
+    rdfs:subClassOf [ a owl:Restriction ;
+            owl:onProperty cad:hasFeatureFunction ;
+            owl:someValuesFrom cad:FeatureFunction ],
+        [ a owl:Restriction ;
+            owl:onProperty cad:hasFeatureBehavior ;
+            owl:someValuesFrom cad:FeatureBehavior ] .

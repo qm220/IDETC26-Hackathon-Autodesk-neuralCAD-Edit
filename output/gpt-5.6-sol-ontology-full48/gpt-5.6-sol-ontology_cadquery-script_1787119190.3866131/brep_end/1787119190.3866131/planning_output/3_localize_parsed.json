@@ -1,0 +1,145 @@
+{
+  "request": "Add flange with thickness of 0,5mm and width of 2mm that starts on the flat bottom surface. Do not fill the central part. Add four mounting holes with D=0,5mm which are spaced 0,6mm from outer edges of the flange",
+  "request_wording": {
+    "action_words": [
+      "Add",
+      "flange",
+      "thickness",
+      "0,5mm",
+      "width",
+      "2mm",
+      "starts",
+      "on",
+      "not",
+      "fill",
+      "Add",
+      "four",
+      "holes",
+      "D=0,5mm",
+      "spaced",
+      "0,6mm",
+      "from"
+    ],
+    "referenced_feature_words": [
+      "flat",
+      "bottom",
+      "surface",
+      "central",
+      "part",
+      "outer",
+      "edges",
+      "flange"
+    ],
+    "intention_words": [
+      "mounting"
+    ],
+    "grammatical_words": [
+      "with",
+      "of",
+      "and",
+      "of",
+      "that",
+      "the",
+      "Do",
+      "the",
+      "with",
+      "which",
+      "are",
+      "of",
+      "the"
+    ]
+  },
+  "actions": [
+    {
+      "operation": "Create a flange",
+      "parameters": {
+        "thickness": "0,5mm",
+        "width": "2mm"
+      },
+      "target": "flat bottom surface",
+      "relational_constraint": "The flange must start on the flat bottom surface.",
+      "unresolved_reference": "Identify the flat bottom surface in the original CAD model and determine the flange path or boundary and the direction in which its 2mm width is applied.",
+      "target section code": [
+        "R01"
+      ],
+      "target face code": [
+        "F005",
+        "FACE 11"
+      ],
+      "steps": [
+        "Localize the requested bottom side using part.semantic_orientation: the -Z view is explicitly mapped to the human-semantic bottom with confidence 0.91.",
+        "Select R01/F005, specifically FACE 11, the planar bottom mounting face at z=-0.75 mm. FACE 11 spans x=-1 to 1 mm and y=-3 to 3 mm and has an outer wire plus an inner wire surrounding the open underside pocket.",
+        "Create a sketch on FACE 11, or on a coincident XY datum plane at z=-0.75 mm, with the sketch normal directed toward -Z so that the new flange begins exactly at the existing mounting plane.",
+        "Project the outer boundary wire of FACE 11 into the sketch. Interpret the specified 2 mm flange width as a 2 mm outward extension from every outer edge of the existing 2 mm by 6 mm footprint.",
+        "Construct the flange outer boundary by offsetting the existing outer footprint outward by 2 mm. For the existing rectangular limits, use x=-3 to 3 mm and y=-5 to 5 mm, with straight, mitered corners unless a different corner treatment is subsequently specified.",
+        "Retain the projected inner boundary wire of FACE 11 as an internal sketch loop so the sketch is annular rather than a filled plate.",
+        "Extrude the resulting closed annular profile 0.5 mm in the -Z direction, from z=-0.75 mm to z=-1.25 mm.",
+        "Fuse the extrusion to SOLID 0 through its overlap with the existing bottom mounting rim. Confirm that the result remains one connected solid and that no fillets or chamfers are added because none were requested.",
+        "Verify that the new flange extends 2 mm beyond the original outer walls represented by FACE 10, FACE 12, FACE 13, and FACE 14 while preserving the original saddle seat and end-support geometry."
+      ]
+    },
+    {
+      "operation": "Leave the central part of the flange unfilled",
+      "parameters": {},
+      "target": "central part of the flange",
+      "relational_constraint": "The flange must not fill its central region.",
+      "unresolved_reference": "Identify the boundaries and extent of the referenced central part.",
+      "target section code": [
+        "R01"
+      ],
+      "target face code": [
+        "F003",
+        "F005",
+        "FACE 0",
+        "FACE 1",
+        "FACE 2",
+        "FACE 3",
+        "FACE 4",
+        "FACE 5",
+        "FACE 6",
+        "FACE 11"
+      ],
+      "steps": [
+        "Use the inner wire of FACE 11 as the definitive boundary of the central region that must remain unfilled. The two-wire topology of FACE 11 identifies this boundary as the existing open-bottom pocket opening.",
+        "Preserve F003, the open underside weight-relief pocket, including its cylindrical roof FACE 0, roof extensions FACE 1 and FACE 2, side walls FACE 3 and FACE 4, and end walls FACE 5 and FACE 6.",
+        "In the flange sketch, retain the existing pocket-opening limits defined by the inner bottom rim, nominally x=-0.8 to 0.8 mm and y=-2.8 to 2.8 mm, as an internal exclusion loop.",
+        "Do not create flange material inside that exclusion loop. The opening must continue through the complete 0.5 mm flange thickness to the new bottom level at z=-1.25 mm.",
+        "If the flange was initially modeled as a solid outer plate, create a secondary pocket cut using the projected inner wire of FACE 11 and cut through all flange material in the -Z direction.",
+        "Confirm from the bottom view that the new feature is a peripheral mounting flange with an open central region, rather than a plate closing F003.",
+        "Verify that the cut does not remove the narrow existing mounting rim or intersect the cylindrical pocket roof and that the original mass-reduction and underside-clearance functions remain intact."
+      ]
+    },
+    {
+      "operation": "Create four holes",
+      "parameters": {
+        "count": "four",
+        "diameter": "0,5mm",
+        "edge_spacing": "0,6mm"
+      },
+      "target": "flange",
+      "relational_constraint": "The holes must be spaced 0,6mm from the outer edges of the flange.",
+      "unresolved_reference": "Identify the applicable outer edges of the flange and resolve the four hole locations. The request does not specify whether the 0,6mm spacing is measured to each hole center or to its circumference.",
+      "target section code": [
+        "R01"
+      ],
+      "target face code": [
+        "F005",
+        "FACE 11"
+      ],
+      "steps": [
+        "Create the hole sketch on the new planar underside or upper face of the flange, parallel to FACE 11. Use the flange outer rectangular boundary as the dimensional reference.",
+        "Place one hole near each of the four flange corners so the holes form a symmetric 2 by 2 mounting pattern about the CAD x=0 and y=0 planes.",
+        "Use four circles of diameter 0.5 mm.",
+        "Apply the conventional center-to-edge interpretation of the stated 0.6 mm spacing unless manufacturing clarification specifies otherwise. Dimension every hole center 0.6 mm inward from each of its two adjacent outer flange edges.",
+        "For the inferred flange outer limits x=-3 to 3 mm and y=-5 to 5 mm, place the hole centers at (-2.4,-4.4), (2.4,-4.4), (-2.4,4.4), and (2.4,4.4) mm.",
+        "If the specified 0.6 mm is later confirmed as clearance from the outer edge to the hole circumference rather than to the center, revise the center offsets to 0.85 mm from the adjacent outer edges, accounting for the 0.25 mm hole radius.",
+        "Cut all four circular profiles through the complete 0.5 mm flange thickness, normal to the flange plane. Use a through-all cut limited to the flange region.",
+        "Confirm that each hole lies entirely within the outward flange extension and does not break into the central opening, the original side walls, or the original end supports.",
+        "Verify equal diameter, symmetric placement, adequate remaining edge material, and four unobstructed mounting passages through the flange."
+      ]
+    }
+  ],
+  "intention": [
+    "Provide mounting capability."
+  ]
+}

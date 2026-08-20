@@ -255,10 +255,10 @@ def plot_metric_facets(
             ax.set_title(metric_titles.get(metric, metric), fontsize=10)
         ax.set_xticks(x)
         ax.set_xticklabels(models, rotation=45, ha="right", fontsize=8)
-        ax.set_ylim(0, 1)
+        ax.set_ylim(0, 1.08)
         ax.set_ylabel("Mean score" if i == 0 and row_label is None else "")
         for xi, mean in zip(x, means):
-            ax.text(xi, mean, f"{mean:.2f}", ha="center", va="bottom", fontsize=8)
+            ax.text(xi, mean, f"{mean:.4f}", ha="center", va="bottom", fontsize=6)
 
     if row_label is not None:
         axes[0].set_ylabel(f"{row_label}\nMean score")
@@ -364,7 +364,7 @@ def cost_barplot(config: dict, dbm: DatabaseManager, request_type: str = "edit",
         ax.set_xticks(x)
         ax.set_xticklabels(ordered_models, rotation=45, ha="right", fontsize=8)
         for xi, mean in zip(x, means):
-            ax.text(xi, mean, f"{mean:.2f}", ha="center", va="bottom", fontsize=8)
+            ax.text(xi, mean, f"{mean:.4f}", ha="center", va="bottom", fontsize=6)
     else:
         ax.text(0.5, 0.5, "No cost data available", ha="center", va="center", transform=ax.transAxes)
 

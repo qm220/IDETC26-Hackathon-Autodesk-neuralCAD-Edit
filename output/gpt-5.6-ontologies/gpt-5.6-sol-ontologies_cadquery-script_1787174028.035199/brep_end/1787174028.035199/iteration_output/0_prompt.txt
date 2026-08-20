@@ -1,0 +1,788 @@
+The planning stage produced model.json (hierarchical part → sections → features
+→ B-rep faces), aim.json (desired final state from the edit request), and
+operation.json (grounded edit operations, parameters, constraints, targets,
+and modeling plans). Use those artifacts when writing my_cad_function.
+
+Section ids look like R01. Feature ids look like F001. FACE N values are
+CadQuery Faces() indices from the STEP analysis. Bind them to actual STEP
+geometry by inspecting the loaded model (print faces and coordinates) before
+editing. If an operation needs boundary topology such as a chamfer or fillet
+edge, derive it in CadQuery from the grounded face(s).
+
+Implement each operation's modeling_plan steps. Load the start model from
+args["input_file"].
+
+model.json from the planning stage:
+
+{
+  "part": {
+    "id": "P001",
+    "name": "Saddle cradle support",
+    "ontology_class": "cad:Part",
+    "source_views": [
+      "+Z",
+      "-Z",
+      "-X",
+      "+X",
+      "+Y",
+      "-Y",
+      "iso1"
+    ],
+    "solid_ids": [
+      "SOLID 0"
+    ],
+    "semantic_orientation": {
+      "status": "partial",
+      "confidence": 0.72,
+      "view_sides": {
+        "+X": "unknown",
+        "-X": "unknown",
+        "+Y": "unknown",
+        "-Y": "unknown",
+        "+Z": "top",
+        "-Z": "bottom"
+      }
+    },
+    "part_functions": [
+      {
+        "ontology_class": "cad:SupportFunction",
+        "name": "Support a cylindrical component",
+        "primary": true,
+        "confidence": 0.91
+      },
+      {
+        "ontology_class": "cad:LocateFunction",
+        "name": "Locate the supported component in the saddle",
+        "primary": false,
+        "confidence": 0.82
+      }
+    ],
+    "sections": [
+      {
+        "id": "R01",
+        "name": "Cradle body",
+        "ontology_class": "cad:MainBodySection",
+        "solid_ids": [
+          "SOLID 0"
+        ],
+        "section_functions": [
+          {
+            "ontology_class": "cad:SupportFunction",
+            "name": "Support and retain the seated component",
+            "primary": true,
+            "confidence": 0.9
+          },
+          {
+            "ontology_class": "cad:TransferLoadFunction",
+            "name": "Transfer seating loads to the base",
+            "primary": false,
+            "confidence": 0.84
+          }
+        ],
+        "features": [
+          {
+            "id": "F001",
+            "name": "Concave seating cradle",
+            "ontology_class": "cad:CradleFeature",
+            "feature_functions": [
+              {
+                "ontology_class": "cad:SupportFunction",
+                "name": "Support the cylindrical component",
+                "primary": true,
+                "confidence": 0.94
+              },
+              {
+                "ontology_class": "cad:LocateFunction",
+                "name": "Laterally locate the seated component",
+                "primary": false,
+                "confidence": 0.86
+              }
+            ],
+            "brep_faces": [
+              {
+                "cadquery_face_id": "FACE 7",
+                "geometry_type": "cad:CylindricalSurface",
+                "semantic_role": "cad:SeatingFaceRole",
+                "feature_assignment_confidence": 0.99
+              },
+              {
+                "cadquery_face_id": "FACE 8",
+                "geometry_type": "cad:PlanarSurface",
+                "semantic_role": "cad:SupportFaceRole",
+                "feature_assignment_confidence": 0.93
+              },
+              {
+                "cadquery_face_id": "FACE 9",
+                "geometry_type": "cad:PlanarSurface",
+                "semantic_role": "cad:SupportFaceRole",
+                "feature_assignment_confidence": 0.93
+              }
+            ],
+            "confidence": 0.96
+          },
+          {
+            "id": "F002",
+            "name": "Underside relief cavity",
+            "ontology_class": "cad:CavityFeature",
+            "feature_functions": [
+              {
+                "ontology_class": "cad:ReduceMassFunction",
+                "name": "Reduce material while preserving the cradle shell",
+                "primary": true,
+                "confidence": 0.96
+              },
+              {
+                "ontology_class": "cad:ProvideClearanceFunction",
+                "name": "Provide underside internal clearance",
+                "primary": false,
+                "confidence": 0.77
+              }
+            ],
+            "brep_faces": [
+              {
+                "cadquery_face_id": "FACE 0",
+                "geometry_type": "cad:CylindricalSurface",
+                "semantic_role": "cad:CavityWallRole",
+                "feature_assignment_confidence": 0.99
+              },
+              {
+                "cadquery_face_id": "FACE 1",
+                "geometry_type": "cad:PlanarSurface",
+                "semantic_role": "cad:CavityWallRole",
+                "feature_assignment_confidence": 0.96
+              },
+              {
+                "cadquery_face_id": "FACE 2",
+                "geometry_type": "cad:PlanarSurface",
+                "semantic_role": "cad:CavityWallRole",
+                "feature_assignment_confidence": 0.96
+              },
+              {
+                "cadquery_face_id": "FACE 3",
+                "geometry_type": "cad:PlanarSurface",
+                "semantic_role": "cad:CavityWallRole",
+                "feature_assignment_confidence": 0.99
+              },
+              {
+                "cadquery_face_id": "FACE 4",
+                "geometry_type": "cad:PlanarSurface",
+                "semantic_role": "cad:CavityWallRole",
+                "feature_assignment_confidence": 0.99
+              },
+              {
+                "cadquery_face_id": "FACE 5",
+                "geometry_type": "cad:PlanarSurface",
+                "semantic_role": "cad:CavityWallRole",
+                "feature_assignment_confidence": 0.98
+              },
+              {
+                "cadquery_face_id": "FACE 6",
+                "geometry_type": "cad:PlanarSurface",
+                "semantic_role": "cad:CavityWallRole",
+                "feature_assignment_confidence": 0.98
+              }
+            ],
+            "confidence": 0.98
+          },
+          {
+            "id": "F003",
+            "name": "Structural shell and base rim",
+            "ontology_class": "cad:ShellFeature",
+            "feature_functions": [
+              {
+                "ontology_class": "cad:TransferLoadFunction",
+                "name": "Transfer cradle loads through the outer shell",
+                "primary": true,
+                "confidence": 0.9
+              },
+              {
+                "ontology_class": "cad:MountFunction",
+                "name": "Provide a base interface for mounting or resting",
+                "primary": false,
+                "confidence": 0.72
+              }
+            ],
+            "brep_faces": [
+              {
+                "cadquery_face_id": "FACE 10",
+                "geometry_type": "cad:PlanarSurface",
+                "semantic_role": "cad:OuterWallRole",
+                "feature_assignment_confidence": 0.99
+              },
+              {
+                "cadquery_face_id": "FACE 11",
+                "geometry_type": "cad:PlanarSurface",
+                "semantic_role": "cad:MountingFaceRole",
+                "feature_assignment_confidence": 0.88
+              },
+              {
+                "cadquery_face_id": "FACE 12",
+                "geometry_type": "cad:PlanarSurface",
+                "semantic_role": "cad:OuterWallRole",
+                "feature_assignment_confidence": 0.99
+              },
+              {
+                "cadquery_face_id": "FACE 13",
+                "geometry_type": "cad:PlanarSurface",
+                "semantic_role": "cad:OuterWallRole",
+                "feature_assignment_confidence": 0.97
+              },
+              {
+                "cadquery_face_id": "FACE 14",
+                "geometry_type": "cad:PlanarSurface",
+                "semantic_role": "cad:OuterWallRole",
+                "feature_assignment_confidence": 0.97
+              }
+            ],
+            "confidence": 0.93
+          }
+        ]
+      }
+    ]
+  }
+}
+
+aim.json from the planning stage:
+
+{
+  "request": {
+    "request_id": "REQ-001",
+    "raw_text": "Add rounds to all edges of the part. R=0,2mm",
+    "action_words": [
+      "Add rounds"
+    ],
+    "reference_geometry_words": [
+      "all edges of the part"
+    ],
+    "parameter_words": [
+      "R=0,2mm"
+    ],
+    "functional_intention_words": []
+  },
+  "aim": {
+    "primary_aim": "The final part shall have a 0.2 mm radius round on every edge.",
+    "functional_design_intentions": [],
+    "targets_to_change": [
+      {
+        "id": "T01",
+        "action": "add",
+        "target_level": "new_geometry",
+        "reference_geometry": "rounds on all edges of the part",
+        "section_ids": [],
+        "feature_ids": [],
+        "ontology_class": "cad:Fillet",
+        "parameters": [
+          {
+            "name": "radius",
+            "value": 0.2,
+            "unit": "mm",
+            "explicitness": "explicit"
+          }
+        ],
+        "required_relationships": [
+          {
+            "relation": "applied_to",
+            "reference": "all edges of the part"
+          }
+        ],
+        "confidence": 0.98
+      }
+    ],
+    "targets_to_preserve": [
+      {
+        "reference_geometry": "all non-targeted geometry and dimensions of the part",
+        "section_ids": [],
+        "feature_ids": [],
+        "preservation_rule": "Preserve the existing part geometry and dimensions except for local changes required by the specified rounds.",
+        "confidence": 0.9
+      }
+    ],
+    "predicted_final_outcome": {
+      "geometry": [
+        {
+          "target_id": "T01",
+          "ontology_class": "cad:Fillet",
+          "description": "Every edge of the part has a round with a radius of 0.2 mm.",
+          "properties": [
+            {
+              "name": "radius",
+              "value": 0.2,
+              "unit": "mm"
+            }
+          ],
+          "relationships": [
+            {
+              "relation": "applied_to",
+              "reference": "all edges of the part"
+            }
+          ],
+          "confidence": 0.98
+        }
+      ],
+      "functions": [],
+      "behaviors": []
+    },
+    "validation_criteria": [
+      {
+        "category": "geometry",
+        "target_ids": [
+          "T01"
+        ],
+        "description": "All edges of the part are rounded.",
+        "expected_value": null,
+        "unit": ""
+      },
+      {
+        "category": "geometry",
+        "target_ids": [
+          "T01"
+        ],
+        "description": "Each specified round has the requested radius.",
+        "expected_value": 0.2,
+        "unit": "mm"
+      },
+      {
+        "category": "preservation",
+        "target_ids": [],
+        "description": "Existing geometry and dimensions remain unchanged except where locally modified by the rounds.",
+        "expected_value": null,
+        "unit": ""
+      }
+    ],
+    "unresolved_requirements": [
+      {
+        "description": "The request does not provide model identifiers for the edges; the exact edge set must be grounded against the source model.",
+        "candidate_interpretations": [
+          "Every edge present on the part before the requested edit"
+        ],
+        "requires_user_clarification": false
+      }
+    ]
+  }
+}
+
+operation.json from the planning stage:
+
+{
+  "request_id": "REQ-001",
+  "operation_ontology": {
+    "id": "cqop:CadQueryOperationOntology",
+    "version": "1.2.0"
+  },
+  "aim_summary": {
+    "goal": "Apply a constant 0.2 mm radius round to every edge of the part.",
+    "change_targets": [
+      "T01"
+    ],
+    "preserve_targets": [
+      "all non-targeted geometry and dimensions of the part"
+    ],
+    "expected_outcome": "Every original edge of the part is filleted to a 0.2 mm radius while all geometry and dimensions outside the local edge treatments remain unchanged."
+  },
+  "operations_plan": [
+    {
+      "operation_id": "OP01",
+      "summary": "Apply 0.2 mm constant-radius fillets to all edges of solid SOLID 0.",
+      "confidence": 0.98,
+      "depends_on_operation_ids": [],
+      "steps": [
+        {
+          "step_id": "S01",
+          "step_index": 1,
+          "ontology_operation": "CreateFillettoEdges",
+          "description": "Derive every edge of the existing solid and apply a 0.2 mm fillet in one edge-treatment operation.",
+          "required_parameters": {
+            "target_body": {
+              "value": "SOLID 0",
+              "unit": "",
+              "source_type": "model_json_entity",
+              "cadquery_type": "cq.Workplane",
+              "model_reference": {
+                "part_id": "P001",
+                "section_ids": [
+                  "R01"
+                ],
+                "feature_ids": [
+                  "F001",
+                  "F002",
+                  "F003"
+                ],
+                "face_ids": [],
+                "solid_ids": [
+                  "SOLID 0"
+                ]
+              },
+              "source_step_id": "",
+              "confidence": 1.0
+            },
+            "target_edges": {
+              "value": "cq.Workplane(obj=model_entities[\"SOLID 0\"]).edges().vals()",
+              "unit": "",
+              "source_type": "cadquery_object",
+              "cadquery_type": "list[cq.Edge]",
+              "model_reference": {
+                "part_id": "P001",
+                "section_ids": [
+                  "R01"
+                ],
+                "feature_ids": [
+                  "F001",
+                  "F002",
+                  "F003"
+                ],
+                "face_ids": [
+                  "FACE 0",
+                  "FACE 1",
+                  "FACE 2",
+                  "FACE 3",
+                  "FACE 4",
+                  "FACE 5",
+                  "FACE 6",
+                  "FACE 7",
+                  "FACE 8",
+                  "FACE 9",
+                  "FACE 10",
+                  "FACE 11",
+                  "FACE 12",
+                  "FACE 13",
+                  "FACE 14"
+                ],
+                "solid_ids": [
+                  "SOLID 0"
+                ]
+              },
+              "source_step_id": "",
+              "confidence": 0.99
+            },
+            "radius": {
+              "value": 0.2,
+              "unit": "mm",
+              "source_type": "request_value",
+              "cadquery_type": "float",
+              "model_reference": {
+                "part_id": "",
+                "section_ids": [],
+                "feature_ids": [],
+                "face_ids": [],
+                "solid_ids": []
+              },
+              "source_step_id": "",
+              "confidence": 1.0
+            }
+          },
+          "ontology_conformant": true,
+          "depends_on_step_ids": [],
+          "output": {
+            "name": "all_edges_fillet_result",
+            "cadquery_type": "cq.Workplane"
+          },
+          "confidence": 0.98
+        }
+      ],
+      "expected_result": {
+        "geometry": "Every edge present on the original solid has a constant-radius fillet of 0.2 mm.",
+        "function": "",
+        "behavior": ""
+      },
+      "validation_criteria": [
+        {
+          "category": "geometry",
+          "description": "Confirm that every edge from the pre-edit solid is included in the fillet result."
+        },
+        {
+          "category": "geometry",
+          "description": "Confirm that every created round has a radius of 0.2 mm."
+        },
+        {
+          "category": "preservation",
+          "description": "Confirm that existing geometry and dimensions remain unchanged except for the local material changes required by the rounds."
+        }
+      ]
+    }
+  ]
+}
+
+
+        Given the instructions and task information in operation.json, generate a CadQuery Python function that execute the modeling tasks you designed. First use CadQuery to extract information you need regarding the model, such as surfaces you want to use as reference faces. Then write CadQuery code with correct dimensions and coordinates to perform the edit.
+
+        The script that runs the function is provided for reference, as well as an example function, but you should only create your version of the function my_cad_function. Do not include any of the rest of the script.
+
+        Once you have generated the function, it will be executed in CadQuery. You will then be provided with a rendering of the CAD model created by your function, and any prints, debug or error messages. You will then have the opportunity to refine your function based on this feedback, and it will be re-executed. Continue this process until the task is complete, or you reach the maximum number of iterations.
+
+        If the task involves editing an existing model, the path to that model's .step file is passed to your function as args["input_file"], and is also listed as brep_start_path_step in the task information. Load it from args["input_file"] rather than hard-coding a path. For these cases, you might need to print out debug information once the model is loaded in your first iteration.
+
+        Return a json object with two fields. Do not include any other text outside of the json object in your response:
+        'complete': true if the task has been completed. IMPORTANT: This should only be judged by looking at the output from the last iteration, not whether a function has been returned this iteration. If there is no valid output that corresponds to the instruction, the task is not complete. The first iteration can never be complete. If this is true, then the current function will NOT be executed, and the function from the last iteration will be used.
+        'my_cad_function': CadQuery python function as a string. Use the same definition and arguments as the example.
+        Script example:
+
+        
+
+#!/usr/bin/env python3
+
+import cadquery as cq
+from cadquery import exporters
+import os
+import sys
+
+###
+# Function definitions
+###
+
+def _shape_from_result(result):
+    if hasattr(result, "val"):
+        return result.val()
+    if isinstance(result, cq.Assembly):
+        return result.toCompound()
+    return result
+
+
+def export_as_step(result, output_dir):
+    """Export CadQuery result as STEP file"""
+    try:
+        output_path = os.path.join(output_dir, "tmp.step")
+        if isinstance(result, cq.Assembly):
+            result.save(output_path)
+            print(f"Exported assembly to: {output_path}")
+            return
+        exporters.export(_shape_from_result(result), output_path, exportType="STEP")
+        print(f"Exported shape to: {output_path}")
+    except Exception as e:
+        print(f"Error exporting STEP file: {e}")
+        import traceback
+        traceback.print_exc()
+
+
+def export_as_stl(result, output_dir):
+    """Export CadQuery result as STL file"""
+    try:
+        output_path = os.path.join(output_dir, "tmp.stl")
+        exporters.export(_shape_from_result(result), output_path, exportType="STL")
+        print(f"Exported STL to: {output_path}")
+    except Exception as e:
+        print(f"Error exporting STL file: {e}")
+        import traceback
+        traceback.print_exc()
+
+
+def export_as_image(result, output_dir):
+    """Export CadQuery result as an image (SVG or PNG if VTK available)"""
+    try:
+        # Get the shape from result
+        if hasattr(result, 'val'):
+            shape = result.val()
+        elif isinstance(result, cq.Assembly):
+            # For assemblies, try to get combined shape
+            shape = result.toCompound()
+        else:
+            shape = result
+        
+        # Try PNG export using VTK (requires cadquery with ocp/vtk support)
+        png_path = os.path.join(output_dir, "tmp.png")
+        try:
+            from cadquery.vis import show
+            # Use show() with screenshot parameter instead of vis.screenshot()
+            show(
+                shape,
+                screenshot=png_path,
+                width=1920,
+                height=1080,
+                interact=False  # Don't open interactive GUI
+            )
+            print(f"Exported PNG image to: {png_path}")
+            return
+        except Exception as e:
+            print(f"Error exporting PNG image: {e}")
+            pass
+        
+        # Try using ocp_vscode or jupyter_cadquery for rendering
+        try:
+            from ocp_tessellate.convert import to_svg
+            svg_path = os.path.join(output_dir, "tmp.svg")
+            svg_content = to_svg(shape)
+            with open(svg_path, 'w') as f:
+                f.write(svg_content)
+            print(f"Exported SVG image to: {svg_path}")
+            return
+        except ImportError:
+            pass
+        
+        # Fallback: export SVG using CadQuery's built-in SVG exporter
+        svg_path = os.path.join(output_dir, "tmp.svg")
+        exporters.export(shape, svg_path, exportType="SVG")
+        print(f"Exported SVG image to: {svg_path}")
+        
+    except Exception as e:
+        print(f"Error exporting image: {e}")
+        import traceback
+        traceback.print_exc()
+
+
+def parse_cadquery_args(argv, required_args=None):
+    """
+    Parses command line arguments passed to CadQuery scripts.
+    Args will be passed as --passkey value(s)
+    Only required args are processed
+    """
+    if required_args is None:
+        required_args = ['--output_dir', '--input_file', '--function_file']
+    
+    args = {}
+    i = 0
+    while i < len(argv):
+        arg = argv[i]
+        if arg in required_args:
+            if i + 1 < len(argv):
+                args[arg.lstrip('-')] = argv[i + 1]
+                i += 1  # skip next since it's a value
+            else:
+                print(f"Warning: No value provided for argument {arg}")
+        i += 1
+    return args
+
+
+def load_and_execute_function(function_string, args):
+    """
+    Load a my_cad_function function from a string and execute it.
+    
+    Args:
+        function_string (str): The complete function definition as a string
+        args (dict): Arguments to pass to the function
+    
+    Returns:
+        CadQuery Workplane, Shape, or Assembly, or None
+    """
+    try:
+        # Create a safe execution environment with necessary imports
+        exec_globals = {
+            'cq': cq,
+            'cadquery': cq,
+            'Workplane': cq.Workplane,
+            'Assembly': cq.Assembly,
+            'exporters': exporters,
+            'os': os,
+            'sys': sys,
+            '__builtins__': __builtins__
+        }
+        
+        # Execute the function definition
+        exec(function_string, exec_globals)
+        
+        # Get the function from the execution environment
+        if 'my_cad_function' not in exec_globals:
+            raise ValueError("Function 'my_cad_function' not found in provided code")
+        
+        my_cad_function = exec_globals['my_cad_function']
+        
+        # Execute the function with arguments
+        return my_cad_function(args)
+        
+    except Exception as e:
+        print(f"Error executing LLM-provided function: {e}")
+        import traceback
+        traceback.print_exc()
+        return None
+
+
+###
+# Example my_cad_function that creates three boxes.
+###
+# def my_cad_function(args):
+#     boxes = []
+#     for translation in [(100, 0, 0), (0, 100, 0), (0, 0, 100)]:
+#         box = cq.Workplane("XY").box(10, 20, 30).translate(translation)
+#         boxes.append(box)
+#     # Combine all boxes into a compound
+#     result = boxes[0]
+#     for box in boxes[1:]:
+#         result = result.union(box)
+#     print(f"Created compound with multiple boxes at different locations.")
+#     return result
+
+###
+# Example my_cad_function that loads a STEP file and prints information.
+###
+# def my_cad_function(args):
+#     if "input_file" in args:
+#         input_file = os.path.expanduser(args["input_file"])
+#         shape = cq.importers.importStep(input_file)
+#         # Get the underlying OCC shape for analysis
+#         if hasattr(shape, 'val'):
+#             occ_shape = shape.val()
+#         else:
+#             occ_shape = shape
+#         print(f"Is Valid: {occ_shape.isValid()}")
+#         print(f"Volume: {occ_shape.Volume():.6f} mm^3")
+#         print(f"Number of faces: {len(occ_shape.Faces())}")
+#         bbox = occ_shape.BoundingBox()
+#         center = bbox.center
+#         print(f"Bbox Center: ({center.x:.4f}, {center.y:.4f}, {center.z:.4f})")
+#         return shape
+#     return None
+
+
+###
+# Main script execution
+###
+
+if __name__ == "__main__":
+    # Process command line arguments
+    argv = sys.argv
+    args = parse_cadquery_args(argv)
+    output_dir = args.get("output_dir", "~/Desktop")
+    output_dir = os.path.expanduser(output_dir)
+    if not os.path.exists(output_dir):
+        os.makedirs(output_dir)
+
+    # Do not delete tmp.step / tmp.stl from a previous successful iteration.
+    # A later failed or timed-out run must leave the last good solid in place
+    # so ingest/eval still have geometry. Preview files can be replaced.
+    for stale_name in ("tmp.png", "tmp.svg"):
+        stale_path = os.path.join(output_dir, stale_name)
+        if os.path.exists(stale_path):
+            os.remove(stale_path)
+
+    # Load function from file or use default
+    result = None
+    if "function_file" in args:
+        function_file = os.path.expanduser(args["function_file"])
+        if os.path.exists(function_file):
+            try:
+                with open(function_file, 'r') as f:
+                    function_string = f.read()
+                print(f"Loading function from: {function_file}")
+                result = load_and_execute_function(function_string, args)
+            except Exception as e:
+                print(f"Error loading function from file: {e}")
+        else:
+            print(f"Function file not found: {function_file}")
+    else:
+        print("No function file provided")
+
+    # Export results if a result was returned
+    if result is not None:
+        export_as_step(result, output_dir)
+        export_as_stl(result, output_dir)
+        export_as_image(result, output_dir)
+    else:
+        print("No CadQuery result returned; skipped STEP/STL/image export.")
+    
+    print("Script completed.")
+
+Instruction:
+
+Edit the existing model according to the provided instructions.
+
+Task information:
+
+request_text:
+
+Add rounds to all edges of the part. R=0,2mm
+
+brep_start_path_step:
+
+/home/adml/Research/Hackathon2026/IDETC26-Hackathon-Autodesk-neuralCAD-Edit/data/edit_192_external/breps/F332D3FXML85WLR2_1769424114.3880424.step
+
+Last output rendering: None (this is the first iteration)
+
+Iterations remaining: 10

@@ -1,0 +1,277 @@
+Thinking text:
+**Exploring coordinate mapping**
+
+I’m thinking about how to map coordinates on the XZ plane and extrude positively along the Y-axis. Maybe using CadQuery's Workplane("XZ") with the normal set to (0,-1,0) will be a good start. Solid.makePolygon might simplify the process. I should consider the orientation uncertainty while using cq.Workplane("XZ") to establish the origin first. I feel like calling cq.Solid.extrudeLinear with a polygon wire could also work for this.
+**Calculating root radius**
+
+I'm considering how to derive the potential root radius from the maximum radius and the variable z using the standard module. I note that the existing maximum radial derived from bounding box corners may be overestimating if both the bounding box x and z max are taken into account. To address this, I’ll compute the vertices' maximum using the square root, leading to a good understanding of r_outer as the max radial over the sprocket's solid vertices.
+**Designing a gear profile**
+
+I’m visualizing a solid outer profile for a gear, minus the central cylinder at the rim's inner radius. My aim is to create a full gear and then subtract the inner cylinder to form an annulus. I want the inner radius to be less than the rim radius, around 43.765, while the spoke bounding box goes up to 46. I need to make sure to retain the holes, so I’ll adjust the inner radius to about 42.5. It’s important to construct each tooth individually and then unite them with the main body, ensuring I don't create a complete disk.
+**Building tooth polygons**
+
+I need to construct each tooth polygon as a closed shape, starting with the root-left at the radius (rf) minus half the base. Then, I'll outline the base-left, flank to tip, and then the tip arc, followed by the flank, root-right, and finally connect back to the root arc, possibly using a direct chord. This will define the root region sector between the chord and tooth, overlapping with the trimmed body. I should ensure that I trim it at rf plus 0.2, with the tooth beginning at rf minus 0.
+**Aligning face parameters**
+
+I'm focusing on the rmax value, which seems abnormal due to the bounding box, but it’s valid. I need to align the phase of the original tooth and derive the representative Face 671's center angle in the xz plane from the global faces. It appears that Face index 671 might be 0-based, and the center is close to one tooth. So I'll set the phase using atan2(z,x) of the center and ensure the tip face center aligns with the radial center. After that, I'll print the results.
+
+Generated script:
+def my_cad_function(args):
+    import os
+    import math
+
+    input_file = os.path.expanduser(args["input_file"])
+    imported = cq.importers.importStep(input_file)
+    model = imported.val() if hasattr(imported, "val") else imported
+
+    print("Loaded STEP:", input_file)
+    print("Model valid:", model.isValid())
+    print("Global face count:", len(model.Faces()))
+
+    # Bind the planning-stage FACE N references to the actual imported topology.
+    faces = list(model.Faces())
+    reference_indices = [513, 593, 670, 671, 672, 673, 779]
+    for idx in reference_indices:
+        if idx < len(faces):
+            face = faces[idx]
+            c = face.Center()
+            bb = face.BoundingBox()
+            try:
+                gt = face.geomType()
+            except Exception:
+                gt = "UNKNOWN"
+            print(
+                "FACE %d: type=%s area=%.6f center=(%.6f, %.6f, %.6f) "
+                "bbox=(%.6f, %.6f, %.6f)-(%.6f, %.6f, %.6f)"
+                % (
+                    idx, gt, face.Area(), c.x, c.y, c.z,
+                    bb.xmin, bb.ymin, bb.zmin,
+                    bb.xmax, bb.ymax, bb.zmax,
+                )
+            )
+
+    solids = list(model.Solids())
+    if len(solids) < 2:
+        raise ValueError("Expected the two-solid sprocket and insert model")
+
+    # SOLID 1 is selected geometrically as the solid with the greatest radial span.
+    def radial_extent(shape):
+        radii = []
+        for vertex in shape.Vertices():
+            p = vertex.Center()
+            radii.append(math.hypot(p.x, p.z))
+        if radii:
+            return max(radii)
+        bb = shape.BoundingBox()
+        return max(
+            math.hypot(x, z)
+            for x in (bb.xmin, bb.xmax)
+            for z in (bb.zmin, bb.zmax)
+        )
+
+    solid_data = []
+    for i, solid in enumerate(solids):
+        bb = solid.BoundingBox()
+        rext = radial_extent(solid)
+        solid_data.append((rext, solid))
+        print(
+            "Solid %d: volume=%.6f radial_extent=%.6f "
+            "bbox=(%.6f, %.6f, %.6f)-(%.6f, %.6f, %.6f)"
+            % (
+                i, solid.Volume(), rext,
+                bb.xmin, bb.ymin, bb.zmin,
+                bb.xmax, bb.ymax, bb.zmax,
+            )
+        )
+
+    solid_data.sort(key=lambda item: item[0], reverse=True)
+    sprocket = solid_data[0][1]
+    preserved_solids = [item[1] for item in solid_data[1:]]
+
+    sprocket_bb = sprocket.BoundingBox()
+    y_min = sprocket_bb.ymin
+    y_max = sprocket_bb.ymax
+    face_width = y_max - y_min
+    outside_radius = radial_extent(sprocket)
+
+    tooth_count = 27
+    pressure_angle = math.radians(20.0)
+
+    # With no replacement dimensions supplied, fit a standard full-depth
+    # 27-tooth involute definition to the existing maximum radial envelope.
+    module = (2.0 * outside_radius) / float(tooth_count + 2)
+    pitch_radius = module * tooth_count / 2.0
+    base_radius = pitch_radius * math.cos(pressure_angle)
+    addendum_radius = outside_radius
+    root_radius = pitch_radius - 1.25 * module
+
+    if root_radius <= 0.0 or root_radius >= addendum_radius:
+        raise ValueError("Derived spur gear radii are invalid")
+
+    print(
+        "Derived spur gear: teeth=%d module=%.6f pressure_angle=20deg "
+        "root_r=%.6f base_r=%.6f pitch_r=%.6f outside_r=%.6f "
+        "face_width=%.6f y=[%.6f, %.6f]"
+        % (
+            tooth_count, module, root_radius, base_radius,
+            pitch_radius, addendum_radius, face_width, y_min, y_max,
+        )
+    )
+
+    # Align the new pattern with the representative original tooth-tip face.
+    phase = 0.0
+    if 671 < len(faces):
+        tip_center = faces[671].Center()
+        tip_radius = math.hypot(tip_center.x, tip_center.z)
+        if tip_radius > 0.65 * outside_radius:
+            phase = math.atan2(tip_center.z, tip_center.x)
+    print("Pattern phase (degrees):", math.degrees(phase))
+
+    # Suppress all of F009 by clipping the sprocket to a continuous root blank.
+    # A small radial overlap is retained for robust tooth-to-rim union.
+    trim_radius = root_radius + min(0.15, 0.04 * module)
+    axial_pad = max(0.2, 0.05 * face_width)
+    trim_cylinder = cq.Solid.makeCylinder(
+        trim_radius,
+        face_width + 2.0 * axial_pad,
+        cq.Vector(0.0, y_min - axial_pad, 0.0),
+        cq.Vector(0.0, 1.0, 0.0),
+    )
+    trimmed_sprocket = sprocket.intersect(trim_cylinder)
+    if trimmed_sprocket.isNull():
+        raise ValueError("Root-envelope trimming removed the sprocket")
+
+    def involute_function(alpha):
+        return math.tan(alpha) - alpha
+
+    inv_pressure = involute_function(pressure_angle)
+    half_tooth_at_pitch = math.pi / (2.0 * tooth_count)
+    base_half_angle = half_tooth_at_pitch + inv_pressure
+
+    # Start each additive tooth slightly inside the retained root cylinder.
+    join_radius = root_radius - min(0.35, 0.08 * module)
+    flank_start_radius = max(base_radius, root_radius)
+    flank_samples = 9
+
+    def half_angle_at_radius(radius):
+        if radius <= base_radius:
+            return base_half_angle
+        alpha = math.acos(max(-1.0, min(1.0, base_radius / radius)))
+        return half_tooth_at_pitch + inv_pressure - involute_function(alpha)
+
+    tooth_solids = []
+    pitch_angle = 2.0 * math.pi / tooth_count
+
+    for tooth_index in range(tooth_count):
+        center_angle = phase + tooth_index * pitch_angle
+        points_2d = []
+
+        # Negative-angle root and base connection.
+        points_2d.append((
+            join_radius * math.cos(center_angle - base_half_angle),
+            join_radius * math.sin(center_angle - base_half_angle),
+        ))
+        if flank_start_radius > join_radius + 1.0e-7:
+            points_2d.append((
+                flank_start_radius * math.cos(center_angle - half_angle_at_radius(flank_start_radius)),
+                flank_start_radius * math.sin(center_angle - half_angle_at_radius(flank_start_radius)),
+            ))
+
+        # First involute flank, from base/root region to addendum.
+        for j in range(1, flank_samples + 1):
+            fraction = float(j) / float(flank_samples)
+            radius = flank_start_radius + fraction * (addendum_radius - flank_start_radius)
+            angle = center_angle - half_angle_at_radius(radius)
+            points_2d.append((radius * math.cos(angle), radius * math.sin(angle)))
+
+        # A direct segment between the two addendum endpoints forms a flat
+        # top land rather than the original cylindrical rounded sprocket lobe.
+        tip_half_angle = half_angle_at_radius(addendum_radius)
+        points_2d.append((
+            addendum_radius * math.cos(center_angle + tip_half_angle),
+            addendum_radius * math.sin(center_angle + tip_half_angle),
+        ))
+
+        # Opposing involute flank, descending toward the root.
+        for j in range(flank_samples - 1, -1, -1):
+            fraction = float(j) / float(flank_samples)
+            radius = flank_start_radius + fraction * (addendum_radius - flank_start_radius)
+            angle = center_angle + half_angle_at_radius(radius)
+            points_2d.append((radius * math.cos(angle), radius * math.sin(angle)))
+
+        points_2d.append((
+            join_radius * math.cos(center_angle + base_half_angle),
+            join_radius * math.sin(center_angle + base_half_angle),
+        ))
+
+        # Map transverse XZ coordinates into 3D at the rear axial limit and
+        # extrude linearly along +Y, producing straight, untwisted spur traces.
+        polygon_vertices = [cq.Vector(x, y_min, z) for x, z in points_2d]
+        polygon_vertices.append(polygon_vertices[0])
+        tooth_wire = cq.Wire.makePolygon(polygon_vertices)
+        tooth_face = cq.Face.makeFromWires(tooth_wire)
+        tooth_solid = cq.Solid.extrudeLinear(
+            tooth_face,
+            cq.Vector(0.0, face_width, 0.0),
+        )
+        tooth_solids.append(tooth_solid)
+
+    # Unite all 27 replacement teeth to the retained F008 rim in one operation.
+    tooth_compound = cq.Compound.makeCompound(tooth_solids)
+    rebuilt_sprocket = trimmed_sprocket.fuse(tooth_compound)
+
+    # Clean coincident splitter faces where supported by the installed CQ build.
+    try:
+        rebuilt_sprocket = rebuilt_sprocket.clean()
+    except Exception as exc:
+        print("Non-fatal clean warning:", exc)
+
+    print("Rebuilt sprocket valid:", rebuilt_sprocket.isValid())
+    print("Rebuilt sprocket solids:", len(rebuilt_sprocket.Solids()))
+    print("Rebuilt sprocket volume:", rebuilt_sprocket.Volume())
+
+    if not rebuilt_sprocket.isValid():
+        raise ValueError("The rebuilt spur gear is not a valid B-rep")
+
+    # Keep the splined insert as a separate solid and restore the two-component
+    # assembly as a compound, without modifying R01, R02, or R03 internally.
+    output_solids = list(rebuilt_sprocket.Solids()) + preserved_solids
+    result = cq.Compound.makeCompound(output_solids)
+    print("Final compound solids:", len(result.Solids()))
+    print("Final model valid:", result.isValid())
+    return result
+
+
+Program output:
+stdout: Loading function from: /home/adml/Research/Hackathon2026/IDETC26-Hackathon-Autodesk-neuralCAD-Edit/output/gpt-5.6-sol-ontology-full48/gpt-5.6-sol-ontology_cadquery-script_1787114332.3505607/brep_end/1787114332.3505607/temp_script.py
+Loaded STEP: /home/adml/Research/Hackathon2026/IDETC26-Hackathon-Autodesk-neuralCAD-Edit/data/edit_192_external/breps/SUJ2G2UMJQR7PMBX_1759210034.374472.step
+Model valid: True
+Global face count: 1482
+FACE 513: type=CYLINDER area=129.125870 center=(-25.547209, -1.460500, 35.162716) bbox=(-32.358181, -5.080000, 29.468509)-(-18.026990, 2.159000, 39.880729)
+FACE 593: type=CYLINDER area=129.125870 center=(25.547209, -1.460500, 35.162716) bbox=(18.026990, -5.080000, 29.468509)-(32.358181, 2.159000, 39.880729)
+FACE 670: type=PLANE area=4.809268 center=(37.834522, -1.587500, 38.764625) bbox=(36.918574, -2.881009, 38.315123)-(38.853279, -0.293991, 39.264580)
+FACE 671: type=CYLINDER area=7.887704 center=(40.783494, -1.587500, 38.481140) bbox=(38.853279, -2.525264, 36.509253)-(41.711787, -0.649736, 39.467527)
+FACE 672: type=CONE area=23.132930 center=(38.996780, -0.368668, 36.792354) bbox=(34.895020, -0.888859, 32.631402)-(41.711787, 0.000000, 39.467527)
+FACE 673: type=PLANE area=4.831183 center=(40.896983, -1.587500, 35.516036) bbox=(40.394163, -2.881934, 34.623395)-(41.456457, -0.293066, 36.509253)
+FACE 779: type=CYLINDER area=28.115965 center=(33.100175, -1.587500, 39.444314) bbox=(31.165572, -3.175000, 37.906627)-(36.918574, 0.000000, 43.005652)
+Solid 0: volume=2162.777148 radial_extent=15.750000 bbox=(-15.750000, -4.625019, -15.750000)-(15.750000, 3.174981, 15.750000)
+Solid 1: volume=27615.571303 radial_extent=55.240958 bbox=(-56.511168, -6.350000, -56.603624)-(56.510983, 3.175000, 56.234103)
+Derived spur gear: teeth=27 module=3.809721 pressure_angle=20deg root_r=46.669085 base_r=48.329553 pitch_r=51.431236 outside_r=55.240958 face_width=9.525000 y=[-6.350000, 3.175000]
+Pattern phase (degrees): 43.336230608287586
+Rebuilt sprocket valid: False
+Rebuilt sprocket solids: 1
+Rebuilt sprocket volume: 32513.55290769011
+Error executing LLM-provided function: The rebuilt spur gear is not a valid B-rep
+No CadQuery result returned; skipped STEP/STL/image export.
+Script completed.
+
+stderr: Traceback (most recent call last):
+  File "/home/adml/Research/Hackathon2026/IDETC26-Hackathon-Autodesk-neuralCAD-Edit/src/harnesses/cadquery_script.py", line 158, in load_and_execute_function
+    return my_cad_function(args)
+           ^^^^^^^^^^^^^^^^^^^^^
+  File "<string>", line 216, in my_cad_function
+ValueError: The rebuilt spur gear is not a valid B-rep
+
+
+Exported this iteration:
+none (CadQuery failed or returned no shape)

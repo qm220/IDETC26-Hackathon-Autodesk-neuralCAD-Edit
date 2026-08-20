@@ -1,0 +1,9 @@
+=== thinking_text ===
+
+
+=== response_text ===
+{
+  "complete": true,
+  "my_cad_function": "def my_cad_function(args):\n    import os\n\n    input_file = os.path.expanduser(args[\"input_file\"])\n    imported = cq.importers.importStep(input_file)\n    original = imported.val() if hasattr(imported, \"val\") else imported\n\n    bbox = original.BoundingBox()\n    distal_candidates = []\n    for index, face in enumerate(original.Faces()):\n        fb = face.BoundingBox()\n        center = face.Center()\n        if (face.geomType() == \"PLANE\" and\n                abs(fb.xmax - fb.xmin) < 1.0e-5 and\n                abs(center.x - bbox.xmax) < 1.0e-4):\n            distal_candidates.append((abs(face.Area() - 48.0), index, face, center.x))\n\n    if not distal_candidates:\n        raise ValueError(\"Could not resolve the planar non-rounded distal end face\")\n\n    distal_candidates.sort(key=lambda item: item[0])\n    _, distal_index, distal_face, mirror_x = distal_candidates[0]\n    print(\"Resolved mirror reference as FACE %d at x=%.6f\" %\n          (distal_index, mirror_x))\n\n    mirrored = original.mirror(\"YZ\", (mirror_x, 0.0, 0.0))\n    fused = original.fuse(mirrored).clean()\n\n    if not fused.isValid():\n        raise ValueError(\"The fused mirrored result is not a valid B-rep\")\n    if len(fused.Solids()) != 1:\n        raise ValueError(\"Expected exactly one unified solid, got %d\" % len(fused.Solids()))\n\n    return cq.Workplane(obj=fused)",
+  "error": ""
+}

@@ -1,0 +1,107 @@
+Analyze the attached multi-view images of a mechanical/CAD part.
+Produce a single JSON file describing the part's structure.
+
+You are given those information:
+1. Labeled multi-view images of the original mechanical part.
+2. A CadQuery STEP/B-rep analysis report.
+
+Follow these analysis steps in order:
+1. Identify the object. If it is an identifiable daily object, such as an coffee machine, decide its semantic orientation. Distinguish its front, back, left, right, top and bottom semantic views to match what humans would consider them. Then match those semantic views with +X, -X, +Y, -Y, +Z and -Z, where a label such as +X or -Z is a CAD view direction.
+
+2. FEATURE IDENTIFICATION
+   List distinct functional features (mounting points, joints, interfaces)
+   and structural features (ribs, shells, spines, cavities) visible across
+   the views.
+
+3. SECTIONING
+   Divide the part into logical sections. For each
+   section, capture: a short name, its relative location on
+   the part, and a plain-language description of its geometry.
+   One section can contain one to multiple features, identify which features are included in the each section. 
+
+4. For each section and features within the section, reason about the FUNCTIONAL INTENT, the PHYSICAL BEHAVIOR of the section to perform the function.
+
+5. Analyse the RELATIONSHIPs between each sections and features. Two types of RELATIONSHIPS should be considered. First, functional relationships, such as support, reinforce and retain. Second, structural relationships, such as adjacency, coaxial and symmetric.
+
+6. B-rep face identification
+  The CadQuery Brep analysis report has been attached. It contain the metadata of the model and all of its faces. Analyse the faces of the B-rep model and assign them to corresponding features based on their bounding boxes, coordinates and visibility in the images. Record them with their unique CadQuery id in the JSON file. Give each face a short one-line description. CadQuery Brep analysis report should be used as authorative geometry reference. Extra ids, faces should not be added if it is not in the report. 
+
+7. For the faces that are ambiguous and cannot be clearly categorised into features. Assign them into features where they most likely belong.
+
+8. ADJACENCY ORDERING
+   Within each section's surface list, order the surfaces so each is
+   physically adjacent to its neighbors in the list (a walk across the
+   section, not an arbitrary order). If a section contains disconnected
+   sub-groups (e.g. two separate tabs that don't touch), order each
+   sub-group internally.
+
+9. Record your analysis result in the JSON file following the schema.
+
+==================================================
+OUTPUT: Only valid JSON, 
+==================================================
+JSON schema:
+
+
+{
+  "part": {
+    "id": "",
+    "name": "",
+    "source_views": [],
+    "solid_ids": [],
+    "semantic_orientation": {
+      "confidence": null,
+      "view_sides": {
+        "+X": "right|left|front|back|top|bottom|unknown",
+        "-X": "right|left|front|back|top|bottom|unknown",
+        "+Y": "right|left|front|back|top|bottom|unknown",
+        "-Y": "right|left|front|back|top|bottom|unknown",
+        "+Z": "right|left|front|back|top|bottom|unknown",
+        "-Z": "right|left|front|back|top|bottom|unknown"
+      }
+    },
+    "part_functions": [
+      {
+        "name": "",
+        "function": null,
+        "confidence": null
+      }
+    ],
+    "sections": [
+      {
+        "id": "",
+        "name": "",
+        "solid_ids": [],
+        "section_functions": [
+          {
+            "name": "",
+            "function": null,
+            "confidence": null
+          }
+        ],
+        "features": [
+          {
+            "id": "",
+            "name": "",
+            "feature_functions": [
+              {
+                "name": "",
+                "function": null,
+                "confidence": null
+              }
+            ],
+            "brep_faces": [
+              {
+                "cadquery_face_id": "",
+                "geometry_type": "",
+                "semantic_role": "",
+                "feature_assignment_confidence": null
+              }
+            ],
+            "confidence": null
+          }
+        ]
+      }
+    ]
+  }
+}

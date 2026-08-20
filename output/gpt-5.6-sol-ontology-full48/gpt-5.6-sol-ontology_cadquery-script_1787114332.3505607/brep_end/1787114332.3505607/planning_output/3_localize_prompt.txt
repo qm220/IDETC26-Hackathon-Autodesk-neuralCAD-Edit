@@ -1,0 +1,1482 @@
+Now use all the given information:
+1. model.json
+2. operation.json
+3. Multiview images labelled with CAD look directions (+X, -X, +Y, -Y, +Z, -Z, and iso1 / iso2 when present)
+
+Decide which sections and features of the original model should be modified, removed, interacted with, or whether new features should be created. Use as much information from the multiview images, model.json, and operation.json as possible.
+
+Make this decision using the following evidence, in this order:
+
+1. If the action target clearly identifies geometry, locate the corresponding section(s), feature(s), and B-rep FACE/EDGE IDs in model.json (part.sections, features, brep_faces, brep_edges, unclassified_brep_faces).
+2. If the request indicates a side using "front", "back", "top", "bottom", "left", or "right", use part.semantic_orientation from model.json.
+   - Prefer view_sides: that maps each CAD view label (+X, -Y, …) to a human-semantic side.
+   - Also use status, description, and confidence.
+   - If status is "unknown", the requested side is missing from view_sides, or confidence is below 0.6, treat the directional word as ambiguous. Do not guess an axis from the camera label alone. Use other evidence instead.
+3. If no clear geometry is identified, use referenced_feature_words and relational_constraint to identify candidate sections and features.
+4. Also consider the intention of the edit. Based on each section's and feature's functions and behaviors, decide which entity most needs the action. Then record the corresponding section id, feature id, and FACE IDs from model.json.
+
+Brep_id values are CadQuery Faces()/Edges() indices from the STEP analysis report (for example FACE 0, EDGE 12). Prefer listing those exact IDs in "target face code" (and in steps when they help later CadQuery implementation). You may also list feature ids (F001) and section ids (R01).
+
+Plan the modeling procedure needed to perform each action. Describe it in professional CAD modelling language, from choosing the plane and drawing sketches through extrusion, cuts, fillets, and chamfers. Be thorough and detailed.
+
+Edit operation.json accordingly. Keep the previous request_wording and actions, and add localization plus steps.
+
+OUTPUT FORMAT (JSON, operation.json, no markdown fences, use this schema):
+{
+  "request": "",
+  "request_wording": {
+    "action_words": ["..."],
+    "referenced_feature_words": ["..."],
+    "intention_words": ["..."],
+    "grammatical_words": ["..."]
+  },
+  "actions": [
+    {
+      "operation": "...",
+      "parameters": {
+        "parameter_name": "..."
+      },
+      "target": "...",
+      "relational_constraint": "...",
+      "unresolved_reference": "...",
+      "target section code": ["R01"],
+      "target face code": ["F001", "FACE 0"],
+      "steps": [
+        "...",
+        "..."
+      ]
+    }
+  ],
+  "intention": ["..."]
+}
+
+The model.json, operation.json, and labeled multi-view images follow.
+
+
+aim.json:
+
+{
+  "request": "Hi , Please convert the round edges of the gear into straight spur gear teeth.",
+  "request_wording": {
+    "action_words": [
+      "convert",
+      "into",
+      "straight",
+      "spur",
+      "gear",
+      "teeth"
+    ],
+    "referenced_feature_words": [
+      "round",
+      "edges",
+      "gear"
+    ],
+    "intention_words": [],
+    "grammatical_words": [
+      "Hi",
+      "Please",
+      "the",
+      "of",
+      "the"
+    ]
+  },
+  "actions": [
+    {
+      "operation": "Convert the referenced rounded edge geometry into straight spur gear teeth.",
+      "parameters": {
+        "tooth_orientation": "straight",
+        "gear_type": "spur"
+      },
+      "target": "the round edges of the existing gear",
+      "relational_constraint": "The straight spur gear teeth must replace the referenced round edges and remain part of the gear.",
+      "unresolved_reference": "Identify the existing gear, the specific round edges to be converted, and the gear axis needed to establish the straight spur-tooth orientation. Tooth count, profile, pitch, and dimensions are not specified."
+    }
+  ],
+  "intention": [
+    "Configure the gear with straight spur teeth instead of rounded edge geometry."
+  ]
+}
+
+model.json:
+
+{
+  "part": {
+    "id": "P001",
+    "name": "Splined sprocket assembly",
+    "description": "Two-solid, thin annular power-transmission model comprising a large 27-tooth sprocket body with a lightweight spoke/web structure and a separate central internally splined insert. The solids are coaxially nested but remain distinct B-rep solids, indicating separate functional components rather than accidental disconnected geometry.",
+    "source_views": [
+      "+Z",
+      "-Z",
+      "+X",
+      "-X",
+      "+Y",
+      "-Y",
+      "iso1"
+    ],
+    "solid_ids": [
+      "SOLID 0",
+      "SOLID 1"
+    ],
+    "symmetry_note": "Both solids are organized around the common thin-part axis, geometrically corresponding to the CAD Y direction. SOLID 0 has a repeated internal spline profile. SOLID 1 has a 27-member circular tooth pattern and an approximately circular repeated spoke/cutout network. The overall body is approximately rotationally periodic, although the spoke openings vary in shape.",
+    "semantic_orientation": {
+      "status": "partially_inferred",
+      "description": "The object is a rotational power-transmission component, so top, bottom, left, and right are not intrinsic semantic sides. The two broad axial faces can reasonably be called front and back, but their assignment to the labeled face-on views remains interpretation rather than geometric fact. The functional rotation axis is the thin-part axis, corresponding to CAD Y in the STEP geometry.",
+      "confidence": 0.58,
+      "view_sides": {
+        "+X": "unknown",
+        "-X": "unknown",
+        "+Y": "unknown",
+        "-Y": "unknown",
+        "+Z": "front",
+        "-Z": "back"
+      }
+    },
+    "sections": [
+      {
+        "id": "R01",
+        "name": "Splined center insert",
+        "ontology_class": "cad:CentralSection",
+        "description": "Separate central component formed by SOLID 0. It provides the internally splined shaft interface and an external seating/coupling envelope that fits within the sprocket hub.",
+        "location": "Coaxially nested at the center of the sprocket body, inside the central hub region.",
+        "solid_ids": [
+          "SOLID 0"
+        ],
+        "colour": {
+          "R": 70,
+          "G": 130,
+          "B": 220
+        },
+        "section_functions": [
+          {
+            "ontology_class": "cad:TransmitTorqueFunction",
+            "name": "Transmit shaft torque",
+            "description": "Transfers torque between a mating splined shaft and the surrounding sprocket hub.",
+            "primary": true,
+            "confidence": 0.93
+          },
+          {
+            "ontology_class": "cad:LocateFunction",
+            "name": "Locate the shaft interface",
+            "description": "Centers and axially references the shaft coupling within the sprocket.",
+            "primary": false,
+            "confidence": 0.82
+          }
+        ],
+        "section_behaviors": [
+          {
+            "ontology_class": "cad:ResistTorsionBehavior",
+            "name": "Resist torsion",
+            "description": "The spline teeth and insert body react circumferential contact forces and transmit torsional loading.",
+            "confidence": 0.94
+          },
+          {
+            "ontology_class": "cad:CarryShearBehavior",
+            "name": "Carry spline shear",
+            "description": "Repeated spline flanks carry distributed tangential shear.",
+            "confidence": 0.92
+          }
+        ],
+        "feature_groups": [
+          {
+            "id": "G001",
+            "name": "Internal spline tooth pattern",
+            "ontology_class": "cad:RepeatedFeatureGroup",
+            "feature_class": "cad:ToothFeature",
+            "pattern_type": "cad:CircularPattern",
+            "member_count": null,
+            "member_feature_ids": [
+              "F001"
+            ],
+            "representative_feature_ids": [
+              "F001"
+            ],
+            "pattern_description": "Uniform circumferential pattern of internal spline teeth. The exact tooth count is visually evident as large but was not deterministically summarized by the supplied report, so no count is asserted.",
+            "confidence": 0.94
+          }
+        ],
+        "features": [
+          {
+            "id": "F001",
+            "name": "Internal splined through bore",
+            "ontology_class": "cad:SplineFeature",
+            "parent_feature_id": null,
+            "description": "Axially through internal spline composed of many repeated planar tooth flanks and narrow root/tip surfaces extending across the 7.8 mm axial span of SOLID 0.",
+            "interface_type": "cad:SplineInterface",
+            "feature_functions": [
+              {
+                "ontology_class": "cad:TransmitTorqueFunction",
+                "name": "Transmit torque through spline engagement",
+                "description": "Engages a mating splined shaft to transfer torque.",
+                "primary": true,
+                "confidence": 0.96
+              },
+              {
+                "ontology_class": "cad:LocateFunction",
+                "name": "Center the shaft",
+                "description": "The circumferential spline envelope locates the mating shaft about the common axis.",
+                "primary": false,
+                "confidence": 0.86
+              }
+            ],
+            "feature_behaviors": [
+              {
+                "ontology_class": "cad:CarryShearBehavior",
+                "name": "Carry tangential shear",
+                "description": "Spline flanks react repeated tangential contact loads.",
+                "confidence": 0.95
+              },
+              {
+                "ontology_class": "cad:ReactContactLoadBehavior",
+                "name": "React spline contact",
+                "description": "Tooth flanks provide distributed contact with a mating shaft spline.",
+                "confidence": 0.94
+              }
+            ],
+            "relationships": [
+              {
+                "target_feature_id": "F002",
+                "category": "cad:GeometricFeatureRelationship",
+                "relation": "cad:concentricWith",
+                "description": "The spline pattern and insert seating envelope share the central rotational axis.",
+                "confidence": 0.99
+              },
+              {
+                "target_feature_id": "F002",
+                "category": "cad:FunctionalFeatureRelationship",
+                "relation": "cad:transmitsLoadTo",
+                "description": "Spline tooth loads pass into the surrounding insert body.",
+                "confidence": 0.95
+              }
+            ],
+            "brep_faces": [
+              {
+                "brep_id": "FACE 3",
+                "face_code": "FACE 3",
+                "entity_type": "cad:Face",
+                "geometry_type": "cad:PlanarSurface",
+                "semantic_role": "cad:ToothFlankRole",
+                "name": "Representative spline flank A",
+                "description": "Representative planar internal spline flank extending through the insert thickness.",
+                "salience": "cad:RepresentativeSalience",
+                "confidence": 0.98,
+                "evidence": [
+                  "PLANE surface",
+                  "Axial bbox span y=-4.625019 to 3.174981",
+                  "Centroid near the internal radius",
+                  "Repeated circumferential planar-face correspondence"
+                ]
+              },
+              {
+                "brep_id": "FACE 4",
+                "face_code": "FACE 4",
+                "entity_type": "cad:Face",
+                "geometry_type": "cad:PlanarSurface",
+                "semantic_role": "cad:ToothFlankRole",
+                "name": "Representative spline flank B",
+                "description": "Opposing flank of the representative internal spline tooth.",
+                "salience": "cad:RepresentativeSalience",
+                "confidence": 0.98,
+                "evidence": [
+                  "PLANE surface",
+                  "Axial bbox span y=-4.625019 to 3.174981",
+                  "Mirrored centroid relative to FACE 3",
+                  "Repeated spline topology"
+                ]
+              },
+              {
+                "brep_id": "FACE 5",
+                "face_code": "FACE 5",
+                "entity_type": "cad:Face",
+                "geometry_type": "cad:PlanarSurface",
+                "semantic_role": "cad:RootSurfaceRole",
+                "name": "Representative spline root surface",
+                "description": "Narrow axial surface joining the representative pair of spline flanks.",
+                "salience": "cad:RepresentativeSalience",
+                "confidence": 0.96,
+                "evidence": [
+                  "PLANE surface",
+                  "Area 0.390000 mm^2",
+                  "Axial bbox span 7.8 mm",
+                  "Located between FACE 3 and FACE 4 in the repeated spline profile"
+                ]
+              }
+            ],
+            "confidence": 0.96
+          },
+          {
+            "id": "F002",
+            "name": "Insert seating and coupling body",
+            "ontology_class": "cad:HubFeature",
+            "parent_feature_id": null,
+            "description": "External body of the separate spline insert, including a cylindrical seating surface, axial end seats, chamfered transitions, and a shaped coupling profile.",
+            "interface_type": "cad:SeatingInterface",
+            "feature_functions": [
+              {
+                "ontology_class": "cad:ConnectFunction",
+                "name": "Connect spline to sprocket hub",
+                "description": "Provides the material path between the internal spline and the receiving hub interface.",
+                "primary": true,
+                "confidence": 0.91
+              },
+              {
+                "ontology_class": "cad:LocateFunction",
+                "name": "Locate insert in hub",
+                "description": "External seating surfaces center and axially reference the insert.",
+                "primary": false,
+                "confidence": 0.89
+              }
+            ],
+            "feature_behaviors": [
+              {
+                "ontology_class": "cad:ResistTorsionBehavior",
+                "name": "Carry insert torsion",
+                "description": "The hub-like body carries torque from the spline to the external coupling profile.",
+                "confidence": 0.92
+              },
+              {
+                "ontology_class": "cad:ReactContactLoadBehavior",
+                "name": "React seating contact",
+                "description": "External faces react contact against the receiving sprocket hub.",
+                "confidence": 0.86
+              }
+            ],
+            "relationships": [
+              {
+                "target_feature_id": "F004",
+                "category": "cad:GeometricFeatureRelationship",
+                "relation": "cad:insideFeature",
+                "description": "The insert body is visually nested inside the sprocket's receiving hub interface.",
+                "confidence": 0.93
+              },
+              {
+                "target_feature_id": "F004",
+                "category": "cad:FunctionalFeatureRelationship",
+                "relation": "cad:engagesWith",
+                "description": "The shaped outer insert profile is inferred to engage the central receiving interface of SOLID 1.",
+                "confidence": 0.86
+              },
+              {
+                "target_feature_id": "F004",
+                "category": "cad:GeometricFeatureRelationship",
+                "relation": "cad:coaxialWith",
+                "description": "Both central components are arranged around the same rotational axis.",
+                "confidence": 0.98
+              }
+            ],
+            "brep_faces": [
+              {
+                "brep_id": "FACE 0",
+                "face_code": "FACE 0",
+                "entity_type": "cad:Face",
+                "geometry_type": "cad:ConicalSurface",
+                "semantic_role": "cad:ChamferSurfaceRole",
+                "name": "Insert outer entry chamfer",
+                "description": "Conical lead-in around the external insert envelope.",
+                "salience": "cad:SecondarySalience",
+                "confidence": 0.94,
+                "evidence": [
+                  "CONE surface",
+                  "Cone radius 15.500000 mm",
+                  "Semi-angle 0.785398 rad",
+                  "Axis parallel to CAD Y"
+                ]
+              },
+              {
+                "brep_id": "FACE 1",
+                "face_code": "FACE 1",
+                "entity_type": "cad:Face",
+                "geometry_type": "cad:PlanarSurface",
+                "semantic_role": "cad:SeatingFaceRole",
+                "name": "Insert axial end seat",
+                "description": "Broad annular axial face of the insert.",
+                "salience": "cad:PrimarySalience",
+                "confidence": 0.95,
+                "evidence": [
+                  "PLANE surface",
+                  "Area 372.760131 mm^2",
+                  "Normal parallel to CAD Y",
+                  "Two wires indicating annular topology"
+                ]
+              },
+              {
+                "brep_id": "FACE 2",
+                "face_code": "FACE 2",
+                "entity_type": "cad:Face",
+                "geometry_type": "cad:CylindricalSurface",
+                "semantic_role": "cad:InterfaceFaceRole",
+                "name": "Insert cylindrical seating wall",
+                "description": "External cylindrical seating surface with radius 15.75 mm.",
+                "salience": "cad:PrimarySalience",
+                "confidence": 0.98,
+                "evidence": [
+                  "CYLINDER surface",
+                  "Radius 15.750000 mm",
+                  "Axis parallel to CAD Y",
+                  "Centered at x=0, z=0"
+                ]
+              },
+              {
+                "brep_id": "FACE 224",
+                "face_code": "FACE 224",
+                "entity_type": "cad:Face",
+                "geometry_type": "cad:PlanarSurface",
+                "semantic_role": "cad:MountingSeatRole",
+                "name": "Intermediate insert shoulder",
+                "description": "Planar annular shoulder normal to the insert axis.",
+                "salience": "cad:SecondarySalience",
+                "confidence": 0.88,
+                "evidence": [
+                  "PLANE surface",
+                  "Area 229.230480 mm^2",
+                  "Normal parallel to CAD Y",
+                  "Centered on the insert axis"
+                ]
+              },
+              {
+                "brep_id": "FACE 233",
+                "face_code": "FACE 233",
+                "entity_type": "cad:Face",
+                "geometry_type": "cad:PlanarSurface",
+                "semantic_role": "cad:SeatingFaceRole",
+                "name": "Insert opposite axial seat",
+                "description": "Opposite broad axial face of the shaped insert body.",
+                "salience": "cad:PrimarySalience",
+                "confidence": 0.93,
+                "evidence": [
+                  "PLANE surface",
+                  "Area 173.963792 mm^2",
+                  "Located at y=-4.625019",
+                  "Two-wire planar face"
+                ]
+              }
+            ],
+            "confidence": 0.91
+          }
+        ],
+        "unclassified_brep_faces": [
+          {
+            "brep_ids": [
+              "FACE 3-FACE 194 inclusive, excluding FACE 3, FACE 4 and FACE 5"
+            ],
+            "salience": "cad:SecondarySalience",
+            "description": "Remaining repeated planar and cylindrical faces of the internal spline pattern, assigned to F001.",
+            "confidence": 0.97
+          },
+          {
+            "brep_ids": [
+              "FACE 195-FACE 223 inclusive",
+              "FACE 225-FACE 232 inclusive"
+            ],
+            "salience": "cad:SecondarySalience",
+            "description": "Remaining shaped external coupling, shoulder, transition, and side-wall faces of F002.",
+            "confidence": 0.82
+          }
+        ],
+        "relationships": [],
+        "confidence": 0.94
+      },
+      {
+        "id": "R02",
+        "name": "Central sprocket hub",
+        "ontology_class": "cad:CentralSection",
+        "description": "Central hub region of SOLID 1 surrounding the separate splined insert and joining it to the spoke network.",
+        "location": "At the rotational center of SOLID 1, surrounding R01 and radially inside the spoke network.",
+        "solid_ids": [
+          "SOLID 1"
+        ],
+        "colour": {
+          "R": 225,
+          "G": 115,
+          "B": 65
+        },
+        "section_functions": [
+          {
+            "ontology_class": "cad:TransmitTorqueFunction",
+            "name": "Transfer hub torque",
+            "description": "Transfers torque from the center insert into the radial spoke network.",
+            "primary": true,
+            "confidence": 0.93
+          },
+          {
+            "ontology_class": "cad:SupportFunction",
+            "name": "Support the insert",
+            "description": "Provides radial and axial support around the central insert.",
+            "primary": false,
+            "confidence": 0.87
+          }
+        ],
+        "section_behaviors": [
+          {
+            "ontology_class": "cad:ResistTorsionBehavior",
+            "name": "Resist hub torsion",
+            "description": "The annular hub resists torsional distortion around the central interface.",
+            "confidence": 0.94
+          },
+          {
+            "ontology_class": "cad:SpreadLoadBehavior",
+            "name": "Spread center load",
+            "description": "Distributes concentrated spline-interface loads into multiple spokes.",
+            "confidence": 0.91
+          }
+        ],
+        "feature_groups": [],
+        "features": [
+          {
+            "id": "F004",
+            "name": "Insert-receiving central interface",
+            "ontology_class": "cad:SplineInterface",
+            "parent_feature_id": null,
+            "description": "Shaped central receiving opening in SOLID 1. It is inferred to mate with the external profile of the separate spline insert. Ontology coverage does not distinguish this noncircular coupling profile from a general spline interface.",
+            "interface_type": "cad:SplineInterface",
+            "feature_functions": [
+              {
+                "ontology_class": "cad:EngageFunction",
+                "name": "Engage center insert",
+                "description": "Receives the shaped external profile of the separate splined insert.",
+                "primary": true,
+                "confidence": 0.87
+              },
+              {
+                "ontology_class": "cad:LocateFunction",
+                "name": "Locate center insert",
+                "description": "Constrains the insert relative to the sprocket axis.",
+                "primary": false,
+                "confidence": 0.85
+              }
+            ],
+            "feature_behaviors": [
+              {
+                "ontology_class": "cad:ReactContactLoadBehavior",
+                "name": "React coupling contact",
+                "description": "Repeated interface walls react contact forces from the insert.",
+                "confidence": 0.89
+              },
+              {
+                "ontology_class": "cad:ConstrainRotationBehavior",
+                "name": "Constrain relative rotation",
+                "description": "The noncircular profile is inferred to prevent relative rotation between insert and hub.",
+                "confidence": 0.87
+              }
+            ],
+            "relationships": [
+              {
+                "target_feature_id": "F005",
+                "category": "cad:GeometricFeatureRelationship",
+                "relation": "cad:insideFeature",
+                "description": "The receiving interface lies inside the surrounding annular hub boss.",
+                "confidence": 0.97
+              },
+              {
+                "target_feature_id": "F005",
+                "category": "cad:FunctionalFeatureRelationship",
+                "relation": "cad:transmitsLoadTo",
+                "description": "Interface contact loads pass into the surrounding hub.",
+                "confidence": 0.94
+              }
+            ],
+            "brep_faces": [
+              {
+                "brep_id": "FACE 619",
+                "face_code": "FACE 619",
+                "entity_type": "cad:Face",
+                "geometry_type": "cad:ConicalSurface",
+                "semantic_role": "cad:ChamferSurfaceRole",
+                "name": "Representative receiving-interface chamfer",
+                "description": "Representative conical lead-in face from the repeated central receiving profile.",
+                "salience": "cad:RepresentativeSalience",
+                "confidence": 0.88,
+                "evidence": [
+                  "CONE surface",
+                  "Semi-angle 0.785398 rad",
+                  "Located at radial distance approximately 12.3 mm",
+                  "Part of repeated central pattern from FACE 619 through FACE 666"
+                ]
+              },
+              {
+                "brep_id": "FACE 635",
+                "face_code": "FACE 635",
+                "entity_type": "cad:Face",
+                "geometry_type": "cad:CylindricalSurface",
+                "semantic_role": "cad:InterfaceFaceRole",
+                "name": "Representative central coupling wall",
+                "description": "One repeated axial contact wall in the shaped receiving interface.",
+                "salience": "cad:RepresentativeSalience",
+                "confidence": 0.86,
+                "evidence": [
+                  "CYLINDER surface",
+                  "Radius 3.000000 mm",
+                  "Axis parallel to CAD Y",
+                  "Repeated around the center"
+                ]
+              },
+              {
+                "brep_id": "FACE 667",
+                "face_code": "FACE 667",
+                "entity_type": "cad:Face",
+                "geometry_type": "cad:PlanarSurface",
+                "semantic_role": "cad:SeatingFaceRole",
+                "name": "Central interface axial shoulder",
+                "description": "Planar annular shoulder bordering the receiving interface.",
+                "salience": "cad:PrimarySalience",
+                "confidence": 0.9,
+                "evidence": [
+                  "PLANE surface",
+                  "Area 211.998910 mm^2",
+                  "Centered on the rotational axis",
+                  "Normal parallel to CAD Y"
+                ]
+              }
+            ],
+            "confidence": 0.88
+          },
+          {
+            "id": "F005",
+            "name": "Annular central hub boss",
+            "ontology_class": "cad:HubFeature",
+            "parent_feature_id": null,
+            "description": "Raised annular material surrounding the center interface and blending into the spoke network.",
+            "interface_type": null,
+            "feature_functions": [
+              {
+                "ontology_class": "cad:TransferLoadFunction",
+                "name": "Transfer load to spokes",
+                "description": "Carries torque and radial contact loads from the center interface into the spoke network.",
+                "primary": true,
+                "confidence": 0.95
+              },
+              {
+                "ontology_class": "cad:SupportFunction",
+                "name": "Support central interface",
+                "description": "Provides structural support around the insert-receiving opening.",
+                "primary": false,
+                "confidence": 0.93
+              }
+            ],
+            "feature_behaviors": [
+              {
+                "ontology_class": "cad:ResistTorsionBehavior",
+                "name": "Resist torsion",
+                "description": "The annular boss carries circumferential shear and torsion.",
+                "confidence": 0.95
+              },
+              {
+                "ontology_class": "cad:DistributeStressBehavior",
+                "name": "Distribute hub stress",
+                "description": "Rounded hub transitions reduce stress concentration at spoke junctions.",
+                "confidence": 0.89
+              }
+            ],
+            "relationships": [
+              {
+                "target_feature_id": "F006",
+                "category": "cad:StructuralFeatureRelationship",
+                "relation": "cad:attachedTo",
+                "description": "The hub boss is materially joined to the radial spoke network.",
+                "confidence": 0.98
+              },
+              {
+                "target_feature_id": "F006",
+                "category": "cad:FunctionalFeatureRelationship",
+                "relation": "cad:transmitsLoadTo",
+                "description": "Hub torque is distributed into the spokes.",
+                "confidence": 0.96
+              }
+            ],
+            "brep_faces": [
+              {
+                "brep_id": "FACE 580",
+                "face_code": "FACE 580",
+                "entity_type": "cad:Face",
+                "geometry_type": "cad:ToroidalSurface",
+                "semantic_role": "cad:TransitionSurfaceRole",
+                "name": "Hub annular blend",
+                "description": "Large toroidal transition around the central hub.",
+                "salience": "cad:PrimarySalience",
+                "confidence": 0.91,
+                "evidence": [
+                  "TORUS surface",
+                  "Major radius 14.896681 mm",
+                  "Minor radius 5.080000 mm",
+                  "Centered on the part axis"
+                ]
+              },
+              {
+                "brep_id": "FACE 581",
+                "face_code": "FACE 581",
+                "entity_type": "cad:Face",
+                "geometry_type": "cad:PlanarSurface",
+                "semantic_role": "cad:SupportFaceRole",
+                "name": "Hub axial annular face",
+                "description": "Planar annular face of the central hub boss.",
+                "salience": "cad:PrimarySalience",
+                "confidence": 0.92,
+                "evidence": [
+                  "PLANE surface",
+                  "Area 122.337654 mm^2",
+                  "Two wires",
+                  "Centered at x=0, z=0"
+                ]
+              },
+              {
+                "brep_id": "FACE 668",
+                "face_code": "FACE 668",
+                "entity_type": "cad:Face",
+                "geometry_type": "cad:ConicalSurface",
+                "semantic_role": "cad:ChamferSurfaceRole",
+                "name": "Hub outer chamfer",
+                "description": "Conical transition at the outer cylindrical boundary of the hub.",
+                "salience": "cad:SecondarySalience",
+                "confidence": 0.92,
+                "evidence": [
+                  "CONE surface",
+                  "Cone radius 15.952649 mm",
+                  "Semi-angle 0.785398 rad",
+                  "Centered on the rotational axis"
+                ]
+              },
+              {
+                "brep_id": "FACE 669",
+                "face_code": "FACE 669",
+                "entity_type": "cad:Face",
+                "geometry_type": "cad:CylindricalSurface",
+                "semantic_role": "cad:OuterWallRole",
+                "name": "Hub outer cylindrical wall",
+                "description": "External cylindrical wall of the central hub boss.",
+                "salience": "cad:PrimarySalience",
+                "confidence": 0.96,
+                "evidence": [
+                  "CYLINDER surface",
+                  "Radius 15.825649 mm",
+                  "Axis parallel to CAD Y",
+                  "Centered on x=0, z=0"
+                ]
+              }
+            ],
+            "confidence": 0.94
+          }
+        ],
+        "unclassified_brep_faces": [
+          {
+            "brep_ids": [
+              "FACE 620-FACE 666 inclusive, excluding FACE 635"
+            ],
+            "salience": "cad:SecondarySalience",
+            "description": "Remaining repeated chamfers and axial contact walls of the central insert-receiving interface, assigned to F004.",
+            "confidence": 0.88
+          }
+        ],
+        "relationships": [],
+        "confidence": 0.92
+      },
+      {
+        "id": "R03",
+        "name": "Spoke and web network",
+        "ontology_class": "cad:MainBodySection",
+        "description": "Lightweight radial structural network connecting the central hub to the outer rim. It contains repeated curved spokes and through cutouts with extensive blended B-spline surfaces.",
+        "location": "Radially between the central hub and outer sprocket rim.",
+        "solid_ids": [
+          "SOLID 1"
+        ],
+        "colour": {
+          "R": 80,
+          "G": 175,
+          "B": 105
+        },
+        "section_functions": [
+          {
+            "ontology_class": "cad:TransferLoadFunction",
+            "name": "Transfer torque and radial load",
+            "description": "Transfers load between the central hub and outer rim.",
+            "primary": true,
+            "confidence": 0.96
+          },
+          {
+            "ontology_class": "cad:ReduceMassFunction",
+            "name": "Reduce rotating mass",
+            "description": "Openings remove low-utilization material while retaining radial load paths.",
+            "primary": false,
+            "confidence": 0.95
+          }
+        ],
+        "section_behaviors": [
+          {
+            "ontology_class": "cad:ResistBendingBehavior",
+            "name": "Resist spoke bending",
+            "description": "Curved spokes resist in-plane and local out-of-plane bending.",
+            "confidence": 0.92
+          },
+          {
+            "ontology_class": "cad:CarryTensionBehavior",
+            "name": "Carry spoke tension",
+            "description": "Spokes carry alternating tensile loading during torque transmission.",
+            "confidence": 0.86
+          },
+          {
+            "ontology_class": "cad:CarryCompressionBehavior",
+            "name": "Carry spoke compression",
+            "description": "Spokes carry alternating compressive loading during torque transmission.",
+            "confidence": 0.86
+          }
+        ],
+        "feature_groups": [
+          {
+            "id": "G002",
+            "name": "Radial spoke pattern",
+            "ontology_class": "cad:RepeatedFeatureGroup",
+            "feature_class": "cad:SpokeFeature",
+            "pattern_type": "cad:CircularPattern",
+            "member_count": 10,
+            "member_feature_ids": [
+              "F006"
+            ],
+            "representative_feature_ids": [
+              "F006"
+            ],
+            "pattern_description": "Ten visually identifiable radial load paths arranged around the hub. Their detailed shapes are not all identical, so the pattern is semantically repeated rather than asserted as exact geometric congruence.",
+            "confidence": 0.78
+          },
+          {
+            "id": "G003",
+            "name": "Lightening cutout pattern",
+            "ontology_class": "cad:RepeatedFeatureGroup",
+            "feature_class": "cad:CutoutFeature",
+            "pattern_type": "cad:CircularPattern",
+            "member_count": 10,
+            "member_feature_ids": [
+              "F007"
+            ],
+            "representative_feature_ids": [
+              "F007"
+            ],
+            "pattern_description": "Ten through openings distributed between the radial spokes, with several alternating opening shapes.",
+            "confidence": 0.82
+          }
+        ],
+        "features": [
+          {
+            "id": "F006",
+            "name": "Curved radial spoke network",
+            "ontology_class": "cad:SpokeFeature",
+            "parent_feature_id": null,
+            "description": "Repeated curved material paths joining the annular hub to the outer rim.",
+            "interface_type": null,
+            "feature_functions": [
+              {
+                "ontology_class": "cad:TransferLoadFunction",
+                "name": "Transfer load radially",
+                "description": "Carries torque and radial forces from the hub to the rim.",
+                "primary": true,
+                "confidence": 0.97
+              },
+              {
+                "ontology_class": "cad:SupportFunction",
+                "name": "Support outer rim",
+                "description": "Maintains radial position and stiffness of the toothed rim.",
+                "primary": false,
+                "confidence": 0.95
+              }
+            ],
+            "feature_behaviors": [
+              {
+                "ontology_class": "cad:ResistBendingBehavior",
+                "name": "Resist bending",
+                "description": "Curved spoke sections resist flexure under chain and torque loading.",
+                "confidence": 0.93
+              },
+              {
+                "ontology_class": "cad:CarryShearBehavior",
+                "name": "Carry in-plane shear",
+                "description": "Spoke webs carry tangential shear between hub and rim.",
+                "confidence": 0.94
+              }
+            ],
+            "relationships": [
+              {
+                "target_feature_id": "F008",
+                "category": "cad:StructuralFeatureRelationship",
+                "relation": "cad:attachedTo",
+                "description": "The outer ends of the spokes merge into the annular rim.",
+                "confidence": 0.98
+              },
+              {
+                "target_feature_id": "F008",
+                "category": "cad:FunctionalFeatureRelationship",
+                "relation": "cad:transmitsLoadTo",
+                "description": "Spokes transmit hub torque to the outer rim.",
+                "confidence": 0.97
+              },
+              {
+                "target_feature_id": "F007",
+                "category": "cad:StructuralFeatureRelationship",
+                "relation": "cad:adjacentTo",
+                "description": "Each spoke borders adjacent lightening cutouts.",
+                "confidence": 0.96
+              }
+            ],
+            "brep_faces": [
+              {
+                "brep_id": "FACE 313",
+                "face_code": "FACE 313",
+                "entity_type": "cad:Face",
+                "geometry_type": "cad:BSplineSurface",
+                "semantic_role": "cad:SideWallRole",
+                "name": "Representative spoke side surface",
+                "description": "Curved B-spline side surface from one spoke/load-path segment.",
+                "salience": "cad:RepresentativeSalience",
+                "confidence": 0.84,
+                "evidence": [
+                  "BSPLINE surface",
+                  "Radial location between hub and rim",
+                  "Axial bbox spanning y=-2.759476 to 2.159000",
+                  "Visual correspondence to curved spoke geometry"
+                ]
+              },
+              {
+                "brep_id": "FACE 314",
+                "face_code": "FACE 314",
+                "entity_type": "cad:Face",
+                "geometry_type": "cad:CylindricalSurface",
+                "semantic_role": "cad:TransitionSurfaceRole",
+                "name": "Representative spoke junction wall",
+                "description": "Cylindrical transition segment at a spoke junction.",
+                "salience": "cad:RepresentativeSalience",
+                "confidence": 0.8,
+                "evidence": [
+                  "CYLINDER surface",
+                  "Radius 18.390081 mm",
+                  "Axis parallel to CAD Y",
+                  "Located at a spoke-to-hub transition"
+                ]
+              },
+              {
+                "brep_id": "FACE 315",
+                "face_code": "FACE 315",
+                "entity_type": "cad:Face",
+                "geometry_type": "cad:BSplineSurface",
+                "semantic_role": "cad:SideWallRole",
+                "name": "Representative opposing spoke wall",
+                "description": "Opposing curved side surface of the representative spoke segment.",
+                "salience": "cad:RepresentativeSalience",
+                "confidence": 0.84,
+                "evidence": [
+                  "BSPLINE surface",
+                  "Axial span matching FACE 313",
+                  "Adjacent radial location",
+                  "Visual spoke-wall correspondence"
+                ]
+              },
+              {
+                "brep_id": "FACE 316",
+                "face_code": "FACE 316",
+                "entity_type": "cad:Face",
+                "geometry_type": "cad:BSplineSurface",
+                "semantic_role": "cad:SupportFaceRole",
+                "name": "Representative spoke body surface",
+                "description": "Broad structural B-spline surface extending along a spoke toward the rim.",
+                "salience": "cad:RepresentativeSalience",
+                "confidence": 0.86,
+                "evidence": [
+                  "BSPLINE surface",
+                  "Area 40.895086 mm^2",
+                  "Long radial bbox",
+                  "Location between central hub and outer rim"
+                ]
+              }
+            ],
+            "confidence": 0.9
+          },
+          {
+            "id": "F007",
+            "name": "Through lightening cutouts",
+            "ontology_class": "cad:CutoutFeature",
+            "parent_feature_id": null,
+            "description": "Repeated large through openings bounded by the spokes, hub, and rim. The openings reduce mass and provide clearance through the plate.",
+            "interface_type": null,
+            "feature_functions": [
+              {
+                "ontology_class": "cad:ReduceMassFunction",
+                "name": "Reduce mass",
+                "description": "Removes material from low-load regions of the rotating body.",
+                "primary": true,
+                "confidence": 0.98
+              },
+              {
+                "ontology_class": "cad:ProvideClearanceFunction",
+                "name": "Provide open clearance",
+                "description": "Provides through-clearance between the retained structural members.",
+                "primary": false,
+                "confidence": 0.9
+              }
+            ],
+            "feature_behaviors": [
+              {
+                "ontology_class": "cad:DistributeStressBehavior",
+                "name": "Redistribute stress around openings",
+                "description": "Rounded cutout walls and blends reduce local stress concentration.",
+                "confidence": 0.89
+              }
+            ],
+            "relationships": [
+              {
+                "target_feature_id": "F006",
+                "category": "cad:StructuralFeatureRelationship",
+                "relation": "cad:adjacentTo",
+                "description": "The cutouts lie between and are bounded by neighboring spokes.",
+                "confidence": 0.97
+              },
+              {
+                "target_feature_id": "F005",
+                "category": "cad:GeometricFeatureRelationship",
+                "relation": "cad:surroundsFeature",
+                "description": "Collectively, the cutout pattern is distributed around the central hub.",
+                "confidence": 0.88
+              }
+            ],
+            "brep_faces": [
+              {
+                "brep_id": "FACE 296",
+                "face_code": "FACE 296",
+                "entity_type": "cad:Face",
+                "geometry_type": "cad:BSplineSurface",
+                "semantic_role": "cad:CavityWallRole",
+                "name": "Representative cutout wall",
+                "description": "Curved wall segment bordering one through lightening opening.",
+                "salience": "cad:RepresentativeSalience",
+                "confidence": 0.79,
+                "evidence": [
+                  "BSPLINE surface",
+                  "Location in the web annulus",
+                  "Visual correspondence to a rounded opening boundary",
+                  "Repeated nearby B-spline wall topology"
+                ]
+              },
+              {
+                "brep_id": "FACE 302",
+                "face_code": "FACE 302",
+                "entity_type": "cad:Face",
+                "geometry_type": "cad:ToroidalSurface",
+                "semantic_role": "cad:FilletSurfaceRole",
+                "name": "Representative cutout root blend",
+                "description": "Toroidal blend at a rounded cutout end.",
+                "salience": "cad:RepresentativeSalience",
+                "confidence": 0.83,
+                "evidence": [
+                  "TORUS surface",
+                  "Major radius 17.120081 mm",
+                  "Minor radius 1.270000 mm",
+                  "Located at a rounded web-opening transition"
+                ]
+              }
+            ],
+            "confidence": 0.87
+          }
+        ],
+        "unclassified_brep_faces": [
+          {
+            "brep_ids": [
+              "FACE 296-FACE 579 inclusive, excluding FACE 296, FACE 302, FACE 313, FACE 314, FACE 315 and FACE 316",
+              "FACE 582-FACE 618 inclusive"
+            ],
+            "salience": "cad:SecondarySalience",
+            "description": "Remaining spoke, web, cutout-wall, side-face, and blended transition surfaces assigned to the spoke/web section. Some boundary-transition faces near the rim are included here because the supplied report does not provide explicit feature adjacency.",
+            "confidence": 0.79
+          }
+        ],
+        "relationships": [],
+        "confidence": 0.89
+      },
+      {
+        "id": "R04",
+        "name": "Outer sprocket rim and teeth",
+        "ontology_class": "cad:OuterSection",
+        "description": "Outer annular load ring of SOLID 1 carrying the repeated sprocket teeth and their side blends.",
+        "location": "Radially outside the spoke network and surrounding all central sections.",
+        "solid_ids": [
+          "SOLID 1"
+        ],
+        "colour": {
+          "R": 165,
+          "G": 85,
+          "B": 190
+        },
+        "section_functions": [
+          {
+            "ontology_class": "cad:EngageFunction",
+            "name": "Engage a chain",
+            "description": "The repeated peripheral teeth are inferred to engage a roller chain or similar toothed transmission element.",
+            "primary": true,
+            "confidence": 0.96
+          },
+          {
+            "ontology_class": "cad:TransmitTorqueFunction",
+            "name": "Transmit rim torque",
+            "description": "Transfers torque between the chain-engaging teeth and the spoke network.",
+            "primary": false,
+            "confidence": 0.96
+          }
+        ],
+        "section_behaviors": [
+          {
+            "ontology_class": "cad:ReactContactLoadBehavior",
+            "name": "React tooth contact load",
+            "description": "The teeth react localized chain contact forces.",
+            "confidence": 0.97
+          },
+          {
+            "ontology_class": "cad:ResistBendingBehavior",
+            "name": "Resist tooth and rim bending",
+            "description": "The rim ring supports tooth-root bending and distributes load circumferentially.",
+            "confidence": 0.94
+          },
+          {
+            "ontology_class": "cad:SpreadLoadBehavior",
+            "name": "Spread chain load",
+            "description": "The annular rim spreads tooth loads into multiple spokes.",
+            "confidence": 0.93
+          }
+        ],
+        "feature_groups": [
+          {
+            "id": "G004",
+            "name": "Sprocket tooth pattern",
+            "ontology_class": "cad:RepeatedFeatureGroup",
+            "feature_class": "cad:ToothFeature",
+            "pattern_type": "cad:CircularPattern",
+            "member_count": 27,
+            "member_feature_ids": [
+              "F009"
+            ],
+            "representative_feature_ids": [
+              "F009"
+            ],
+            "pattern_description": "Twenty-seven peripheral teeth at approximately 13.33-degree angular pitch. The count is supported by the repeated radial face sequence beginning at FACE 670 and by visual correspondence.",
+            "confidence": 0.95
+          }
+        ],
+        "features": [
+          {
+            "id": "F008",
+            "name": "Annular sprocket rim",
+            "ontology_class": "cad:WallFeature",
+            "parent_feature_id": null,
+            "description": "Continuous annular structural ring supporting the tooth roots and connecting them to the spoke network.",
+            "interface_type": null,
+            "feature_functions": [
+              {
+                "ontology_class": "cad:SupportFunction",
+                "name": "Support tooth pattern",
+                "description": "Provides circumferential support beneath the sprocket teeth.",
+                "primary": true,
+                "confidence": 0.97
+              },
+              {
+                "ontology_class": "cad:TransferLoadFunction",
+                "name": "Transfer tooth loads",
+                "description": "Transfers chain contact loads from teeth to spokes.",
+                "primary": false,
+                "confidence": 0.96
+              }
+            ],
+            "feature_behaviors": [
+              {
+                "ontology_class": "cad:ResistBendingBehavior",
+                "name": "Resist rim bending",
+                "description": "The annular ring resists local tooth-root and global circumferential bending.",
+                "confidence": 0.95
+              },
+              {
+                "ontology_class": "cad:SpreadLoadBehavior",
+                "name": "Spread tooth load",
+                "description": "Circumferential continuity spreads localized tooth loads.",
+                "confidence": 0.95
+              }
+            ],
+            "relationships": [
+              {
+                "target_feature_id": "F009",
+                "category": "cad:StructuralFeatureRelationship",
+                "relation": "cad:supportsFeature",
+                "description": "The rim structurally supports the repeated tooth pattern.",
+                "confidence": 0.98
+              },
+              {
+                "target_feature_id": "F009",
+                "category": "cad:StructuralFeatureRelationship",
+                "relation": "cad:sharesBoundaryWith",
+                "description": "Tooth roots share material boundaries with the rim.",
+                "confidence": 0.97
+              }
+            ],
+            "brep_faces": [
+              {
+                "brep_id": "FACE 312",
+                "face_code": "FACE 312",
+                "entity_type": "cad:Face",
+                "geometry_type": "cad:PlanarSurface",
+                "semantic_role": "cad:SupportFaceRole",
+                "name": "Rear rim/web face",
+                "description": "Broad planar axial face spanning the body and inner rim region.",
+                "salience": "cad:PrimarySalience",
+                "confidence": 0.82,
+                "evidence": [
+                  "PLANE surface",
+                  "Area 482.655240 mm^2",
+                  "Normal parallel to CAD Y",
+                  "BBox spans approximately 93.36 mm across x and z"
+                ]
+              },
+              {
+                "brep_id": "FACE 496",
+                "face_code": "FACE 496",
+                "entity_type": "cad:Face",
+                "geometry_type": "cad:PlanarSurface",
+                "semantic_role": "cad:SupportFaceRole",
+                "name": "Front rim/web face",
+                "description": "Broad opposite axial face with multiple wires corresponding to the through openings.",
+                "salience": "cad:PrimarySalience",
+                "confidence": 0.87,
+                "evidence": [
+                  "PLANE surface",
+                  "Area 1726.822903 mm^2",
+                  "12 wires",
+                  "Located at y=3.175000"
+                ]
+              },
+              {
+                "brep_id": "FACE 513",
+                "face_code": "FACE 513",
+                "entity_type": "cad:Face",
+                "geometry_type": "cad:CylindricalSurface",
+                "semantic_role": "cad:OuterWallRole",
+                "name": "Representative rim circumferential wall",
+                "description": "One broad cylindrical segment of the annular rim envelope.",
+                "salience": "cad:RepresentativeSalience",
+                "confidence": 0.9,
+                "evidence": [
+                  "CYLINDER surface",
+                  "Radius 43.765796 mm",
+                  "Axis parallel to CAD Y",
+                  "Large circumferential segment area 129.125870 mm^2"
+                ]
+              },
+              {
+                "brep_id": "FACE 593",
+                "face_code": "FACE 593",
+                "entity_type": "cad:Face",
+                "geometry_type": "cad:CylindricalSurface",
+                "semantic_role": "cad:OuterWallRole",
+                "name": "Opposed rim circumferential wall segment",
+                "description": "Symmetry-related cylindrical segment of the rim envelope.",
+                "salience": "cad:RepresentativeSalience",
+                "confidence": 0.9,
+                "evidence": [
+                  "CYLINDER surface",
+                  "Radius 43.765796 mm",
+                  "Axis parallel to CAD Y",
+                  "Symmetric bbox relative to FACE 513"
+                ]
+              }
+            ],
+            "confidence": 0.93
+          },
+          {
+            "id": "F009",
+            "name": "Twenty-seven sprocket teeth",
+            "ontology_class": "cad:ToothFeature",
+            "parent_feature_id": null,
+            "description": "Repeated peripheral tooth set with flanks, tip/contact surfaces, root transitions, and axial side blends.",
+            "interface_type": "cad:ContactInterface",
+            "feature_functions": [
+              {
+                "ontology_class": "cad:EngageFunction",
+                "name": "Engage chain rollers",
+                "description": "The teeth provide repeated mechanical engagement with a chain.",
+                "primary": true,
+                "confidence": 0.97
+              },
+              {
+                "ontology_class": "cad:TransmitTorqueFunction",
+                "name": "Transmit chain torque",
+                "description": "Converts chain tension into torque on the sprocket.",
+                "primary": false,
+                "confidence": 0.97
+              }
+            ],
+            "feature_behaviors": [
+              {
+                "ontology_class": "cad:ReactContactLoadBehavior",
+                "name": "React chain contact",
+                "description": "Tooth flanks and rounded tips react chain or roller contact.",
+                "confidence": 0.97
+              },
+              {
+                "ontology_class": "cad:ResistBendingBehavior",
+                "name": "Resist tooth-root bending",
+                "description": "Each tooth behaves as a short cantilever supported by the rim.",
+                "confidence": 0.95
+              }
+            ],
+            "relationships": [
+              {
+                "target_feature_id": "F008",
+                "category": "cad:StructuralFeatureRelationship",
+                "relation": "cad:partOfFeature",
+                "description": "The repeated tooth set is materially integrated with the outer rim.",
+                "confidence": 0.98
+              },
+              {
+                "target_feature_id": "F008",
+                "category": "cad:FunctionalFeatureRelationship",
+                "relation": "cad:transmitsLoadTo",
+                "description": "Tooth contact loads pass into the annular rim.",
+                "confidence": 0.97
+              }
+            ],
+            "brep_faces": [
+              {
+                "brep_id": "FACE 670",
+                "face_code": "FACE 670",
+                "entity_type": "cad:Face",
+                "geometry_type": "cad:PlanarSurface",
+                "semantic_role": "cad:ToothFlankRole",
+                "name": "Representative tooth flank A",
+                "description": "One planar flank from a representative peripheral tooth.",
+                "salience": "cad:RepresentativeSalience",
+                "confidence": 0.94,
+                "evidence": [
+                  "PLANE surface",
+                  "Centroid at radial distance approximately 54.17 mm",
+                  "Axial bbox spanning y=-2.881009 to -0.293991",
+                  "Repeated at approximately 13.33-degree pitch"
+                ]
+              },
+              {
+                "brep_id": "FACE 671",
+                "face_code": "FACE 671",
+                "entity_type": "cad:Face",
+                "geometry_type": "cad:CylindricalSurface",
+                "semantic_role": "cad:ToothTipRole",
+                "name": "Representative tooth tip/contact surface",
+                "description": "Rounded cylindrical contact segment at the representative tooth extremity.",
+                "salience": "cad:RepresentativeSalience",
+                "confidence": 0.91,
+                "evidence": [
+                  "CYLINDER surface",
+                  "Radius 1.984375 mm",
+                  "Located near the maximum radial envelope",
+                  "Repeated tooth-scale geometry"
+                ]
+              },
+              {
+                "brep_id": "FACE 672",
+                "face_code": "FACE 672",
+                "entity_type": "cad:Face",
+                "geometry_type": "cad:ConicalSurface",
+                "semantic_role": "cad:TransitionSurfaceRole",
+                "name": "Representative tooth side transition",
+                "description": "Conical transition associated with the representative tooth side profile.",
+                "salience": "cad:RepresentativeSalience",
+                "confidence": 0.88,
+                "evidence": [
+                  "CONE surface",
+                  "Semi-angle 1.397398 rad",
+                  "Radial location near the tooth envelope",
+                  "Repeated in the 27-member circumferential sequence"
+                ]
+              },
+              {
+                "brep_id": "FACE 673",
+                "face_code": "FACE 673",
+                "entity_type": "cad:Face",
+                "geometry_type": "cad:PlanarSurface",
+                "semantic_role": "cad:ToothFlankRole",
+                "name": "Representative tooth flank B",
+                "description": "Opposing planar flank of the representative tooth.",
+                "salience": "cad:RepresentativeSalience",
+                "confidence": 0.94,
+                "evidence": [
+                  "PLANE surface",
+                  "Tooth-scale axial bbox",
+                  "Located opposite FACE 670 around the rounded FACE 671 segment",
+                  "Repeated circumferential correspondence"
+                ]
+              },
+              {
+                "brep_id": "FACE 779",
+                "face_code": "FACE 779",
+                "entity_type": "cad:Face",
+                "geometry_type": "cad:CylindricalSurface",
+                "semantic_role": "cad:RootSurfaceRole",
+                "name": "Representative tooth-root wall segment",
+                "description": "Broader cylindrical segment participating in the tooth-root and rim transition.",
+                "salience": "cad:RepresentativeSalience",
+                "confidence": 0.84,
+                "evidence": [
+                  "CYLINDER surface",
+                  "Radius 3.994150 mm",
+                  "Eight-edge trimmed surface",
+                  "Repeated around the outer circumference"
+                ]
+              }
+            ],
+            "confidence": 0.95
+          }
+        ],
+        "unclassified_brep_faces": [
+          {
+            "brep_ids": [
+              "FACE 234-FACE 295 inclusive"
+            ],
+            "salience": "cad:SecondarySalience",
+            "description": "Outer-rim transition, blend, side, and root-region faces preceding the principal tooth-pattern blocks, assigned to F008.",
+            "confidence": 0.78
+          },
+          {
+            "brep_ids": [
+              "FACE 674-FACE 1481 inclusive, excluding FACE 779"
+            ],
+            "salience": "cad:SecondarySalience",
+            "description": "All remaining repeated tooth flanks, tips, roots, axial side transitions, toroidal blends, conical transitions, and B-spline tooth surfaces assigned to the 27-tooth pattern F009.",
+            "confidence": 0.93
+          }
+        ],
+        "relationships": [],
+        "confidence": 0.94
+      }
+    ]
+  }
+}
+
+Natural-language edit request:
+
+Hi , Please convert the round edges of the gear into straight spur gear teeth.
+
+Multi-view images of the original CAD model:
+
+View: +Z
+
+[IMAGE 0: /home/adml/Research/Hackathon2026/IDETC26-Hackathon-Autodesk-neuralCAD-Edit/data/edit_192_external/breps/SUJ2G2UMJQR7PMBX_1759210034.374472_+Z.jpg]
+
+View: -Z
+
+[IMAGE 1: /home/adml/Research/Hackathon2026/IDETC26-Hackathon-Autodesk-neuralCAD-Edit/data/edit_192_external/breps/SUJ2G2UMJQR7PMBX_1759210034.374472_-Z.jpg]
+
+View: -X
+
+[IMAGE 2: /home/adml/Research/Hackathon2026/IDETC26-Hackathon-Autodesk-neuralCAD-Edit/data/edit_192_external/breps/SUJ2G2UMJQR7PMBX_1759210034.374472_-X.jpg]
+
+View: +X
+
+[IMAGE 3: /home/adml/Research/Hackathon2026/IDETC26-Hackathon-Autodesk-neuralCAD-Edit/data/edit_192_external/breps/SUJ2G2UMJQR7PMBX_1759210034.374472_+X.jpg]
+
+View: +Y
+
+[IMAGE 4: /home/adml/Research/Hackathon2026/IDETC26-Hackathon-Autodesk-neuralCAD-Edit/data/edit_192_external/breps/SUJ2G2UMJQR7PMBX_1759210034.374472_+Y.jpg]
+
+View: -Y
+
+[IMAGE 5: /home/adml/Research/Hackathon2026/IDETC26-Hackathon-Autodesk-neuralCAD-Edit/data/edit_192_external/breps/SUJ2G2UMJQR7PMBX_1759210034.374472_-Y.jpg]
+
+View: iso1
+
+[IMAGE 6: /home/adml/Research/Hackathon2026/IDETC26-Hackathon-Autodesk-neuralCAD-Edit/data/edit_192_external/breps/SUJ2G2UMJQR7PMBX_1759210034.374472_iso1.jpg]

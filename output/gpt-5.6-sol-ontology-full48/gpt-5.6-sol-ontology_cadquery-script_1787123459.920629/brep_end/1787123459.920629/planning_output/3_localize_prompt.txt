@@ -1,0 +1,2365 @@
+Now use all the given information:
+1. model.json
+2. operation.json
+3. Multiview images labelled with CAD look directions (+X, -X, +Y, -Y, +Z, -Z, and iso1 / iso2 when present)
+
+Decide which sections and features of the original model should be modified, removed, interacted with, or whether new features should be created. Use as much information from the multiview images, model.json, and operation.json as possible.
+
+Make this decision using the following evidence, in this order:
+
+1. If the action target clearly identifies geometry, locate the corresponding section(s), feature(s), and B-rep FACE/EDGE IDs in model.json (part.sections, features, brep_faces, brep_edges, unclassified_brep_faces).
+2. If the request indicates a side using "front", "back", "top", "bottom", "left", or "right", use part.semantic_orientation from model.json.
+   - Prefer view_sides: that maps each CAD view label (+X, -Y, …) to a human-semantic side.
+   - Also use status, description, and confidence.
+   - If status is "unknown", the requested side is missing from view_sides, or confidence is below 0.6, treat the directional word as ambiguous. Do not guess an axis from the camera label alone. Use other evidence instead.
+3. If no clear geometry is identified, use referenced_feature_words and relational_constraint to identify candidate sections and features.
+4. Also consider the intention of the edit. Based on each section's and feature's functions and behaviors, decide which entity most needs the action. Then record the corresponding section id, feature id, and FACE IDs from model.json.
+
+Brep_id values are CadQuery Faces()/Edges() indices from the STEP analysis report (for example FACE 0, EDGE 12). Prefer listing those exact IDs in "target face code" (and in steps when they help later CadQuery implementation). You may also list feature ids (F001) and section ids (R01).
+
+Plan the modeling procedure needed to perform each action. Describe it in professional CAD modelling language, from choosing the plane and drawing sketches through extrusion, cuts, fillets, and chamfers. Be thorough and detailed.
+
+Edit operation.json accordingly. Keep the previous request_wording and actions, and add localization plus steps.
+
+OUTPUT FORMAT (JSON, operation.json, no markdown fences, use this schema):
+{
+  "request": "",
+  "request_wording": {
+    "action_words": ["..."],
+    "referenced_feature_words": ["..."],
+    "intention_words": ["..."],
+    "grammatical_words": ["..."]
+  },
+  "actions": [
+    {
+      "operation": "...",
+      "parameters": {
+        "parameter_name": "..."
+      },
+      "target": "...",
+      "relational_constraint": "...",
+      "unresolved_reference": "...",
+      "target section code": ["R01"],
+      "target face code": ["F001", "FACE 0"],
+      "steps": [
+        "...",
+        "..."
+      ]
+    }
+  ],
+  "intention": ["..."]
+}
+
+The model.json, operation.json, and labeled multi-view images follow.
+
+
+aim.json:
+
+{
+  "request": "Add two horizontal buttons to the front panel. One above existing one, the other below - all approximately equally distanced. Buttons should be copies of existing one.",
+  "request_wording": {
+    "action_words": [
+      "Add",
+      "two",
+      "horizontal",
+      "buttons",
+      "One",
+      "above",
+      "other",
+      "below",
+      "all",
+      "approximately",
+      "equally",
+      "distanced",
+      "Buttons",
+      "copies"
+    ],
+    "referenced_feature_words": [
+      "front",
+      "panel",
+      "existing",
+      "one",
+      "existing",
+      "one"
+    ],
+    "intention_words": [],
+    "grammatical_words": [
+      "to",
+      "the",
+      "the",
+      "should",
+      "be",
+      "of"
+    ]
+  },
+  "actions": [
+    {
+      "operation": "Create one button by copying the existing button.",
+      "parameters": {
+        "quantity": "1",
+        "orientation": "horizontal",
+        "geometry": "copy of the existing button",
+        "spacing": "approximately equal to the spacing between the existing button and the lower copied button"
+      },
+      "target": "The front panel and the existing button on it.",
+      "relational_constraint": "Place the copied button above the existing button on the front panel. Its distance from the existing button should be approximately equal to the distance between the existing button and the lower copied button.",
+      "unresolved_reference": "Identify the front panel, the existing button to copy, the panel's above/below direction, and an appropriate approximately equal spacing because no numerical distance is specified."
+    },
+    {
+      "operation": "Create one button by copying the existing button.",
+      "parameters": {
+        "quantity": "1",
+        "orientation": "horizontal",
+        "geometry": "copy of the existing button",
+        "spacing": "approximately equal to the spacing between the upper copied button and the existing button"
+      },
+      "target": "The front panel, the existing button, and the upper copied button created by the preceding action.",
+      "relational_constraint": "Place the copied button below the existing button on the front panel. The upper copied button, existing button, and lower copied button should form an approximately equally spaced above-and-below arrangement.",
+      "unresolved_reference": "Identify the front panel, the existing button to copy, the panel's above/below direction, and an appropriate approximately equal spacing because no numerical distance is specified."
+    }
+  ],
+  "intention": []
+}
+
+model.json:
+
+{
+  "part": {
+    "id": "P001",
+    "name": "Countertop espresso machine assembly",
+    "description": "Multi-solid CAD assembly representing a countertop espresso or coffee machine with structural housing, front and rear panels, ventilation details, brew and control hardware, a steam wand, lever, and two removable cups. CadQuery reports 56 disconnected solids; these are interpreted as separate assembly components and decorative or contextual bodies rather than one monolithic manufactured part.",
+    "source_views": [
+      "+Z",
+      "-Z",
+      "-X",
+      "+X",
+      "+Y",
+      "-Y",
+      "iso1"
+    ],
+    "solid_ids": [
+      "SOLID 0",
+      "SOLID 1",
+      "SOLID 2",
+      "SOLID 3",
+      "SOLID 4",
+      "SOLID 5",
+      "SOLID 6",
+      "SOLID 7",
+      "SOLID 8",
+      "SOLID 9",
+      "SOLID 10",
+      "SOLID 11",
+      "SOLID 12",
+      "SOLID 13",
+      "SOLID 14",
+      "SOLID 15",
+      "SOLID 16",
+      "SOLID 17",
+      "SOLID 18",
+      "SOLID 19",
+      "SOLID 20",
+      "SOLID 21",
+      "SOLID 22",
+      "SOLID 23",
+      "SOLID 24",
+      "SOLID 25",
+      "SOLID 26",
+      "SOLID 27",
+      "SOLID 28",
+      "SOLID 29",
+      "SOLID 30",
+      "SOLID 31",
+      "SOLID 32",
+      "SOLID 33",
+      "SOLID 34",
+      "SOLID 35",
+      "SOLID 36",
+      "SOLID 37",
+      "SOLID 38",
+      "SOLID 39",
+      "SOLID 40",
+      "SOLID 41",
+      "SOLID 42",
+      "SOLID 43",
+      "SOLID 44",
+      "SOLID 45",
+      "SOLID 46",
+      "SOLID 47",
+      "SOLID 48",
+      "SOLID 49",
+      "SOLID 50",
+      "SOLID 51",
+      "SOLID 52",
+      "SOLID 53",
+      "SOLID 54",
+      "SOLID 55"
+    ],
+    "symmetry_note": "The main enclosure is approximately bilateral about x=-150 mm. The rear grille bars form a linear pattern, the thin rear-panel perforations form a two-dimensional regular pattern, and several control markings form a partial circular pattern. Functional front hardware and the steam wand break global symmetry.",
+    "semantic_orientation": {
+      "status": "inferred",
+      "description": "The operator-facing side is identified from the brew outlet, control knob, steam wand, and cup opening. CAD Z is the vertical direction, with the lever extending toward increasing Z. Camera labels are mapped from visual evidence and are not treated as intrinsic semantic direction names.",
+      "confidence": 0.92,
+      "view_sides": {
+        "+X": "right",
+        "-X": "left",
+        "+Y": "front",
+        "-Y": "back",
+        "+Z": "bottom",
+        "-Z": "top"
+      }
+    },
+    "sections": [
+      {
+        "id": "R01",
+        "name": "Main enclosure and load-bearing frame",
+        "ontology_class": "cad:MainBodySection",
+        "description": "Large molded enclosure and internal U-shaped frame that establish the machine envelope and support the dispensing hardware.",
+        "location": "Surrounds the internal mechanism and spans between the base, rear enclosure, and operator-facing upper head.",
+        "solid_ids": [
+          "SOLID 0",
+          "SOLID 6"
+        ],
+        "colour": {
+          "R": 224,
+          "G": 176,
+          "B": 64
+        },
+        "section_functions": [
+          {
+            "ontology_class": "cad:SupportFunction",
+            "name": "Support appliance mechanisms",
+            "description": "Provides the principal structural support for the brew head, panels, and controls.",
+            "primary": true,
+            "confidence": 0.95
+          },
+          {
+            "ontology_class": "cad:ProtectFunction",
+            "name": "Protect internal components",
+            "description": "Encloses and shields internal appliance hardware.",
+            "primary": false,
+            "confidence": 0.9
+          }
+        ],
+        "section_behaviors": [
+          {
+            "ontology_class": "cad:ResistBendingBehavior",
+            "name": "Resist frame bending",
+            "description": "The broad side walls and base web resist bending under component and operator loads.",
+            "confidence": 0.91
+          },
+          {
+            "ontology_class": "cad:SpreadLoadBehavior",
+            "name": "Spread supported loads",
+            "description": "Large shell surfaces distribute loads into the base footprint.",
+            "confidence": 0.88
+          }
+        ],
+        "feature_groups": [],
+        "features": [
+          {
+            "id": "F001",
+            "name": "Primary molded enclosure shell",
+            "ontology_class": "cad:HousingFeature",
+            "parent_feature_id": null,
+            "description": "Rounded exterior shell represented by SOLID 0.",
+            "interface_type": null,
+            "feature_functions": [
+              {
+                "ontology_class": "cad:ProtectFunction",
+                "name": "Enclose mechanism",
+                "description": "Protects and visually encloses the appliance mechanism.",
+                "primary": true,
+                "confidence": 0.94
+              }
+            ],
+            "feature_behaviors": [
+              {
+                "ontology_class": "cad:ResistBendingBehavior",
+                "name": "Shell stiffness",
+                "description": "Curved shell surfaces resist local bending and handling loads.",
+                "confidence": 0.88
+              }
+            ],
+            "relationships": [
+              {
+                "target_feature_id": "F002",
+                "category": "cad:StructuralFeatureRelationship",
+                "relation": "cad:surroundsFeature",
+                "description": "The exterior enclosure surrounds the internal support frame.",
+                "confidence": 0.9
+              }
+            ],
+            "brep_faces": [
+              {
+                "brep_id": "FACE 6",
+                "face_code": "FACE 6",
+                "entity_type": "cad:Face",
+                "geometry_type": "cad:BSplineSurface",
+                "semantic_role": "cad:OuterWallRole",
+                "name": "Broad enclosure wall",
+                "description": "Large exterior B-spline wall centered near x=-150 mm, y=50.58 mm, z=195.90 mm.",
+                "salience": "cad:PrimarySalience",
+                "confidence": 0.96,
+                "evidence": [
+                  "BSPLINE surface",
+                  "area 76581.242803 mm^2",
+                  "large enclosure-scale bounding box",
+                  "visual correspondence to molded casing"
+                ]
+              },
+              {
+                "brep_id": "FACE 11",
+                "face_code": "FACE 11",
+                "entity_type": "cad:Face",
+                "geometry_type": "cad:BSplineSurface",
+                "semantic_role": "cad:OuterWallRole",
+                "name": "Opposed broad enclosure wall",
+                "description": "Large enclosure face at the low-Y side of SOLID 0.",
+                "salience": "cad:PrimarySalience",
+                "confidence": 0.94,
+                "evidence": [
+                  "BSPLINE surface",
+                  "area 93529.944613 mm^2",
+                  "normal approximately -Y",
+                  "enclosure-scale bounding box"
+                ]
+              }
+            ],
+            "confidence": 0.94
+          },
+          {
+            "id": "F002",
+            "name": "Internal U-shaped support frame",
+            "ontology_class": "cad:SupportFeature",
+            "parent_feature_id": null,
+            "description": "Large structural body represented by SOLID 6, including side supports, base web, and upper bridge.",
+            "interface_type": null,
+            "feature_functions": [
+              {
+                "ontology_class": "cad:SupportFunction",
+                "name": "Support brew and panel assemblies",
+                "description": "Carries the operator-facing dispensing and panel loads.",
+                "primary": true,
+                "confidence": 0.96
+              },
+              {
+                "ontology_class": "cad:TransferLoadFunction",
+                "name": "Transfer loads to base",
+                "description": "Transfers mechanism and operator loads toward the appliance footprint.",
+                "primary": false,
+                "confidence": 0.91
+              }
+            ],
+            "feature_behaviors": [
+              {
+                "ontology_class": "cad:CarryCompressionBehavior",
+                "name": "Carry vertical compression",
+                "description": "Side members carry vertical component loads.",
+                "confidence": 0.9
+              },
+              {
+                "ontology_class": "cad:ResistBendingBehavior",
+                "name": "Resist frame bending",
+                "description": "The U-shaped section resists opening and lateral bending.",
+                "confidence": 0.92
+              }
+            ],
+            "relationships": [
+              {
+                "target_feature_id": "F001",
+                "category": "cad:StructuralFeatureRelationship",
+                "relation": "cad:insideFeature",
+                "description": "The structural frame is situated inside the enclosure shell.",
+                "confidence": 0.9
+              },
+              {
+                "target_feature_id": "F015",
+                "category": "cad:FunctionalFeatureRelationship",
+                "relation": "cad:supportsFeature",
+                "description": "The frame supports the brew-head housing.",
+                "confidence": 0.88
+              }
+            ],
+            "brep_faces": [
+              {
+                "brep_id": "FACE 58",
+                "face_code": "FACE 58",
+                "entity_type": "cad:Face",
+                "geometry_type": "cad:BSplineSurface",
+                "semantic_role": "cad:SupportFaceRole",
+                "name": "Frame bridge wall",
+                "description": "Large B-spline support face near y=408.43 mm.",
+                "salience": "cad:PrimarySalience",
+                "confidence": 0.91,
+                "evidence": [
+                  "area 75580.946565 mm^2",
+                  "large symmetric bounding box",
+                  "normal approximately +Y"
+                ]
+              },
+              {
+                "brep_id": "FACE 59",
+                "face_code": "FACE 59",
+                "entity_type": "cad:Face",
+                "geometry_type": "cad:BSplineSurface",
+                "semantic_role": "cad:SupportFaceRole",
+                "name": "Upper structural bridge",
+                "description": "Broad upper B-spline surface joining the frame sides.",
+                "salience": "cad:PrimarySalience",
+                "confidence": 0.91,
+                "evidence": [
+                  "area 60543.921883 mm^2",
+                  "normal approximately +Z",
+                  "symmetric enclosure-scale span"
+                ]
+              },
+              {
+                "brep_id": "FACE 68",
+                "face_code": "FACE 68",
+                "entity_type": "cad:Face",
+                "geometry_type": "cad:BSplineSurface",
+                "semantic_role": "cad:SupportFaceRole",
+                "name": "Base support surface",
+                "description": "Large low-Z surface forming the principal base web.",
+                "salience": "cad:PrimarySalience",
+                "confidence": 0.96,
+                "evidence": [
+                  "area 107871.616210 mm^2",
+                  "normal approximately -Z",
+                  "bounding box spans most of machine footprint"
+                ]
+              }
+            ],
+            "confidence": 0.94
+          }
+        ],
+        "unclassified_brep_faces": [
+          {
+            "brep_ids": [
+              "FACE 0-FACE 5",
+              "FACE 7-FACE 10"
+            ],
+            "salience": "cad:SecondarySalience",
+            "description": "Remaining molded shell side, crown, bottom, and transition surfaces of SOLID 0.",
+            "confidence": 0.94
+          },
+          {
+            "brep_ids": [
+              "FACE 46-FACE 57",
+              "FACE 60-FACE 67"
+            ],
+            "salience": "cad:SecondarySalience",
+            "description": "Remaining support-frame side walls, interior transitions, and enclosure junction surfaces of SOLID 6.",
+            "confidence": 0.91
+          }
+        ],
+        "relationships": [],
+        "confidence": 0.94
+      },
+      {
+        "id": "R02",
+        "name": "Base, closure panels, and corner supports",
+        "ontology_class": "cad:OuterSection",
+        "description": "Thin closure panels, lower front or base panel, four corner support pads, and the upper or rear closure body.",
+        "location": "Attached around the exterior boundary of the main enclosure and at the appliance footprint.",
+        "solid_ids": [
+          "SOLID 1",
+          "SOLID 2",
+          "SOLID 3",
+          "SOLID 4",
+          "SOLID 5",
+          "SOLID 7",
+          "SOLID 8"
+        ],
+        "colour": {
+          "R": 55,
+          "G": 130,
+          "B": 210
+        },
+        "section_functions": [
+          {
+            "ontology_class": "cad:ProtectFunction",
+            "name": "Close exterior openings",
+            "description": "Closure panels shield the enclosure and internal structure.",
+            "primary": true,
+            "confidence": 0.91
+          },
+          {
+            "ontology_class": "cad:SupportFunction",
+            "name": "Support appliance footprint",
+            "description": "Corner pads provide discrete support points.",
+            "primary": false,
+            "confidence": 0.89
+          }
+        ],
+        "section_behaviors": [
+          {
+            "ontology_class": "cad:ReactContactLoadBehavior",
+            "name": "React surface contact",
+            "description": "The corner pads and panel edges react contact with the supporting surface.",
+            "confidence": 0.9
+          },
+          {
+            "ontology_class": "cad:SpreadLoadBehavior",
+            "name": "Spread enclosure loads",
+            "description": "Panels spread local loads around the shell perimeter.",
+            "confidence": 0.84
+          }
+        ],
+        "feature_groups": [
+          {
+            "id": "G001",
+            "name": "Four corner support pads",
+            "ontology_class": "cad:RepeatedFeatureGroup",
+            "feature_class": "cad:SupportFeature",
+            "pattern_type": "cad:MirrorPattern",
+            "member_count": 4,
+            "member_feature_ids": [
+              "F005"
+            ],
+            "representative_feature_ids": [
+              "F005"
+            ],
+            "pattern_description": "Four geometrically equivalent rounded pad solids at two x positions and two z positions on the low-Y closure.",
+            "confidence": 0.99
+          }
+        ],
+        "features": [
+          {
+            "id": "F003",
+            "name": "Large rounded closure panel pair",
+            "ontology_class": "cad:ShellFeature",
+            "parent_feature_id": null,
+            "description": "Two coincident or duplicated thin rounded panels represented by SOLID 1 and SOLID 7.",
+            "interface_type": null,
+            "feature_functions": [
+              {
+                "ontology_class": "cad:ProtectFunction",
+                "name": "Close enclosure face",
+                "description": "Provides a broad protective exterior closure.",
+                "primary": true,
+                "confidence": 0.9
+              }
+            ],
+            "feature_behaviors": [
+              {
+                "ontology_class": "cad:ResistBendingBehavior",
+                "name": "Panel bending resistance",
+                "description": "Thin rounded panels resist distributed handling and enclosure loads.",
+                "confidence": 0.82
+              }
+            ],
+            "relationships": [
+              {
+                "target_feature_id": "F001",
+                "category": "cad:StructuralFeatureRelationship",
+                "relation": "cad:attachedTo",
+                "description": "The panels are attached to the main enclosure.",
+                "confidence": 0.88
+              }
+            ],
+            "brep_faces": [
+              {
+                "brep_id": "FACE 14",
+                "face_code": "FACE 14",
+                "entity_type": "cad:Face",
+                "geometry_type": "cad:PlanarSurface",
+                "semantic_role": "cad:OuterWallRole",
+                "name": "Outer closure face",
+                "description": "Large planar face of SOLID 1 at y=-1 mm.",
+                "salience": "cad:PrimarySalience",
+                "confidence": 0.98,
+                "evidence": [
+                  "PLANE",
+                  "area 99798.829444 mm^2",
+                  "292 by 344 mm bounding span"
+                ]
+              },
+              {
+                "brep_id": "FACE 71",
+                "face_code": "FACE 71",
+                "entity_type": "cad:Face",
+                "geometry_type": "cad:PlanarSurface",
+                "semantic_role": "cad:OuterWallRole",
+                "name": "Duplicated outer closure face",
+                "description": "Geometrically coincident large planar face of SOLID 7.",
+                "salience": "cad:RepresentativeSalience",
+                "confidence": 0.98,
+                "evidence": [
+                  "same area and bounding box as FACE 14",
+                  "separate solid identity"
+                ]
+              }
+            ],
+            "confidence": 0.91
+          },
+          {
+            "id": "F004",
+            "name": "Lower or upper rounded closure body",
+            "ontology_class": "cad:ShellFeature",
+            "parent_feature_id": null,
+            "description": "Rounded panel body represented by SOLID 8 at y=390 to 440 mm.",
+            "interface_type": null,
+            "feature_functions": [
+              {
+                "ontology_class": "cad:ProtectFunction",
+                "name": "Protect enclosure boundary",
+                "description": "Closes and protects the opposite enclosure boundary.",
+                "primary": true,
+                "confidence": 0.87
+              }
+            ],
+            "feature_behaviors": [
+              {
+                "ontology_class": "cad:SpreadLoadBehavior",
+                "name": "Spread panel loads",
+                "description": "Broad panel faces distribute contact loads.",
+                "confidence": 0.82
+              }
+            ],
+            "relationships": [
+              {
+                "target_feature_id": "F002",
+                "category": "cad:StructuralFeatureRelationship",
+                "relation": "cad:attachedTo",
+                "description": "The rounded closure body is mounted to the support frame.",
+                "confidence": 0.85
+              }
+            ],
+            "brep_faces": [
+              {
+                "brep_id": "FACE 87",
+                "face_code": "FACE 87",
+                "entity_type": "cad:Face",
+                "geometry_type": "cad:BSplineSurface",
+                "semantic_role": "cad:OuterWallRole",
+                "name": "Broad closure wall",
+                "description": "Large B-spline face at y approximately 390 mm.",
+                "salience": "cad:PrimarySalience",
+                "confidence": 0.91,
+                "evidence": [
+                  "area 86896.181264 mm^2",
+                  "normal approximately -Y",
+                  "closure-scale bounding box"
+                ]
+              },
+              {
+                "brep_id": "FACE 90",
+                "face_code": "FACE 90",
+                "entity_type": "cad:Face",
+                "geometry_type": "cad:BSplineSurface",
+                "semantic_role": "cad:OuterWallRole",
+                "name": "Opposed closure wall",
+                "description": "Large opposed face near y=410.12 mm.",
+                "salience": "cad:PrimarySalience",
+                "confidence": 0.89,
+                "evidence": [
+                  "area 73004.654269 mm^2",
+                  "normal approximately +Y"
+                ]
+              }
+            ],
+            "confidence": 0.89
+          },
+          {
+            "id": "F005",
+            "name": "Representative corner support pad",
+            "ontology_class": "cad:SupportFeature",
+            "parent_feature_id": null,
+            "description": "Representative of four rounded pad solids, SOLID 2 through SOLID 5.",
+            "interface_type": "cad:SeatingInterface",
+            "feature_functions": [
+              {
+                "ontology_class": "cad:SupportFunction",
+                "name": "Support machine at corner",
+                "description": "Provides a discrete support point at the machine footprint.",
+                "primary": true,
+                "confidence": 0.94
+              }
+            ],
+            "feature_behaviors": [
+              {
+                "ontology_class": "cad:ReactContactLoadBehavior",
+                "name": "React support contact",
+                "description": "The pad reacts compressive contact with the supporting surface.",
+                "confidence": 0.95
+              },
+              {
+                "ontology_class": "cad:CarryCompressionBehavior",
+                "name": "Carry compression",
+                "description": "Carries local compressive appliance weight.",
+                "confidence": 0.93
+              }
+            ],
+            "relationships": [
+              {
+                "target_feature_id": "F003",
+                "category": "cad:StructuralFeatureRelationship",
+                "relation": "cad:attachedTo",
+                "description": "The pads are attached at the corners of the closure panel.",
+                "confidence": 0.91
+              }
+            ],
+            "brep_faces": [
+              {
+                "brep_id": "FACE 24",
+                "face_code": "FACE 24",
+                "entity_type": "cad:Face",
+                "geometry_type": "cad:BSplineSurface",
+                "semantic_role": "cad:SeatingFaceRole",
+                "name": "Representative pad seating surface",
+                "description": "Low-Y face of the first rounded support pad.",
+                "salience": "cad:RepresentativeSalience",
+                "confidence": 0.91,
+                "evidence": [
+                  "SOLID 2",
+                  "normal approximately -Y",
+                  "matching repeated solids at four corner coordinates"
+                ]
+              },
+              {
+                "brep_id": "FACE 30",
+                "face_code": "FACE 30",
+                "entity_type": "cad:Face",
+                "geometry_type": "cad:BSplineSurface",
+                "semantic_role": "cad:SeatingFaceRole",
+                "name": "Second pad seating surface",
+                "description": "Equivalent low-Y surface on SOLID 3.",
+                "salience": "cad:RepresentativeSalience",
+                "confidence": 0.91,
+                "evidence": [
+                  "same area as FACE 24",
+                  "mirrored x coordinate"
+                ]
+              },
+              {
+                "brep_id": "FACE 36",
+                "face_code": "FACE 36",
+                "entity_type": "cad:Face",
+                "geometry_type": "cad:BSplineSurface",
+                "semantic_role": "cad:SeatingFaceRole",
+                "name": "Third pad seating surface",
+                "description": "Equivalent low-Y surface on SOLID 4.",
+                "salience": "cad:RepresentativeSalience",
+                "confidence": 0.91,
+                "evidence": [
+                  "same area as FACE 24",
+                  "translated z coordinate"
+                ]
+              },
+              {
+                "brep_id": "FACE 42",
+                "face_code": "FACE 42",
+                "entity_type": "cad:Face",
+                "geometry_type": "cad:BSplineSurface",
+                "semantic_role": "cad:SeatingFaceRole",
+                "name": "Fourth pad seating surface",
+                "description": "Equivalent low-Y surface on SOLID 5.",
+                "salience": "cad:RepresentativeSalience",
+                "confidence": 0.91,
+                "evidence": [
+                  "same area as FACE 24",
+                  "mirrored x and translated z coordinates"
+                ]
+              }
+            ],
+            "confidence": 0.93
+          }
+        ],
+        "unclassified_brep_faces": [
+          {
+            "brep_ids": [
+              "FACE 12-FACE 13",
+              "FACE 15-FACE 23",
+              "FACE 25-FACE 29",
+              "FACE 31-FACE 35",
+              "FACE 37-FACE 41",
+              "FACE 43-FACE 45",
+              "FACE 69-FACE 70",
+              "FACE 72-FACE 86",
+              "FACE 88-FACE 89"
+            ],
+            "salience": "cad:SecondarySalience",
+            "description": "Remaining panel perimeter walls, rounded corner cylinders, panel end faces, pad side walls, and panel transition surfaces.",
+            "confidence": 0.91
+          }
+        ],
+        "relationships": [],
+        "confidence": 0.91
+      },
+      {
+        "id": "R03",
+        "name": "Ventilation and rear service panel",
+        "ontology_class": "cad:EndSection",
+        "description": "Rear or top service-panel region containing twenty narrow grille bars, a tubular perimeter detail, and a thin plate with 108 patterned blind perforations.",
+        "location": "On the enclosure side opposite the operator-facing brew controls, adjacent to the main shell.",
+        "solid_ids": [
+          "SOLID 9",
+          "SOLID 10",
+          "SOLID 11",
+          "SOLID 12",
+          "SOLID 13",
+          "SOLID 14",
+          "SOLID 15",
+          "SOLID 16",
+          "SOLID 17",
+          "SOLID 18",
+          "SOLID 19",
+          "SOLID 20",
+          "SOLID 21",
+          "SOLID 22",
+          "SOLID 23",
+          "SOLID 24",
+          "SOLID 25",
+          "SOLID 26",
+          "SOLID 27",
+          "SOLID 28",
+          "SOLID 29",
+          "SOLID 30",
+          "SOLID 31",
+          "SOLID 32",
+          "SOLID 33",
+          "SOLID 34",
+          "SOLID 35",
+          "SOLID 36"
+        ],
+        "colour": {
+          "R": 70,
+          "G": 185,
+          "B": 115
+        },
+        "section_functions": [
+          {
+            "ontology_class": "cad:ProtectFunction",
+            "name": "Protect service-panel region",
+            "description": "Provides a guarded exterior panel over the appliance interior.",
+            "primary": true,
+            "confidence": 0.84
+          },
+          {
+            "ontology_class": "cad:ProvideClearanceFunction",
+            "name": "Provide patterned openings",
+            "description": "The repeated recesses and grille structure provide local openings or visual ventilation detailing.",
+            "primary": false,
+            "confidence": 0.8
+          }
+        ],
+        "section_behaviors": [
+          {
+            "ontology_class": "cad:ResistBendingBehavior",
+            "name": "Stiffen thin panel",
+            "description": "The bars and perimeter tubing stiffen the broad panel.",
+            "confidence": 0.83
+          },
+          {
+            "ontology_class": "cad:SpreadLoadBehavior",
+            "name": "Distribute panel loads",
+            "description": "The thin plate and perimeter members spread local contact loads.",
+            "confidence": 0.79
+          }
+        ],
+        "feature_groups": [
+          {
+            "id": "G002",
+            "name": "Twenty parallel grille bars",
+            "ontology_class": "cad:RepeatedFeatureGroup",
+            "feature_class": "cad:RibFeature",
+            "pattern_type": "cad:LinearPattern",
+            "member_count": 20,
+            "member_feature_ids": [
+              "F006"
+            ],
+            "representative_feature_ids": [
+              "F006"
+            ],
+            "pattern_description": "Twenty separate radius-2.235 mm cylindrical solids, each 218 mm long along X and offset along Z.",
+            "confidence": 0.99
+          },
+          {
+            "id": "G003",
+            "name": "Rear-panel blind perforation array",
+            "ontology_class": "cad:RepeatedFeatureGroup",
+            "feature_class": "cad:BlindHoleFeature",
+            "pattern_type": "cad:LinearPattern",
+            "member_count": 108,
+            "member_feature_ids": [
+              "F008"
+            ],
+            "representative_feature_ids": [
+              "F008"
+            ],
+            "pattern_description": "Regular two-dimensional array of 108 radius-3.45 mm cylindrical recess walls in the 5 mm thick panel. FACE 398 contains 109 wires, consistent with one outer boundary and 108 patterned openings.",
+            "confidence": 0.99
+          }
+        ],
+        "features": [
+          {
+            "id": "F006",
+            "name": "Representative horizontal grille bar",
+            "ontology_class": "cad:RibFeature",
+            "parent_feature_id": null,
+            "description": "Representative of SOLID 9 through SOLID 28, each a slender cylindrical bar with planar ends.",
+            "interface_type": null,
+            "feature_functions": [
+              {
+                "ontology_class": "cad:ProtectFunction",
+                "name": "Guard panel opening",
+                "description": "Forms a protective grille across the panel region.",
+                "primary": true,
+                "confidence": 0.84
+              }
+            ],
+            "feature_behaviors": [
+              {
+                "ontology_class": "cad:ResistBendingBehavior",
+                "name": "Resist transverse bending",
+                "description": "The long cylindrical bar bridges the panel width.",
+                "confidence": 0.81
+              }
+            ],
+            "relationships": [
+              {
+                "target_feature_id": "F007",
+                "category": "cad:GeometricFeatureRelationship",
+                "relation": "cad:parallelTo",
+                "description": "All grille bars are parallel to the long horizontal perimeter member.",
+                "confidence": 0.97
+              }
+            ],
+            "brep_faces": [
+              {
+                "brep_id": "FACE 91",
+                "face_code": "FACE 91",
+                "entity_type": "cad:Face",
+                "geometry_type": "cad:CylindricalSurface",
+                "semantic_role": "cad:OuterWallRole",
+                "name": "Representative grille-bar wall",
+                "description": "Radius-2.235 mm cylinder extending from x=-260 to -42 mm.",
+                "salience": "cad:RepresentativeSalience",
+                "confidence": 0.99,
+                "evidence": [
+                  "CYLINDER radius 2.235 mm",
+                  "axis parallel to X",
+                  "218 mm bounding length",
+                  "twenty repeated solids"
+                ]
+              },
+              {
+                "brep_id": "FACE 94",
+                "face_code": "FACE 94",
+                "entity_type": "cad:Face",
+                "geometry_type": "cad:CylindricalSurface",
+                "semantic_role": "cad:OuterWallRole",
+                "name": "Second representative grille-bar wall",
+                "description": "Equivalent bar offset by 10 mm in Z.",
+                "salience": "cad:RepresentativeSalience",
+                "confidence": 0.99,
+                "evidence": [
+                  "same radius and axis as FACE 91",
+                  "linear Z offset"
+                ]
+              }
+            ],
+            "confidence": 0.96
+          },
+          {
+            "id": "F007",
+            "name": "Tubular perimeter trim",
+            "ontology_class": "cad:RibFeature",
+            "parent_feature_id": null,
+            "description": "Bent tubular trim assembled from SOLID 29 through SOLID 35 around the grille region.",
+            "interface_type": null,
+            "feature_functions": [
+              {
+                "ontology_class": "cad:ProtectFunction",
+                "name": "Guard panel perimeter",
+                "description": "Provides a rounded guard and visual boundary around the grille.",
+                "primary": true,
+                "confidence": 0.83
+              }
+            ],
+            "feature_behaviors": [
+              {
+                "ontology_class": "cad:ResistBendingBehavior",
+                "name": "Perimeter stiffening",
+                "description": "Tubular members stiffen the panel perimeter.",
+                "confidence": 0.81
+              }
+            ],
+            "relationships": [
+              {
+                "target_feature_id": "F009",
+                "category": "cad:StructuralFeatureRelationship",
+                "relation": "cad:attachedTo",
+                "description": "The tubular trim is attached around the thin service panel.",
+                "confidence": 0.85
+              }
+            ],
+            "brep_faces": [
+              {
+                "brep_id": "FACE 155",
+                "face_code": "FACE 155",
+                "entity_type": "cad:Face",
+                "geometry_type": "cad:CylindricalSurface",
+                "semantic_role": "cad:OuterWallRole",
+                "name": "Long perimeter tube",
+                "description": "Radius-2.5 mm cylindrical member extending 145 mm along X.",
+                "salience": "cad:PrimarySalience",
+                "confidence": 0.94,
+                "evidence": [
+                  "CYLINDER radius 2.5 mm",
+                  "axis parallel to X",
+                  "SOLID 29"
+                ]
+              },
+              {
+                "brep_id": "FACE 166",
+                "face_code": "FACE 166",
+                "entity_type": "cad:Face",
+                "geometry_type": "cad:CylindricalSurface",
+                "semantic_role": "cad:OuterWallRole",
+                "name": "Right vertical perimeter tube",
+                "description": "Radius-2.5 mm cylindrical member extending 145 mm along Z.",
+                "salience": "cad:PrimarySalience",
+                "confidence": 0.94,
+                "evidence": [
+                  "CYLINDER radius 2.5 mm",
+                  "axis parallel to Z",
+                  "SOLID 32"
+                ]
+              },
+              {
+                "brep_id": "FACE 169",
+                "face_code": "FACE 169",
+                "entity_type": "cad:Face",
+                "geometry_type": "cad:CylindricalSurface",
+                "semantic_role": "cad:OuterWallRole",
+                "name": "Left vertical perimeter tube",
+                "description": "Mirrored radius-2.5 mm cylindrical member extending along Z.",
+                "salience": "cad:PrimarySalience",
+                "confidence": 0.94,
+                "evidence": [
+                  "same radius and length as FACE 166",
+                  "mirrored x coordinate"
+                ]
+              }
+            ],
+            "confidence": 0.89
+          },
+          {
+            "id": "F008",
+            "name": "Representative blind panel perforation",
+            "ontology_class": "cad:BlindHoleFeature",
+            "parent_feature_id": null,
+            "description": "Representative of 108 shallow cylindrical perforations or recesses in SOLID 36.",
+            "interface_type": null,
+            "feature_functions": [
+              {
+                "ontology_class": "cad:ProvideClearanceFunction",
+                "name": "Provide local panel opening",
+                "description": "Creates a repeated local opening or recess in the thin panel.",
+                "primary": true,
+                "confidence": 0.86
+              }
+            ],
+            "feature_behaviors": [
+              {
+                "ontology_class": "cad:ReactContactLoadBehavior",
+                "name": "Define recess wall contact",
+                "description": "The cylindrical wall bounds each panel recess.",
+                "confidence": 0.72
+              }
+            ],
+            "relationships": [
+              {
+                "target_feature_id": "F009",
+                "category": "cad:StructuralFeatureRelationship",
+                "relation": "cad:partOfFeature",
+                "description": "Each blind perforation is a removal feature in the service panel.",
+                "confidence": 0.97
+              }
+            ],
+            "brep_faces": [
+              {
+                "brep_id": "FACE 178",
+                "face_code": "FACE 178",
+                "entity_type": "cad:Face",
+                "geometry_type": "cad:CylindricalSurface",
+                "semantic_role": "cad:BoreWallRole",
+                "name": "Representative perforation wall",
+                "description": "Radius-3.45 mm cylindrical wall spanning y=55 to 59 mm.",
+                "salience": "cad:RepresentativeSalience",
+                "confidence": 0.99,
+                "evidence": [
+                  "CYLINDER radius 3.45 mm",
+                  "axis parallel to Y",
+                  "repeated grid coordinates",
+                  "adjacent planar recess floor FACE 179"
+                ]
+              },
+              {
+                "brep_id": "FACE 179",
+                "face_code": "FACE 179",
+                "entity_type": "cad:Face",
+                "geometry_type": "cad:PlanarSurface",
+                "semantic_role": "cad:CavityWallRole",
+                "name": "Representative perforation floor",
+                "description": "Planar circular floor at y=55 mm closing the representative blind recess.",
+                "salience": "cad:RepresentativeSalience",
+                "confidence": 0.98,
+                "evidence": [
+                  "PLANE normal parallel to Y",
+                  "circular area 37.392807 mm^2",
+                  "same center as FACE 178"
+                ]
+              },
+              {
+                "brep_id": "FACE 180",
+                "face_code": "FACE 180",
+                "entity_type": "cad:Face",
+                "geometry_type": "cad:CylindricalSurface",
+                "semantic_role": "cad:BoreWallRole",
+                "name": "Second representative perforation wall",
+                "description": "Equivalent cylindrical recess translated 40 mm in Z.",
+                "salience": "cad:RepresentativeSalience",
+                "confidence": 0.99,
+                "evidence": [
+                  "same radius and axis as FACE 178",
+                  "regular pattern translation"
+                ]
+              }
+            ],
+            "confidence": 0.97
+          },
+          {
+            "id": "F009",
+            "name": "Thin perforated service panel",
+            "ontology_class": "cad:WallFeature",
+            "parent_feature_id": null,
+            "description": "Five-millimeter-thick rectangular panel body represented by SOLID 36.",
+            "interface_type": null,
+            "feature_functions": [
+              {
+                "ontology_class": "cad:ProtectFunction",
+                "name": "Cover service region",
+                "description": "Forms the principal protective wall behind the patterned openings.",
+                "primary": true,
+                "confidence": 0.88
+              }
+            ],
+            "feature_behaviors": [
+              {
+                "ontology_class": "cad:ResistBendingBehavior",
+                "name": "Resist panel bending",
+                "description": "The plate carries distributed enclosure loads around its patterned openings.",
+                "confidence": 0.84
+              }
+            ],
+            "relationships": [
+              {
+                "target_feature_id": "F001",
+                "category": "cad:StructuralFeatureRelationship",
+                "relation": "cad:attachedTo",
+                "description": "The service panel mounts against the enclosure shell.",
+                "confidence": 0.87
+              }
+            ],
+            "brep_faces": [
+              {
+                "brep_id": "FACE 395",
+                "face_code": "FACE 395",
+                "entity_type": "cad:Face",
+                "geometry_type": "cad:PlanarSurface",
+                "semantic_role": "cad:InnerWallRole",
+                "name": "Service-panel inner face",
+                "description": "Large planar face at y=54 mm.",
+                "salience": "cad:PrimarySalience",
+                "confidence": 0.98,
+                "evidence": [
+                  "PLANE",
+                  "area 63589.459521 mm^2",
+                  "272 by 235 mm panel span"
+                ]
+              },
+              {
+                "brep_id": "FACE 398",
+                "face_code": "FACE 398",
+                "entity_type": "cad:Face",
+                "geometry_type": "cad:PlanarSurface",
+                "semantic_role": "cad:OuterWallRole",
+                "name": "Perforated service-panel outer face",
+                "description": "Large planar face at y=59 mm containing 109 wires.",
+                "salience": "cad:PrimarySalience",
+                "confidence": 0.99,
+                "evidence": [
+                  "PLANE",
+                  "n_wires 109",
+                  "one outer boundary plus 108 repeated perforation boundaries",
+                  "area 59551.036413 mm^2"
+                ]
+              }
+            ],
+            "confidence": 0.94
+          }
+        ],
+        "unclassified_brep_faces": [
+          {
+            "brep_ids": [
+              "FACE 92-FACE 93",
+              "FACE 95-FACE 154",
+              "FACE 156-FACE 165",
+              "FACE 167-FACE 168",
+              "FACE 170-FACE 177"
+            ],
+            "salience": "cad:SecondarySalience",
+            "description": "Grille-bar end faces and remaining straight or bent perimeter-tube walls and end caps.",
+            "confidence": 0.95
+          },
+          {
+            "brep_ids": [
+              "FACE 181-FACE 394",
+              "FACE 396-FACE 397",
+              "FACE 399-FACE 401"
+            ],
+            "salience": "cad:SecondarySalience",
+            "description": "Remaining repeated perforation walls and floors, plus panel perimeter side walls, rounded top corners, and end faces. Within FACE 181-FACE 393, odd/even pairs predominantly represent planar recess floors and cylindrical recess walls respectively.",
+            "confidence": 0.98
+          }
+        ],
+        "relationships": [],
+        "confidence": 0.92
+      },
+      {
+        "id": "R04",
+        "name": "Operator controls and brew-head assembly",
+        "ontology_class": "cad:CentralSection",
+        "description": "Operator-facing control knob, indicator details, brew-head housings, outlet structures, button-like features, and the tall operating lever.",
+        "location": "Centered on the operator-facing upper region, above the cup platform and adjacent to the steam wand.",
+        "solid_ids": [
+          "SOLID 37",
+          "SOLID 38",
+          "SOLID 39",
+          "SOLID 40",
+          "SOLID 41",
+          "SOLID 42",
+          "SOLID 43",
+          "SOLID 44",
+          "SOLID 45",
+          "SOLID 46",
+          "SOLID 47",
+          "SOLID 49",
+          "SOLID 50",
+          "SOLID 55"
+        ],
+        "colour": {
+          "R": 210,
+          "G": 70,
+          "B": 90
+        },
+        "section_functions": [
+          {
+            "ontology_class": "cad:EngageFunction",
+            "name": "Provide operator engagement",
+            "description": "Knobs, buttons, and lever provide operator input to the appliance.",
+            "primary": true,
+            "confidence": 0.94
+          },
+          {
+            "ontology_class": "cad:SupportFunction",
+            "name": "Support dispensing hardware",
+            "description": "Brew-head housings support the outlet mechanism.",
+            "primary": false,
+            "confidence": 0.91
+          }
+        ],
+        "section_behaviors": [
+          {
+            "ontology_class": "cad:PermitRotationBehavior",
+            "name": "Permit control rotation",
+            "description": "The knob and lever interfaces permit intended rotational input.",
+            "confidence": 0.9
+          },
+          {
+            "ontology_class": "cad:ReactContactLoadBehavior",
+            "name": "React operator contact",
+            "description": "Control surfaces and brew-head interfaces react hand and attachment loads.",
+            "confidence": 0.9
+          }
+        ],
+        "feature_groups": [
+          {
+            "id": "G004",
+            "name": "Four control-position markers",
+            "ontology_class": "cad:RepeatedFeatureGroup",
+            "feature_class": "cad:BossFeature",
+            "pattern_type": "cad:CircularPattern",
+            "member_count": 4,
+            "member_feature_ids": [
+              "F011"
+            ],
+            "representative_feature_ids": [
+              "F011"
+            ],
+            "pattern_description": "Four small rounded solids distributed around the control knob.",
+            "confidence": 0.92
+          },
+          {
+            "id": "G005",
+            "name": "Paired vertical control bars",
+            "ontology_class": "cad:RepeatedFeatureGroup",
+            "feature_class": "cad:BossFeature",
+            "pattern_type": "cad:PairedPattern",
+            "member_count": 2,
+            "member_feature_ids": [
+              "F012"
+            ],
+            "representative_feature_ids": [
+              "F012"
+            ],
+            "pattern_description": "Two equivalent elongated rounded solids represented by SOLID 45 and SOLID 46.",
+            "confidence": 0.99
+          }
+        ],
+        "features": [
+          {
+            "id": "F010",
+            "name": "Rotary selector knob",
+            "ontology_class": "cad:HubFeature",
+            "parent_feature_id": null,
+            "description": "Large rounded control body represented by SOLID 37 with a narrow pointer or grip feature from SOLID 38.",
+            "interface_type": "cad:ShaftInterface",
+            "feature_functions": [
+              {
+                "ontology_class": "cad:EngageFunction",
+                "name": "Select operating state",
+                "description": "Provides a hand-operated rotary control.",
+                "primary": true,
+                "confidence": 0.96
+              },
+              {
+                "ontology_class": "cad:GripFunction",
+                "name": "Provide hand grip",
+                "description": "Rounded exterior and pointer support manual turning.",
+                "primary": false,
+                "confidence": 0.94
+              }
+            ],
+            "feature_behaviors": [
+              {
+                "ontology_class": "cad:PermitRotationBehavior",
+                "name": "Permit selector rotation",
+                "description": "The hub-like knob rotates about its control axis.",
+                "confidence": 0.93
+              },
+              {
+                "ontology_class": "cad:TransmitTorqueFunction",
+                "name": "Transmit manual torque",
+                "description": "Transfers hand-applied torque to the control shaft.",
+                "confidence": 0.9
+              }
+            ],
+            "relationships": [
+              {
+                "target_feature_id": "F011",
+                "category": "cad:GeometricFeatureRelationship",
+                "relation": "cad:surroundsFeature",
+                "description": "The position markers are distributed around the knob.",
+                "confidence": 0.91
+              }
+            ],
+            "brep_faces": [
+              {
+                "brep_id": "FACE 407",
+                "face_code": "FACE 407",
+                "entity_type": "cad:Face",
+                "geometry_type": "cad:BSplineSurface",
+                "semantic_role": "cad:InterfaceFaceRole",
+                "name": "Knob front contact face",
+                "description": "Rounded top face centered near x=-149.90 mm, y=324.98 mm.",
+                "salience": "cad:PrimarySalience",
+                "confidence": 0.94,
+                "evidence": [
+                  "SOLID 37",
+                  "centrally located control geometry",
+                  "visual correspondence to rotary knob"
+                ]
+              },
+              {
+                "brep_id": "FACE 413",
+                "face_code": "FACE 413",
+                "entity_type": "cad:Face",
+                "geometry_type": "cad:BSplineSurface",
+                "semantic_role": "cad:InterfaceFaceRole",
+                "name": "Selector pointer side",
+                "description": "Long narrow pointer or grip side surface from SOLID 38.",
+                "salience": "cad:PrimarySalience",
+                "confidence": 0.88,
+                "evidence": [
+                  "narrow 59.64 mm bounding length",
+                  "visual pointer correspondence"
+                ]
+              }
+            ],
+            "confidence": 0.94
+          },
+          {
+            "id": "F011",
+            "name": "Representative control-position marker",
+            "ontology_class": "cad:BossFeature",
+            "parent_feature_id": null,
+            "description": "Representative of four small rounded markers formed by SOLID 41 through SOLID 44.",
+            "interface_type": null,
+            "feature_functions": [
+              {
+                "ontology_class": "cad:LocateFunction",
+                "name": "Indicate selector position",
+                "description": "Provides a tactile or visual location marker around the selector.",
+                "primary": true,
+                "confidence": 0.86
+              }
+            ],
+            "feature_behaviors": [
+              {
+                "ontology_class": "cad:ReactContactLoadBehavior",
+                "name": "React light contact",
+                "description": "Small raised markers can react incidental finger contact.",
+                "confidence": 0.68
+              }
+            ],
+            "relationships": [
+              {
+                "target_feature_id": "F010",
+                "category": "cad:GeometricFeatureRelationship",
+                "relation": "cad:offsetFrom",
+                "description": "Markers are radially offset from the selector knob.",
+                "confidence": 0.9
+              }
+            ],
+            "brep_faces": [
+              {
+                "brep_id": "FACE 433",
+                "face_code": "FACE 433",
+                "entity_type": "cad:Face",
+                "geometry_type": "cad:BSplineSurface",
+                "semantic_role": "cad:OuterWallRole",
+                "name": "Representative marker top",
+                "description": "Rounded upper face of the first position marker.",
+                "salience": "cad:RepresentativeSalience",
+                "confidence": 0.9,
+                "evidence": [
+                  "SOLID 41",
+                  "small repeated rounded body",
+                  "matching solids 42 through 44"
+                ]
+              }
+            ],
+            "confidence": 0.87
+          },
+          {
+            "id": "F012",
+            "name": "Representative paired control bar",
+            "ontology_class": "cad:BossFeature",
+            "parent_feature_id": null,
+            "description": "Representative elongated rounded control or indicator bar from SOLID 45 and SOLID 46.",
+            "interface_type": "cad:ContactInterface",
+            "feature_functions": [
+              {
+                "ontology_class": "cad:EngageFunction",
+                "name": "Provide auxiliary control contact",
+                "description": "Provides an elongated user-contact or indicator feature.",
+                "primary": true,
+                "confidence": 0.81
+              }
+            ],
+            "feature_behaviors": [
+              {
+                "ontology_class": "cad:ReactContactLoadBehavior",
+                "name": "React finger contact",
+                "description": "Rounded bar surfaces react light operator loads.",
+                "confidence": 0.78
+              }
+            ],
+            "relationships": [
+              {
+                "target_feature_id": "F010",
+                "category": "cad:GeometricFeatureRelationship",
+                "relation": "cad:offsetFrom",
+                "description": "The paired bars are laterally offset from the central knob.",
+                "confidence": 0.91
+              }
+            ],
+            "brep_faces": [
+              {
+                "brep_id": "FACE 457",
+                "face_code": "FACE 457",
+                "entity_type": "cad:Face",
+                "geometry_type": "cad:BSplineSurface",
+                "semantic_role": "cad:InterfaceFaceRole",
+                "name": "First control-bar contact face",
+                "description": "Long rounded face of SOLID 45.",
+                "salience": "cad:RepresentativeSalience",
+                "confidence": 0.88,
+                "evidence": [
+                  "32.08 mm bounding length",
+                  "paired matching geometry"
+                ]
+              },
+              {
+                "brep_id": "FACE 463",
+                "face_code": "FACE 463",
+                "entity_type": "cad:Face",
+                "geometry_type": "cad:BSplineSurface",
+                "semantic_role": "cad:InterfaceFaceRole",
+                "name": "Second control-bar contact face",
+                "description": "Equivalent long rounded face of SOLID 46.",
+                "salience": "cad:RepresentativeSalience",
+                "confidence": 0.88,
+                "evidence": [
+                  "same area as FACE 457",
+                  "25 mm X offset"
+                ]
+              }
+            ],
+            "confidence": 0.84
+          },
+          {
+            "id": "F013",
+            "name": "Auxiliary horizontal indicator slot",
+            "ontology_class": "cad:ElongatedSlotFeature",
+            "parent_feature_id": null,
+            "description": "Long narrow rounded feature represented by SOLID 39.",
+            "interface_type": null,
+            "feature_functions": [
+              {
+                "ontology_class": "cad:LocateFunction",
+                "name": "Indicate control state",
+                "description": "Provides an elongated visual indicator adjacent to the selector.",
+                "primary": true,
+                "confidence": 0.76
+              }
+            ],
+            "feature_behaviors": [
+              {
+                "ontology_class": "cad:ReactContactLoadBehavior",
+                "name": "React local panel contact",
+                "description": "The insert reacts light contact at the control panel.",
+                "confidence": 0.62
+              }
+            ],
+            "relationships": [
+              {
+                "target_feature_id": "F010",
+                "category": "cad:GeometricFeatureRelationship",
+                "relation": "cad:offsetFrom",
+                "description": "The indicator is laterally offset from the rotary selector.",
+                "confidence": 0.87
+              }
+            ],
+            "brep_faces": [
+              {
+                "brep_id": "FACE 424",
+                "face_code": "FACE 424",
+                "entity_type": "cad:Face",
+                "geometry_type": "cad:BSplineSurface",
+                "semantic_role": "cad:InterfaceFaceRole",
+                "name": "Indicator exposed face",
+                "description": "Long rounded exposed face of the auxiliary indicator.",
+                "salience": "cad:PrimarySalience",
+                "confidence": 0.82,
+                "evidence": [
+                  "SOLID 39",
+                  "approximately 43 mm long",
+                  "visual correspondence to horizontal control-panel mark"
+                ]
+              }
+            ],
+            "confidence": 0.78
+          },
+          {
+            "id": "F014",
+            "name": "Outer brew-head housing",
+            "ontology_class": "cad:HousingFeature",
+            "parent_feature_id": null,
+            "description": "Large rounded housing represented by SOLID 47 around the dispensing axis.",
+            "interface_type": null,
+            "feature_functions": [
+              {
+                "ontology_class": "cad:SupportFunction",
+                "name": "Support brew outlet",
+                "description": "Supports and encloses the dispensing mechanism.",
+                "primary": true,
+                "confidence": 0.94
+              },
+              {
+                "ontology_class": "cad:ProtectFunction",
+                "name": "Protect brew mechanism",
+                "description": "Shields internal outlet hardware.",
+                "primary": false,
+                "confidence": 0.9
+              }
+            ],
+            "feature_behaviors": [
+              {
+                "ontology_class": "cad:ReactBearingLoadBehavior",
+                "name": "React attached brewing load",
+                "description": "The housing reacts loads from the attached brew assembly.",
+                "confidence": 0.86
+              }
+            ],
+            "relationships": [
+              {
+                "target_feature_id": "F015",
+                "category": "cad:StructuralFeatureRelationship",
+                "relation": "cad:surroundsFeature",
+                "description": "The outer housing surrounds the inner brew-head body.",
+                "confidence": 0.9
+              },
+              {
+                "target_feature_id": "F002",
+                "category": "cad:FunctionalFeatureRelationship",
+                "relation": "cad:transmitsLoadTo",
+                "description": "Brew-head loads are transferred into the machine frame.",
+                "confidence": 0.87
+              }
+            ],
+            "brep_faces": [
+              {
+                "brep_id": "FACE 464",
+                "face_code": "FACE 464",
+                "entity_type": "cad:Face",
+                "geometry_type": "cad:BSplineSurface",
+                "semantic_role": "cad:OuterWallRole",
+                "name": "Outer brew-housing side",
+                "description": "Large rounded side face of SOLID 47.",
+                "salience": "cad:PrimarySalience",
+                "confidence": 0.94,
+                "evidence": [
+                  "area 5122.774137 mm^2",
+                  "brew-head-scale symmetric geometry",
+                  "visual correspondence"
+                ]
+              },
+              {
+                "brep_id": "FACE 469",
+                "face_code": "FACE 469",
+                "entity_type": "cad:Face",
+                "geometry_type": "cad:BSplineSurface",
+                "semantic_role": "cad:MountingFaceRole",
+                "name": "Brew-housing mounting face",
+                "description": "Rear planar-like B-spline face of the outer brew housing.",
+                "salience": "cad:PrimarySalience",
+                "confidence": 0.9,
+                "evidence": [
+                  "normal approximately +Y",
+                  "broad symmetric attachment surface"
+                ]
+              }
+            ],
+            "confidence": 0.92
+          },
+          {
+            "id": "F015",
+            "name": "Inner brew-head body",
+            "ontology_class": "cad:HubFeature",
+            "parent_feature_id": null,
+            "description": "Nested rounded bodies represented by SOLID 49 and SOLID 50, forming the central dispensing and attachment region.",
+            "interface_type": "cad:SeatingInterface",
+            "feature_functions": [
+              {
+                "ontology_class": "cad:ConnectFunction",
+                "name": "Connect dispensing attachment",
+                "description": "Provides the central attachment and locating body for the brew outlet.",
+                "primary": true,
+                "confidence": 0.9
+              },
+              {
+                "ontology_class": "cad:LocateFunction",
+                "name": "Locate outlet mechanism",
+                "description": "Concentrically locates the dispensing assembly.",
+                "primary": false,
+                "confidence": 0.88
+              }
+            ],
+            "feature_behaviors": [
+              {
+                "ontology_class": "cad:ReactBearingLoadBehavior",
+                "name": "React attachment load",
+                "description": "Reacts radial and contact loads from the attached dispensing component.",
+                "confidence": 0.87
+              },
+              {
+                "ontology_class": "cad:ConstrainTranslationBehavior",
+                "name": "Constrain attachment translation",
+                "description": "Nested seating surfaces constrain axial and lateral motion.",
+                "confidence": 0.84
+              }
+            ],
+            "relationships": [
+              {
+                "target_feature_id": "F014",
+                "category": "cad:GeometricFeatureRelationship",
+                "relation": "cad:insideFeature",
+                "description": "The inner brew-head body is nested inside the outer housing.",
+                "confidence": 0.9
+              }
+            ],
+            "brep_faces": [
+              {
+                "brep_id": "FACE 482",
+                "face_code": "FACE 482",
+                "entity_type": "cad:Face",
+                "geometry_type": "cad:BSplineSurface",
+                "semantic_role": "cad:SeatingFaceRole",
+                "name": "Brew-head seating face",
+                "description": "Broad attachment-facing surface of SOLID 49.",
+                "salience": "cad:PrimarySalience",
+                "confidence": 0.87,
+                "evidence": [
+                  "normal approximately +Y",
+                  "symmetric central placement"
+                ]
+              },
+              {
+                "brep_id": "FACE 507",
+                "face_code": "FACE 507",
+                "entity_type": "cad:Face",
+                "geometry_type": "cad:BSplineSurface",
+                "semantic_role": "cad:InterfaceFaceRole",
+                "name": "Inner outlet interface face",
+                "description": "Central exposed face of SOLID 50.",
+                "salience": "cad:PrimarySalience",
+                "confidence": 0.87,
+                "evidence": [
+                  "normal approximately +Y",
+                  "central brew-axis location",
+                  "visual correspondence to outlet interface"
+                ]
+              }
+            ],
+            "confidence": 0.88
+          },
+          {
+            "id": "F016",
+            "name": "Tall operating lever",
+            "ontology_class": "cad:ShaftFeature",
+            "parent_feature_id": null,
+            "description": "Vertical cylindrical handle and reduced lower shaft represented by SOLID 55.",
+            "interface_type": "cad:PinInterface",
+            "feature_functions": [
+              {
+                "ontology_class": "cad:GripFunction",
+                "name": "Provide lever grip",
+                "description": "The long cylindrical handle provides an operator gripping surface.",
+                "primary": true,
+                "confidence": 0.98
+              },
+              {
+                "ontology_class": "cad:TransmitTorqueFunction",
+                "name": "Transmit lever torque",
+                "description": "Transfers operator input through the lower shaft.",
+                "primary": false,
+                "confidence": 0.94
+              }
+            ],
+            "feature_behaviors": [
+              {
+                "ontology_class": "cad:ResistBendingBehavior",
+                "name": "Resist lever bending",
+                "description": "The shaft resists transverse hand loads.",
+                "confidence": 0.94
+              },
+              {
+                "ontology_class": "cad:PermitRotationBehavior",
+                "name": "Permit lever actuation",
+                "description": "The pin-like interface permits intended lever motion.",
+                "confidence": 0.87
+              }
+            ],
+            "relationships": [
+              {
+                "target_feature_id": "F014",
+                "category": "cad:StructuralFeatureRelationship",
+                "relation": "cad:attachedTo",
+                "description": "The lever is attached near the brew-head housing.",
+                "confidence": 0.86
+              },
+              {
+                "target_feature_id": "F015",
+                "category": "cad:FunctionalFeatureRelationship",
+                "relation": "cad:engagesWith",
+                "description": "The lever actuates or engages the inner brew mechanism.",
+                "confidence": 0.8
+              }
+            ],
+            "brep_faces": [
+              {
+                "brep_id": "FACE 528",
+                "face_code": "FACE 528",
+                "entity_type": "cad:Face",
+                "geometry_type": "cad:CylindricalSurface",
+                "semantic_role": "cad:InterfaceFaceRole",
+                "name": "Lever grip wall",
+                "description": "Radius-14.62 mm cylindrical handle wall extending from z=329 to 432 mm.",
+                "salience": "cad:PrimarySalience",
+                "confidence": 0.99,
+                "evidence": [
+                  "CYLINDER radius 14.62 mm",
+                  "axis parallel to Z",
+                  "103 mm cylindrical span",
+                  "visual correspondence to tall black lever"
+                ]
+              },
+              {
+                "brep_id": "FACE 526",
+                "face_code": "FACE 526",
+                "entity_type": "cad:Face",
+                "geometry_type": "cad:ConicalSurface",
+                "semantic_role": "cad:TransitionSurfaceRole",
+                "name": "Lever shoulder taper",
+                "description": "Conical transition between the grip and reduced lower shaft.",
+                "salience": "cad:PrimarySalience",
+                "confidence": 0.98,
+                "evidence": [
+                  "CONE",
+                  "semi-angle 0.785398 rad",
+                  "axis parallel to Z"
+                ]
+              },
+              {
+                "brep_id": "FACE 530",
+                "face_code": "FACE 530",
+                "entity_type": "cad:Face",
+                "geometry_type": "cad:CylindricalSurface",
+                "semantic_role": "cad:InterfaceFaceRole",
+                "name": "Reduced lever shaft",
+                "description": "Radius-7.07 mm lower cylindrical shaft extending from z=292 to 322 mm.",
+                "salience": "cad:PrimarySalience",
+                "confidence": 0.98,
+                "evidence": [
+                  "CYLINDER radius 7.07 mm",
+                  "axis parallel to Z",
+                  "concentric with FACE 528"
+                ]
+              }
+            ],
+            "confidence": 0.95
+          }
+        ],
+        "unclassified_brep_faces": [
+          {
+            "brep_ids": [
+              "FACE 402-FACE 406",
+              "FACE 408-FACE 412",
+              "FACE 414-FACE 423",
+              "FACE 425-FACE 432",
+              "FACE 434-FACE 456",
+              "FACE 458-FACE 462",
+              "FACE 465-FACE 468",
+              "FACE 480-FACE 481",
+              "FACE 483-FACE 506",
+              "FACE 527",
+              "FACE 529",
+              "FACE 531"
+            ],
+            "salience": "cad:SecondarySalience",
+            "description": "Remaining knob walls, pointer surfaces, decorative control marks, paired control-bar side walls, nested brew-head housing walls, and lever end faces.",
+            "confidence": 0.88
+          }
+        ],
+        "relationships": [],
+        "confidence": 0.91
+      },
+      {
+        "id": "R05",
+        "name": "Steam-wand assembly",
+        "ontology_class": "cad:EndSection",
+        "description": "Articulated tubular steam or hot-water wand positioned beside the operator-facing brew area.",
+        "location": "Laterally offset from the brew head and extending into the cup-access opening.",
+        "solid_ids": [
+          "SOLID 48"
+        ],
+        "colour": {
+          "R": 155,
+          "G": 85,
+          "B": 195
+        },
+        "section_functions": [
+          {
+            "ontology_class": "cad:GuideFunction",
+            "name": "Guide steam or hot water",
+            "description": "The tubular assembly guides process fluid toward a cup.",
+            "primary": true,
+            "confidence": 0.9
+          },
+          {
+            "ontology_class": "cad:ProvideClearanceFunction",
+            "name": "Reach cup region",
+            "description": "The articulated offset provides clearance around the brew head.",
+            "primary": false,
+            "confidence": 0.86
+          }
+        ],
+        "section_behaviors": [
+          {
+            "ontology_class": "cad:PermitRotationBehavior",
+            "name": "Permit wand articulation",
+            "description": "The jointed cylindrical geometry permits positional adjustment.",
+            "confidence": 0.86
+          },
+          {
+            "ontology_class": "cad:ResistBendingBehavior",
+            "name": "Resist wand bending",
+            "description": "The tubular body resists hand and reaction loads.",
+            "confidence": 0.82
+          }
+        ],
+        "feature_groups": [],
+        "features": [
+          {
+            "id": "F017",
+            "name": "Articulated steam wand",
+            "ontology_class": "cad:CompoundFeature",
+            "parent_feature_id": null,
+            "description": "Compound tubular wand with toroidal joints, cylindrical segments, and a terminal body.",
+            "interface_type": "cad:PinInterface",
+            "feature_functions": [
+              {
+                "ontology_class": "cad:GuideFunction",
+                "name": "Guide process fluid",
+                "description": "Directs steam or hot water toward a vessel.",
+                "primary": true,
+                "confidence": 0.91
+              },
+              {
+                "ontology_class": "cad:LocateFunction",
+                "name": "Position outlet",
+                "description": "Allows the terminal outlet to be positioned beside the cup.",
+                "primary": false,
+                "confidence": 0.87
+              }
+            ],
+            "feature_behaviors": [
+              {
+                "ontology_class": "cad:PermitRotationBehavior",
+                "name": "Permit joint rotation",
+                "description": "Toroidal and cylindrical joint surfaces support articulation.",
+                "confidence": 0.87
+              },
+              {
+                "ontology_class": "cad:ReactBearingLoadBehavior",
+                "name": "React joint load",
+                "description": "Joint surfaces react wand positioning loads.",
+                "confidence": 0.8
+              }
+            ],
+            "relationships": [
+              {
+                "target_feature_id": "F014",
+                "category": "cad:GeometricFeatureRelationship",
+                "relation": "cad:offsetFrom",
+                "description": "The steam wand is laterally offset from the central brew head.",
+                "confidence": 0.94
+              }
+            ],
+            "brep_faces": [
+              {
+                "brep_id": "FACE 470",
+                "face_code": "FACE 470",
+                "entity_type": "cad:Face",
+                "geometry_type": "cad:ToroidalSurface",
+                "semantic_role": "cad:InterfaceFaceRole",
+                "name": "Upper wand joint blend",
+                "description": "Toroidal joint surface with major radius 3.515 mm and minor radius 2.75 mm.",
+                "salience": "cad:PrimarySalience",
+                "confidence": 0.95,
+                "evidence": [
+                  "TORUS",
+                  "major radius 3.515 mm",
+                  "minor radius 2.75 mm",
+                  "joint-scale geometry"
+                ]
+              },
+              {
+                "brep_id": "FACE 472",
+                "face_code": "FACE 472",
+                "entity_type": "cad:Face",
+                "geometry_type": "cad:CylindricalSurface",
+                "semantic_role": "cad:OuterWallRole",
+                "name": "Narrow wand tube",
+                "description": "Radius-6.265 mm inclined cylindrical segment.",
+                "salience": "cad:PrimarySalience",
+                "confidence": 0.96,
+                "evidence": [
+                  "CYLINDER radius 6.265 mm",
+                  "inclined axis",
+                  "visual correspondence to steam tube"
+                ]
+              },
+              {
+                "brep_id": "FACE 474",
+                "face_code": "FACE 474",
+                "entity_type": "cad:Face",
+                "geometry_type": "cad:CylindricalSurface",
+                "semantic_role": "cad:InterfaceFaceRole",
+                "name": "Wand terminal grip",
+                "description": "Radius-11 mm cylindrical terminal or grip body.",
+                "salience": "cad:PrimarySalience",
+                "confidence": 0.94,
+                "evidence": [
+                  "CYLINDER radius 11 mm",
+                  "same inclined axis family as FACE 472",
+                  "visual terminal body"
+                ]
+              },
+              {
+                "brep_id": "FACE 476",
+                "face_code": "FACE 476",
+                "entity_type": "cad:Face",
+                "geometry_type": "cad:ToroidalSurface",
+                "semantic_role": "cad:TransitionSurfaceRole",
+                "name": "Terminal toroidal transition",
+                "description": "Toroidal transition with major radius 10 mm and minor radius 1 mm.",
+                "salience": "cad:PrimarySalience",
+                "confidence": 0.94,
+                "evidence": [
+                  "TORUS",
+                  "major radius 10 mm",
+                  "minor radius 1 mm"
+                ]
+              }
+            ],
+            "confidence": 0.91
+          }
+        ],
+        "unclassified_brep_faces": [
+          {
+            "brep_ids": [
+              "FACE 471",
+              "FACE 473",
+              "FACE 475",
+              "FACE 477-FACE 479"
+            ],
+            "salience": "cad:SecondarySalience",
+            "description": "Remaining wand joint closure faces, free end face, curved terminal wall, and mounting transition surfaces.",
+            "confidence": 0.88
+          }
+        ],
+        "relationships": [],
+        "confidence": 0.9
+      },
+      {
+        "id": "R06",
+        "name": "Removable cup accessories",
+        "ontology_class": "cad:InteriorSection",
+        "description": "Two separate cup bodies and two separate handles shown in the dispensing bay. These solids are interpreted as removable contextual accessories rather than integral appliance structure.",
+        "location": "Below the brew head in the cup-access opening.",
+        "solid_ids": [
+          "SOLID 51",
+          "SOLID 52",
+          "SOLID 53",
+          "SOLID 54"
+        ],
+        "colour": {
+          "R": 45,
+          "G": 190,
+          "B": 195
+        },
+        "section_functions": [
+          {
+            "ontology_class": "cad:ContainFunction",
+            "name": "Contain dispensed beverage",
+            "description": "The two cup bodies contain beverage delivered by the brew head.",
+            "primary": true,
+            "confidence": 0.95
+          },
+          {
+            "ontology_class": "cad:GripFunction",
+            "name": "Provide cup grip",
+            "description": "Separate loop-like handles provide user gripping interfaces.",
+            "primary": false,
+            "confidence": 0.94
+          }
+        ],
+        "section_behaviors": [
+          {
+            "ontology_class": "cad:ReactContactLoadBehavior",
+            "name": "React beverage and hand loads",
+            "description": "Cup walls and handles react contained-fluid and user contact loads.",
+            "confidence": 0.88
+          },
+          {
+            "ontology_class": "cad:CarryTensionBehavior",
+            "name": "Carry handle tension",
+            "description": "Cup handles carry tensile and bending loads during lifting.",
+            "confidence": 0.84
+          }
+        ],
+        "feature_groups": [
+          {
+            "id": "G006",
+            "name": "Two cup bodies",
+            "ontology_class": "cad:RepeatedFeatureGroup",
+            "feature_class": "cad:CavityFeature",
+            "pattern_type": "cad:PairedPattern",
+            "member_count": 2,
+            "member_feature_ids": [
+              "F018"
+            ],
+            "representative_feature_ids": [
+              "F018"
+            ],
+            "pattern_description": "Two similar tapered cup bodies represented by SOLID 51 and SOLID 54; the second is rotated about the vertical axis.",
+            "confidence": 0.96
+          },
+          {
+            "id": "G007",
+            "name": "Two cup handles",
+            "ontology_class": "cad:RepeatedFeatureGroup",
+            "feature_class": "cad:SupportFeature",
+            "pattern_type": "cad:PairedPattern",
+            "member_count": 2,
+            "member_feature_ids": [
+              "F019"
+            ],
+            "representative_feature_ids": [
+              "F019"
+            ],
+            "pattern_description": "Two curved handle solids represented by SOLID 52 and SOLID 53.",
+            "confidence": 0.95
+          }
+        ],
+        "features": [
+          {
+            "id": "F018",
+            "name": "Representative tapered cup body",
+            "ontology_class": "cad:CavityFeature",
+            "parent_feature_id": null,
+            "description": "Representative beverage vessel from SOLID 51 and SOLID 54.",
+            "interface_type": "cad:SeatingInterface",
+            "feature_functions": [
+              {
+                "ontology_class": "cad:ContainFunction",
+                "name": "Contain beverage",
+                "description": "Provides the vessel volume below the dispensing head.",
+                "primary": true,
+                "confidence": 0.96
+              }
+            ],
+            "feature_behaviors": [
+              {
+                "ontology_class": "cad:ReactContactLoadBehavior",
+                "name": "React fluid and seating loads",
+                "description": "The vessel walls react contained-fluid pressure and base contact.",
+                "confidence": 0.86
+              }
+            ],
+            "relationships": [
+              {
+                "target_feature_id": "F019",
+                "category": "cad:StructuralFeatureRelationship",
+                "relation": "cad:attachedTo",
+                "description": "Each handle is attached to its corresponding cup body in the rendered assembly.",
+                "confidence": 0.9
+              },
+              {
+                "target_feature_id": "F015",
+                "category": "cad:GeometricFeatureRelationship",
+                "relation": "cad:alignedWith",
+                "description": "The cups are positioned beneath the brew-head outlet region.",
+                "confidence": 0.82
+              }
+            ],
+            "brep_faces": [
+              {
+                "brep_id": "FACE 508",
+                "face_code": "FACE 508",
+                "entity_type": "cad:Face",
+                "geometry_type": "cad:BSplineSurface",
+                "semantic_role": "cad:OuterWallRole",
+                "name": "First cup outer wall",
+                "description": "Tapered B-spline exterior wall of SOLID 51.",
+                "salience": "cad:PrimarySalience",
+                "confidence": 0.94,
+                "evidence": [
+                  "vessel-scale tapered B-spline geometry",
+                  "visual correspondence to first cup"
+                ]
+              },
+              {
+                "brep_id": "FACE 509",
+                "face_code": "FACE 509",
+                "entity_type": "cad:Face",
+                "geometry_type": "cad:InnerWallRole",
+                "semantic_role": "cad:InnerWallRole",
+                "name": "First cup inner wall",
+                "description": "Inward-facing tapered surface of the first cup.",
+                "salience": "cad:PrimarySalience",
+                "confidence": 0.88,
+                "evidence": [
+                  "nested vessel geometry",
+                  "opposed B-spline wall orientation"
+                ]
+              },
+              {
+                "brep_id": "FACE 520",
+                "face_code": "FACE 520",
+                "entity_type": "cad:Face",
+                "geometry_type": "cad:BSplineSurface",
+                "semantic_role": "cad:OuterWallRole",
+                "name": "Second cup outer wall",
+                "description": "Rotated tapered exterior wall of SOLID 54.",
+                "salience": "cad:PrimarySalience",
+                "confidence": 0.94,
+                "evidence": [
+                  "same area as FACE 508",
+                  "rotated surface normals",
+                  "visual correspondence to second cup"
+                ]
+              },
+              {
+                "brep_id": "FACE 525",
+                "face_code": "FACE 525",
+                "entity_type": "cad:Face",
+                "geometry_type": "cad:BSplineSurface",
+                "semantic_role": "cad:SeatingFaceRole",
+                "name": "Second cup base",
+                "description": "Low-Y or rear seating surface of the second cup body.",
+                "salience": "cad:PrimarySalience",
+                "confidence": 0.82,
+                "evidence": [
+                  "small terminal face",
+                  "normal approximately -Y"
+                ]
+              }
+            ],
+            "confidence": 0.92
+          },
+          {
+            "id": "F019",
+            "name": "Representative cup handle",
+            "ontology_class": "cad:SupportFeature",
+            "parent_feature_id": null,
+            "description": "Representative curved cup handle from SOLID 52 and SOLID 53.",
+            "interface_type": "cad:ContactInterface",
+            "feature_functions": [
+              {
+                "ontology_class": "cad:GripFunction",
+                "name": "Provide hand grip",
+                "description": "Allows the removable vessel to be grasped and lifted.",
+                "primary": true,
+                "confidence": 0.96
+              }
+            ],
+            "feature_behaviors": [
+              {
+                "ontology_class": "cad:CarryTensionBehavior",
+                "name": "Carry lifting tension",
+                "description": "The curved handle carries tensile and bending loads from the cup.",
+                "confidence": 0.88
+              },
+              {
+                "ontology_class": "cad:ResistBendingBehavior",
+                "name": "Resist handle bending",
+                "description": "The loop resists transverse hand loads.",
+                "confidence": 0.88
+              }
+            ],
+            "relationships": [
+              {
+                "target_feature_id": "F018",
+                "category": "cad:FunctionalFeatureRelationship",
+                "relation": "cad:supportsFeature",
+                "description": "The handle supports the cup during lifting.",
+                "confidence": 0.9
+              }
+            ],
+            "brep_faces": [
+              {
+                "brep_id": "FACE 514",
+                "face_code": "FACE 514",
+                "entity_type": "cad:Face",
+                "geometry_type": "cad:BSplineSurface",
+                "semantic_role": "cad:InterfaceFaceRole",
+                "name": "First cup-handle grip wall",
+                "description": "Curved exterior wall of SOLID 52.",
+                "salience": "cad:PrimarySalience",
+                "confidence": 0.92,
+                "evidence": [
+                  "curved 49.48 mm span",
+                  "visual correspondence to loop handle"
+                ]
+              },
+              {
+                "brep_id": "FACE 517",
+                "face_code": "FACE 517",
+                "entity_type": "cad:Face",
+                "geometry_type": "cad:BSplineSurface",
+                "semantic_role": "cad:InterfaceFaceRole",
+                "name": "Second cup-handle grip wall",
+                "description": "Rotated curved exterior wall of SOLID 53.",
+                "salience": "cad:PrimarySalience",
+                "confidence": 0.92,
+                "evidence": [
+                  "same area as FACE 514",
+                  "rotated bounding box and normal",
+                  "second visual cup handle"
+                ]
+              }
+            ],
+            "confidence": 0.93
+          }
+        ],
+        "unclassified_brep_faces": [
+          {
+            "brep_ids": [
+              "FACE 510-FACE 513",
+              "FACE 515-FACE 516",
+              "FACE 518-FACE 519",
+              "FACE 521-FACE 524"
+            ],
+            "salience": "cad:SecondarySalience",
+            "description": "Remaining cup wall quadrants, base and rim surfaces, and handle attachment end faces.",
+            "confidence": 0.89
+          }
+        ],
+        "relationships": [],
+        "confidence": 0.92
+      }
+    ]
+  }
+}
+
+Natural-language edit request:
+
+Add two horizontal buttons to the front panel. One above existing one, the other below - all approximately equally distanced. Buttons should be copies of existing one.
+
+Multi-view images of the original CAD model:
+
+View: +Z
+
+[IMAGE 0: /home/adml/Research/Hackathon2026/IDETC26-Hackathon-Autodesk-neuralCAD-Edit/data/edit_192_external/breps/B7A2N74ZJBF9MZHU_1770174381.837417_+Z.jpg]
+
+View: -Z
+
+[IMAGE 1: /home/adml/Research/Hackathon2026/IDETC26-Hackathon-Autodesk-neuralCAD-Edit/data/edit_192_external/breps/B7A2N74ZJBF9MZHU_1770174381.837417_-Z.jpg]
+
+View: -X
+
+[IMAGE 2: /home/adml/Research/Hackathon2026/IDETC26-Hackathon-Autodesk-neuralCAD-Edit/data/edit_192_external/breps/B7A2N74ZJBF9MZHU_1770174381.837417_-X.jpg]
+
+View: +X
+
+[IMAGE 3: /home/adml/Research/Hackathon2026/IDETC26-Hackathon-Autodesk-neuralCAD-Edit/data/edit_192_external/breps/B7A2N74ZJBF9MZHU_1770174381.837417_+X.jpg]
+
+View: +Y
+
+[IMAGE 4: /home/adml/Research/Hackathon2026/IDETC26-Hackathon-Autodesk-neuralCAD-Edit/data/edit_192_external/breps/B7A2N74ZJBF9MZHU_1770174381.837417_+Y.jpg]
+
+View: -Y
+
+[IMAGE 5: /home/adml/Research/Hackathon2026/IDETC26-Hackathon-Autodesk-neuralCAD-Edit/data/edit_192_external/breps/B7A2N74ZJBF9MZHU_1770174381.837417_-Y.jpg]
+
+View: iso1
+
+[IMAGE 6: /home/adml/Research/Hackathon2026/IDETC26-Hackathon-Autodesk-neuralCAD-Edit/data/edit_192_external/breps/B7A2N74ZJBF9MZHU_1770174381.837417_iso1.jpg]

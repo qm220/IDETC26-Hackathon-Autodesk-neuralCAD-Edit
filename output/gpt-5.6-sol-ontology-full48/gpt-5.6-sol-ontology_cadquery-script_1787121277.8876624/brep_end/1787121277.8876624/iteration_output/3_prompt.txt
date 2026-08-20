@@ -1,0 +1,2183 @@
+The planning stage produced model.json (hierarchical part → sections → features
+→ B-rep faces), aim.json (desired final state from the edit request), and
+operation.json (grounded edit operations, parameters, constraints, targets,
+and modeling plans). Use those artifacts when writing my_cad_function.
+
+Section ids look like R01. Feature ids look like F001. FACE N values are
+CadQuery Faces() indices from the STEP analysis. Bind them to actual STEP
+geometry by inspecting the loaded model (print faces and coordinates) before
+editing. If an operation needs boundary topology such as a chamfer or fillet
+edge, derive it in CadQuery from the grounded face(s).
+
+Implement each operation's modeling_plan steps. Load the start model from
+args["input_file"].
+
+model.json from the planning stage:
+
+{
+  "part": {
+    "id": "P001",
+    "name": "Cross-arm clamp and pivot assembly",
+    "description": "Assembly-like mechanical model comprising two separate elongated crossing arms and a third central rounded-square clamp/pivot component. Each arm is a distinct CAD solid with end bores, transverse connection holes, a central pivot bore, and rounded transition geometry. The central solid provides opposed support plates and a collar-reinforced through bore that aligns the crossing members. Functional intent is inferred from geometry and rendered views.",
+    "source_views": [
+      "+Z",
+      "-Z",
+      "-X",
+      "+X",
+      "+Y",
+      "-Y",
+      "iso1"
+    ],
+    "solid_ids": [
+      "SOLID 0",
+      "SOLID 1",
+      "SOLID 2"
+    ],
+    "symmetry_note": "The model is centered near the CAD origin. SOLID 1 is approximately symmetric about the central x-z planes, while SOLID 2 has opposed rounded-square plate structures on opposite sides of the crossing arms. Repeated paired holes, end bores, and plate structures are present. SOLID 0 is oblique in the x-z plane and is not rotationally periodic about the central axis.",
+    "semantic_orientation": {
+      "status": "indeterminate",
+      "description": "No unique human-semantic front, back, top, or bottom is established by the geometry. The assembly is most reliably described by the crossing-arm plane, the central pivot axis, and the opposed clamp plates. CAD camera labels are therefore not converted into human-semantic sides.",
+      "confidence": 0.36,
+      "view_sides": {
+        "+X": "unknown",
+        "-X": "unknown",
+        "+Y": "unknown",
+        "-Y": "unknown",
+        "+Z": "unknown",
+        "-Z": "unknown"
+      }
+    },
+    "sections": [
+      {
+        "id": "R01",
+        "name": "Oblique crossing arm",
+        "ontology_class": "cad:MainBodySection",
+        "description": "Elongated arm represented by SOLID 0, extending obliquely through the central clamp region. It includes a long structural shaft, a longitudinal end bore, paired transverse holes near the clamp, and a central pivot bore.",
+        "location": "Passes through the central clamp and extends along an oblique axis in the CAD x-z plane; its bounding box is x=-165.876611 to 165.876611 mm, y=0 to 12.700000 mm, and z=-115.715454 to 115.715454 mm.",
+        "solid_ids": [
+          "SOLID 0"
+        ],
+        "colour": {
+          "R": 220,
+          "G": 120,
+          "B": 70
+        },
+        "section_functions": [
+          {
+            "ontology_class": "cad:TransferLoadFunction",
+            "name": "Transfer load across the clamp",
+            "description": "Transfers structural load between its remote ends and the central clamp/pivot region.",
+            "primary": true,
+            "confidence": 0.84
+          },
+          {
+            "ontology_class": "cad:ConnectFunction",
+            "name": "Connect remote attachment points",
+            "description": "Provides an elongated connection between end interfaces and the central assembly.",
+            "primary": false,
+            "confidence": 0.78
+          }
+        ],
+        "section_behaviors": [
+          {
+            "ontology_class": "cad:ResistBendingBehavior",
+            "name": "Resist arm bending",
+            "description": "The elongated section carries transverse loading primarily through bending resistance.",
+            "confidence": 0.86
+          },
+          {
+            "ontology_class": "cad:CarryTensionBehavior",
+            "name": "Carry axial tension",
+            "description": "The arm can carry tensile load along its longitudinal axis.",
+            "confidence": 0.72
+          },
+          {
+            "ontology_class": "cad:CarryCompressionBehavior",
+            "name": "Carry axial compression",
+            "description": "The arm can carry compressive load along its longitudinal axis.",
+            "confidence": 0.72
+          }
+        ],
+        "feature_groups": [
+          {
+            "id": "G001",
+            "name": "Paired transverse connection holes",
+            "ontology_class": "cad:RepeatedFeatureGroup",
+            "feature_class": "cad:ThroughHoleFeature",
+            "pattern_type": "cad:PairedPattern",
+            "member_count": 2,
+            "member_feature_ids": [
+              "F003",
+              "F004"
+            ],
+            "representative_feature_ids": [
+              "F003",
+              "F004"
+            ],
+            "pattern_description": "Two radius-3.175 mm cylindrical hole walls on opposite sides of the central region, both directed along the CAD y-axis.",
+            "confidence": 0.92
+          }
+        ],
+        "features": [
+          {
+            "id": "F001",
+            "name": "Oblique structural shaft",
+            "ontology_class": "cad:ShaftFeature",
+            "parent_feature_id": null,
+            "description": "Main elongated material feature of SOLID 0. Its outer boundary combines cylindrical and planar surfaces and spans most of the solid bounding box.",
+            "interface_type": null,
+            "feature_functions": [
+              {
+                "ontology_class": "cad:TransferLoadFunction",
+                "name": "Transfer arm load",
+                "description": "Carries load between the end regions and the central clamp.",
+                "primary": true,
+                "confidence": 0.88
+              }
+            ],
+            "feature_behaviors": [
+              {
+                "ontology_class": "cad:ResistBendingBehavior",
+                "name": "Resist bending",
+                "description": "The long shaft geometry provides bending stiffness.",
+                "confidence": 0.88
+              },
+              {
+                "ontology_class": "cad:CarryTensionBehavior",
+                "name": "Carry tension",
+                "description": "Carries longitudinal tensile loading.",
+                "confidence": 0.74
+              }
+            ],
+            "relationships": [
+              {
+                "target_feature_id": "F005",
+                "category": "cad:StructuralFeatureRelationship",
+                "relation": "cad:surroundsFeature",
+                "description": "The shaft material surrounds the central pivot bore.",
+                "confidence": 0.93
+              },
+              {
+                "target_feature_id": "F014",
+                "category": "cad:FunctionalFeatureRelationship",
+                "relation": "cad:supportsFeature",
+                "description": "The arm is captured and supported by the first clamp plate.",
+                "confidence": 0.76
+              },
+              {
+                "target_feature_id": "F015",
+                "category": "cad:FunctionalFeatureRelationship",
+                "relation": "cad:supportsFeature",
+                "description": "The arm is captured and supported by the opposed clamp plate.",
+                "confidence": 0.76
+              }
+            ],
+            "brep_faces": [
+              {
+                "brep_id": "FACE 16",
+                "face_code": "FACE 16",
+                "entity_type": "cad:Face",
+                "geometry_type": "cad:CylindricalSurface",
+                "semantic_role": "cad:OuterWallRole",
+                "name": "Negative oblique outer wall",
+                "description": "Radius-6.350 mm cylindrical outer surface on one extended half of the shaft.",
+                "salience": "cad:PrimarySalience",
+                "confidence": 0.97,
+                "evidence": [
+                  "CYLINDER surface",
+                  "cylinder_radius=6.350000 mm",
+                  "axis=(0.833954,0,0.551833)",
+                  "bbox extends from x=-165.876611 to -39.514295 mm",
+                  "visual correspondence to an elongated rounded arm"
+                ]
+              },
+              {
+                "brep_id": "FACE 18",
+                "face_code": "FACE 18",
+                "entity_type": "cad:Face",
+                "geometry_type": "cad:CylindricalSurface",
+                "semantic_role": "cad:OuterWallRole",
+                "name": "Positive oblique outer wall",
+                "description": "Radius-6.350 mm cylindrical outer surface on the opposite extended half of the shaft.",
+                "salience": "cad:PrimarySalience",
+                "confidence": 0.97,
+                "evidence": [
+                  "CYLINDER surface",
+                  "cylinder_radius=6.350000 mm",
+                  "axis=(0.833954,0,0.551833)",
+                  "bbox extends from x=29.001872 to 155.364188 mm",
+                  "paired geometry with FACE 16"
+                ]
+              },
+              {
+                "brep_id": "FACE 17",
+                "face_code": "FACE 17",
+                "entity_type": "cad:Face",
+                "geometry_type": "cad:PlanarSurface",
+                "semantic_role": "cad:OuterWallRole",
+                "name": "Negative-half planar wall",
+                "description": "Large planar exterior wall on one half of the oblique arm.",
+                "salience": "cad:RepresentativeSalience",
+                "confidence": 0.96,
+                "evidence": [
+                  "PLANE surface",
+                  "area=1870.964007 mm^2",
+                  "y=12.700000 mm",
+                  "elongated bounding box aligned with the arm"
+                ]
+              },
+              {
+                "brep_id": "FACE 19",
+                "face_code": "FACE 19",
+                "entity_type": "cad:Face",
+                "geometry_type": "cad:PlanarSurface",
+                "semantic_role": "cad:OuterWallRole",
+                "name": "Positive-half planar wall",
+                "description": "Large planar exterior wall on the opposite half of the oblique arm.",
+                "salience": "cad:RepresentativeSalience",
+                "confidence": 0.96,
+                "evidence": [
+                  "PLANE surface",
+                  "area=1870.964007 mm^2",
+                  "y=12.700000 mm",
+                  "paired geometry with FACE 17"
+                ]
+              },
+              {
+                "brep_id": "FACE 20",
+                "face_code": "FACE 20",
+                "entity_type": "cad:Face",
+                "geometry_type": "cad:CylindricalSurface",
+                "semantic_role": "cad:OuterWallRole",
+                "name": "Continuous rounded shaft wall",
+                "description": "Large radius-6.350 mm cylindrical wall spanning most of the oblique shaft.",
+                "salience": "cad:PrimarySalience",
+                "confidence": 0.95,
+                "evidence": [
+                  "CYLINDER surface",
+                  "area=6738.993152 mm^2",
+                  "axis=(-0.833954,0,-0.551833)",
+                  "bbox spans x=-155.364188 to 165.876611 mm"
+                ]
+              },
+              {
+                "brep_id": "FACE 21",
+                "face_code": "FACE 21",
+                "entity_type": "cad:Face",
+                "geometry_type": "cad:PlanarSurface",
+                "semantic_role": "cad:SideWallRole",
+                "name": "Long planar side wall",
+                "description": "Long planar exterior side of the arm.",
+                "salience": "cad:PrimarySalience",
+                "confidence": 0.96,
+                "evidence": [
+                  "PLANE surface",
+                  "area=2419.350000 mm^2",
+                  "bbox length approximately 381.053 mm diagonally",
+                  "plane normal perpendicular to the arm axis"
+                ]
+              }
+            ],
+            "confidence": 0.92
+          },
+          {
+            "id": "F002",
+            "name": "Longitudinal end bore",
+            "ontology_class": "cad:BlindHoleFeature",
+            "parent_feature_id": "F001",
+            "description": "Long radius-3.175 mm cylindrical cavity extending inward from one end along the oblique shaft axis. The available topology supports an end-opening bore; whether it is intentionally blind is inferred from its limited axial span.",
+            "interface_type": "cad:ShaftInterface",
+            "feature_functions": [
+              {
+                "ontology_class": "cad:FittingFunction",
+                "name": "Receive an axial fitting",
+                "description": "Provides an axial cylindrical interface for a rod, cable, pin, or similar mating element.",
+                "primary": true,
+                "confidence": 0.68
+              },
+              {
+                "ontology_class": "cad:ProvideClearanceFunction",
+                "name": "Provide internal clearance",
+                "description": "Provides a cylindrical internal passage from the arm end.",
+                "primary": false,
+                "confidence": 0.81
+              }
+            ],
+            "feature_behaviors": [
+              {
+                "ontology_class": "cad:ConstrainTranslationBehavior",
+                "name": "Constrain radial translation",
+                "description": "The cylindrical bore wall radially locates an inserted cylindrical member.",
+                "confidence": 0.72
+              }
+            ],
+            "relationships": [
+              {
+                "target_feature_id": "F001",
+                "category": "cad:GeometricFeatureRelationship",
+                "relation": "cad:insideFeature",
+                "description": "The end bore lies inside the oblique shaft.",
+                "confidence": 0.98
+              }
+            ],
+            "brep_faces": [
+              {
+                "brep_id": "FACE 3",
+                "face_code": "FACE 3",
+                "entity_type": "cad:Face",
+                "geometry_type": "cad:CylindricalSurface",
+                "semantic_role": "cad:BoreWallRole",
+                "name": "Oblique longitudinal bore wall",
+                "description": "Radius-3.175 mm cylindrical wall aligned with the oblique arm.",
+                "salience": "cad:PrimarySalience",
+                "confidence": 0.94,
+                "evidence": [
+                  "CYLINDER surface",
+                  "cylinder_radius=3.175000 mm",
+                  "axis=(-0.833954,0,-0.551833)",
+                  "bbox spans x=19.430373 to 160.620399 mm",
+                  "one terminal face has an inner wire",
+                  "end opening visible in rendered views"
+                ]
+              }
+            ],
+            "confidence": 0.78
+          },
+          {
+            "id": "F003",
+            "name": "First transverse connection hole",
+            "ontology_class": "cad:ThroughHoleFeature",
+            "parent_feature_id": "F001",
+            "description": "Radius-3.175 mm transverse hole near one side of the central clamp region.",
+            "interface_type": "cad:PinInterface",
+            "feature_functions": [
+              {
+                "ontology_class": "cad:ReceivePinFunction",
+                "name": "Receive connection pin",
+                "description": "Receives a transverse pin or fastener.",
+                "primary": true,
+                "confidence": 0.85
+              }
+            ],
+            "feature_behaviors": [
+              {
+                "ontology_class": "cad:ReactBearingLoadBehavior",
+                "name": "React pin bearing load",
+                "description": "The cylindrical wall reacts contact and bearing load from a pin.",
+                "confidence": 0.83
+              }
+            ],
+            "relationships": [
+              {
+                "target_feature_id": "F004",
+                "category": "cad:GeometricFeatureRelationship",
+                "relation": "cad:parallelTo",
+                "description": "The paired transverse holes have parallel CAD y-directed axes.",
+                "confidence": 0.99
+              }
+            ],
+            "brep_faces": [
+              {
+                "brep_id": "FACE 0",
+                "face_code": "FACE 0",
+                "entity_type": "cad:Face",
+                "geometry_type": "cad:CylindricalSurface",
+                "semantic_role": "cad:BoreWallRole",
+                "name": "First transverse bore wall",
+                "description": "Cylindrical hole wall centered near (-21.182443,3.175000,-14.016564) mm.",
+                "salience": "cad:PrimarySalience",
+                "confidence": 0.98,
+                "evidence": [
+                  "CYLINDER surface",
+                  "radius=3.175000 mm",
+                  "axis=(0,-1,0)",
+                  "y extent=0 to 6.350000 mm",
+                  "visual transverse-hole correspondence"
+                ]
+              }
+            ],
+            "confidence": 0.91
+          },
+          {
+            "id": "F004",
+            "name": "Second transverse connection hole",
+            "ontology_class": "cad:ThroughHoleFeature",
+            "parent_feature_id": "F001",
+            "description": "Paired radius-3.175 mm transverse hole on the opposite side of the central clamp region.",
+            "interface_type": "cad:PinInterface",
+            "feature_functions": [
+              {
+                "ontology_class": "cad:ReceivePinFunction",
+                "name": "Receive connection pin",
+                "description": "Receives a transverse pin or fastener.",
+                "primary": true,
+                "confidence": 0.85
+              }
+            ],
+            "feature_behaviors": [
+              {
+                "ontology_class": "cad:ReactBearingLoadBehavior",
+                "name": "React pin bearing load",
+                "description": "The cylindrical wall reacts contact and bearing load from a pin.",
+                "confidence": 0.83
+              }
+            ],
+            "relationships": [
+              {
+                "target_feature_id": "F003",
+                "category": "cad:GeometricFeatureRelationship",
+                "relation": "cad:parallelTo",
+                "description": "The paired transverse holes have parallel CAD y-directed axes.",
+                "confidence": 0.99
+              }
+            ],
+            "brep_faces": [
+              {
+                "brep_id": "FACE 1",
+                "face_code": "FACE 1",
+                "entity_type": "cad:Face",
+                "geometry_type": "cad:CylindricalSurface",
+                "semantic_role": "cad:BoreWallRole",
+                "name": "Second transverse bore wall",
+                "description": "Cylindrical hole wall centered near (21.182443,3.175000,14.016564) mm.",
+                "salience": "cad:PrimarySalience",
+                "confidence": 0.98,
+                "evidence": [
+                  "CYLINDER surface",
+                  "radius=3.175000 mm",
+                  "axis=(0,-1,0)",
+                  "paired position relative to FACE 0",
+                  "visual transverse-hole correspondence"
+                ]
+              }
+            ],
+            "confidence": 0.91
+          },
+          {
+            "id": "F005",
+            "name": "Oblique-arm central pivot bore",
+            "ontology_class": "cad:ThroughHoleFeature",
+            "parent_feature_id": "F001",
+            "description": "Central cylindrical clearance/pivot bore through the oblique arm, centered at the CAD origin and directed along y.",
+            "interface_type": "cad:PinInterface",
+            "feature_functions": [
+              {
+                "ontology_class": "cad:ReceivePinFunction",
+                "name": "Receive central pivot pin",
+                "description": "Receives or clears the central pivot element.",
+                "primary": true,
+                "confidence": 0.94
+              },
+              {
+                "ontology_class": "cad:ConstrainMotionFunction",
+                "name": "Locate pivot axis",
+                "description": "Defines the common central pivot axis.",
+                "primary": false,
+                "confidence": 0.91
+              }
+            ],
+            "feature_behaviors": [
+              {
+                "ontology_class": "cad:ReactBearingLoadBehavior",
+                "name": "React central bearing load",
+                "description": "The bore wall can react radial load from the central pin.",
+                "confidence": 0.88
+              },
+              {
+                "ontology_class": "cad:PermitRotationBehavior",
+                "name": "Permit relative rotation",
+                "description": "Clearance around the central axis may permit arm rotation if the assembly is not clamped rigidly.",
+                "confidence": 0.66
+              }
+            ],
+            "relationships": [
+              {
+                "target_feature_id": "F012",
+                "category": "cad:GeometricFeatureRelationship",
+                "relation": "cad:coaxialWith",
+                "description": "The central bores in the two arms share the CAD y-axis.",
+                "confidence": 0.99
+              },
+              {
+                "target_feature_id": "F016",
+                "category": "cad:GeometricFeatureRelationship",
+                "relation": "cad:coaxialWith",
+                "description": "The arm pivot bore is coaxial with the central clamp through bore.",
+                "confidence": 0.99
+              }
+            ],
+            "brep_faces": [
+              {
+                "brep_id": "FACE 15",
+                "face_code": "FACE 15",
+                "entity_type": "cad:Face",
+                "geometry_type": "cad:CylindricalSurface",
+                "semantic_role": "cad:BoreWallRole",
+                "name": "Oblique-arm pivot bore wall",
+                "description": "Radius-6.477 mm cylindrical bore centered at the origin and spanning y=0 to 6.350000 mm.",
+                "salience": "cad:PrimarySalience",
+                "confidence": 0.99,
+                "evidence": [
+                  "CYLINDER surface",
+                  "radius=6.477000 mm",
+                  "origin=(0,6.350000,0)",
+                  "axis=(0,1,0)",
+                  "central visual correspondence"
+                ]
+              }
+            ],
+            "confidence": 0.96
+          },
+          {
+            "id": "F006",
+            "name": "Oblique-arm rounded transitions",
+            "ontology_class": "cad:FilletFeature",
+            "parent_feature_id": "F001",
+            "description": "Localized planar, cylindrical, and B-spline transition faces where the arm profile changes near the central connection region.",
+            "interface_type": null,
+            "feature_functions": [
+              {
+                "ontology_class": "cad:DistributeStressFunction",
+                "name": "Reduce transition stress concentration",
+                "description": "Smooths local section changes near the clamp and hole region.",
+                "primary": true,
+                "confidence": 0.79
+              }
+            ],
+            "feature_behaviors": [
+              {
+                "ontology_class": "cad:DistributeStressBehavior",
+                "name": "Distribute local stress",
+                "description": "Curved transition surfaces spread load at changes in arm section.",
+                "confidence": 0.81
+              }
+            ],
+            "relationships": [
+              {
+                "target_feature_id": "F001",
+                "category": "cad:StructuralFeatureRelationship",
+                "relation": "cad:blendsInto",
+                "description": "The rounded transitions blend into the structural shaft.",
+                "confidence": 0.92
+              }
+            ],
+            "brep_faces": [
+              {
+                "brep_id": "FACE 5",
+                "face_code": "FACE 5",
+                "entity_type": "cad:Face",
+                "geometry_type": "cad:BSplineSurface",
+                "semantic_role": "cad:TransitionSurfaceRole",
+                "name": "Positive-side B-spline transition",
+                "description": "B-spline surface near the positive arm-side transition.",
+                "salience": "cad:RepresentativeSalience",
+                "confidence": 0.91,
+                "evidence": [
+                  "BSPLINE surface",
+                  "area=56.455284 mm^2",
+                  "localized bbox near the central arm region"
+                ]
+              },
+              {
+                "brep_id": "FACE 6",
+                "face_code": "FACE 6",
+                "entity_type": "cad:Face",
+                "geometry_type": "cad:CylindricalSurface",
+                "semantic_role": "cad:FilletSurfaceRole",
+                "name": "Positive-side cylindrical blend",
+                "description": "Radius-5.080 mm cylindrical transition surface.",
+                "salience": "cad:RepresentativeSalience",
+                "confidence": 0.9,
+                "evidence": [
+                  "CYLINDER surface",
+                  "radius=5.080000 mm",
+                  "localized near positive central transition"
+                ]
+              },
+              {
+                "brep_id": "FACE 10",
+                "face_code": "FACE 10",
+                "entity_type": "cad:Face",
+                "geometry_type": "cad:CylindricalSurface",
+                "semantic_role": "cad:FilletSurfaceRole",
+                "name": "Negative-side cylindrical blend",
+                "description": "Paired radius-5.080 mm cylindrical transition surface.",
+                "salience": "cad:RepresentativeSalience",
+                "confidence": 0.9,
+                "evidence": [
+                  "CYLINDER surface",
+                  "radius=5.080000 mm",
+                  "paired geometry with FACE 6"
+                ]
+              },
+              {
+                "brep_id": "FACE 11",
+                "face_code": "FACE 11",
+                "entity_type": "cad:Face",
+                "geometry_type": "cad:BSplineSurface",
+                "semantic_role": "cad:TransitionSurfaceRole",
+                "name": "Negative-side B-spline transition",
+                "description": "B-spline transition on the opposite side of the central region.",
+                "salience": "cad:RepresentativeSalience",
+                "confidence": 0.91,
+                "evidence": [
+                  "BSPLINE surface",
+                  "area=56.455284 mm^2",
+                  "paired position with FACE 7 and related transition faces"
+                ]
+              }
+            ],
+            "confidence": 0.84
+          }
+        ],
+        "unclassified_brep_faces": [
+          {
+            "brep_ids": [
+              "FACE 2",
+              "FACE 4",
+              "FACE 7",
+              "FACE 8",
+              "FACE 9",
+              "FACE 12",
+              "FACE 13",
+              "FACE 14",
+              "FACE 22"
+            ],
+            "salience": "cad:SecondarySalience",
+            "description": "Secondary planar end, side, junction, and B-spline transition faces of SOLID 0. They are assigned to the oblique-arm section but are not separately promoted beyond the principal shaft, bore, hole, and transition features.",
+            "confidence": 0.94
+          }
+        ],
+        "relationships": [
+          {
+            "target_section_id": "R02",
+            "category": "cad:GeometricFeatureRelationship",
+            "relation": "cad:perpendicularTo",
+            "description": "The two elongated arm axes appear approximately perpendicular in the crossing-arm plane.",
+            "confidence": 0.94
+          },
+          {
+            "target_section_id": "R03",
+            "category": "cad:StructuralFeatureRelationship",
+            "relation": "cad:adjacentTo",
+            "description": "The oblique arm passes through and is adjacent to the central clamp/pivot section.",
+            "confidence": 0.96
+          }
+        ],
+        "confidence": 0.91
+      },
+      {
+        "id": "R02",
+        "name": "Orthogonal crossing arm",
+        "ontology_class": "cad:MainBodySection",
+        "description": "Elongated SOLID 1 extending along the CAD z-axis through the central region. It has two longitudinal end bores, paired transverse holes near the clamp, a central pivot bore, and rounded profile transitions.",
+        "location": "Crosses the oblique arm at the model center and extends from z=-190.500000 to 190.500000 mm, with x=-12.700000 to 12.700000 mm and y=0 to 12.700000 mm.",
+        "solid_ids": [
+          "SOLID 1"
+        ],
+        "colour": {
+          "R": 70,
+          "G": 150,
+          "B": 220
+        },
+        "section_functions": [
+          {
+            "ontology_class": "cad:TransferLoadFunction",
+            "name": "Transfer load across the clamp",
+            "description": "Transfers load between its opposed ends and the central pivot assembly.",
+            "primary": true,
+            "confidence": 0.87
+          },
+          {
+            "ontology_class": "cad:ConnectFunction",
+            "name": "Connect opposed attachment points",
+            "description": "Provides a straight structural connection through the central clamp.",
+            "primary": false,
+            "confidence": 0.81
+          }
+        ],
+        "section_behaviors": [
+          {
+            "ontology_class": "cad:ResistBendingBehavior",
+            "name": "Resist arm bending",
+            "description": "The long arm resists transverse load through bending stiffness.",
+            "confidence": 0.88
+          },
+          {
+            "ontology_class": "cad:CarryTensionBehavior",
+            "name": "Carry axial tension",
+            "description": "Carries tensile loading along the CAD z-axis.",
+            "confidence": 0.76
+          },
+          {
+            "ontology_class": "cad:CarryCompressionBehavior",
+            "name": "Carry axial compression",
+            "description": "Carries compressive loading along the CAD z-axis.",
+            "confidence": 0.76
+          }
+        ],
+        "feature_groups": [
+          {
+            "id": "G002",
+            "name": "Paired longitudinal end bores",
+            "ontology_class": "cad:RepeatedFeatureGroup",
+            "feature_class": "cad:BlindHoleFeature",
+            "pattern_type": "cad:PairedPattern",
+            "member_count": 2,
+            "member_feature_ids": [
+              "F008",
+              "F009"
+            ],
+            "representative_feature_ids": [
+              "F008",
+              "F009"
+            ],
+            "pattern_description": "Opposed radius-3.175 mm cylindrical end bores aligned with the CAD z-axis.",
+            "confidence": 0.96
+          },
+          {
+            "id": "G003",
+            "name": "Paired transverse connection holes",
+            "ontology_class": "cad:RepeatedFeatureGroup",
+            "feature_class": "cad:ThroughHoleFeature",
+            "pattern_type": "cad:PairedPattern",
+            "member_count": 2,
+            "member_feature_ids": [
+              "F010",
+              "F011"
+            ],
+            "representative_feature_ids": [
+              "F010",
+              "F011"
+            ],
+            "pattern_description": "Two radius-3.175 mm holes on opposite sides of the central region, each directed along the CAD y-axis.",
+            "confidence": 0.94
+          }
+        ],
+        "features": [
+          {
+            "id": "F007",
+            "name": "Orthogonal structural shaft",
+            "ontology_class": "cad:ShaftFeature",
+            "parent_feature_id": null,
+            "description": "Main elongated material feature of SOLID 1, extending along the CAD z-axis with rounded side walls and broad planar faces.",
+            "interface_type": null,
+            "feature_functions": [
+              {
+                "ontology_class": "cad:TransferLoadFunction",
+                "name": "Transfer arm load",
+                "description": "Carries load between opposed end regions and the central clamp.",
+                "primary": true,
+                "confidence": 0.9
+              }
+            ],
+            "feature_behaviors": [
+              {
+                "ontology_class": "cad:ResistBendingBehavior",
+                "name": "Resist bending",
+                "description": "The elongated shaft resists transverse loading.",
+                "confidence": 0.9
+              },
+              {
+                "ontology_class": "cad:CarryCompressionBehavior",
+                "name": "Carry compression",
+                "description": "Carries longitudinal compressive loading.",
+                "confidence": 0.77
+              }
+            ],
+            "relationships": [
+              {
+                "target_feature_id": "F012",
+                "category": "cad:StructuralFeatureRelationship",
+                "relation": "cad:surroundsFeature",
+                "description": "The shaft material surrounds its central pivot bore.",
+                "confidence": 0.95
+              },
+              {
+                "target_feature_id": "F001",
+                "category": "cad:GeometricFeatureRelationship",
+                "relation": "cad:perpendicularTo",
+                "description": "The principal axes of the two crossing shafts are approximately perpendicular.",
+                "confidence": 0.95
+              }
+            ],
+            "brep_faces": [
+              {
+                "brep_id": "FACE 33",
+                "face_code": "FACE 33",
+                "entity_type": "cad:Face",
+                "geometry_type": "cad:CylindricalSurface",
+                "semantic_role": "cad:OuterWallRole",
+                "name": "Positive-x rounded shaft wall",
+                "description": "Large radius-6.350 mm cylindrical wall spanning the full z extent.",
+                "salience": "cad:PrimarySalience",
+                "confidence": 0.98,
+                "evidence": [
+                  "CYLINDER surface",
+                  "radius=6.350000 mm",
+                  "axis=(0,0,1)",
+                  "bbox z=-190.500000 to 190.500000 mm"
+                ]
+              },
+              {
+                "brep_id": "FACE 41",
+                "face_code": "FACE 41",
+                "entity_type": "cad:Face",
+                "geometry_type": "cad:CylindricalSurface",
+                "semantic_role": "cad:OuterWallRole",
+                "name": "Negative-x rounded shaft wall",
+                "description": "Opposed large radius-6.350 mm cylindrical wall spanning the full z extent.",
+                "salience": "cad:PrimarySalience",
+                "confidence": 0.98,
+                "evidence": [
+                  "CYLINDER surface",
+                  "radius=6.350000 mm",
+                  "axis=(0,0,-1)",
+                  "paired geometry with FACE 33"
+                ]
+              },
+              {
+                "brep_id": "FACE 39",
+                "face_code": "FACE 39",
+                "entity_type": "cad:Face",
+                "geometry_type": "cad:PlanarSurface",
+                "semantic_role": "cad:OuterWallRole",
+                "name": "Positive-z half planar wall",
+                "description": "Large planar wall on the positive-z half of the arm.",
+                "salience": "cad:RepresentativeSalience",
+                "confidence": 0.97,
+                "evidence": [
+                  "PLANE surface",
+                  "area=1870.964007 mm^2",
+                  "bbox z=43.179999 to 190.500000 mm"
+                ]
+              },
+              {
+                "brep_id": "FACE 42",
+                "face_code": "FACE 42",
+                "entity_type": "cad:Face",
+                "geometry_type": "cad:OuterWallRole",
+                "semantic_role": "cad:OuterWallRole",
+                "name": "Negative-z upper planar wall",
+                "description": "Large planar exterior wall extending toward the negative-z end.",
+                "salience": "cad:RepresentativeSalience",
+                "confidence": 0.97,
+                "evidence": [
+                  "PLANE surface",
+                  "area=2322.000028 mm^2",
+                  "y=12.700000 mm",
+                  "bbox extends to z=-190.500000 mm"
+                ]
+              },
+              {
+                "brep_id": "FACE 43",
+                "face_code": "FACE 43",
+                "entity_type": "cad:Face",
+                "geometry_type": "cad:PlanarSurface",
+                "semantic_role": "cad:OuterWallRole",
+                "name": "Positive-z upper planar wall",
+                "description": "Large planar exterior wall extending toward the positive-z end.",
+                "salience": "cad:RepresentativeSalience",
+                "confidence": 0.97,
+                "evidence": [
+                  "PLANE surface",
+                  "area=2322.000028 mm^2",
+                  "y=12.700000 mm",
+                  "bbox extends to z=190.500000 mm"
+                ]
+              },
+              {
+                "brep_id": "FACE 46",
+                "face_code": "FACE 46",
+                "entity_type": "cad:Face",
+                "geometry_type": "cad:PlanarSurface",
+                "semantic_role": "cad:OuterWallRole",
+                "name": "Negative-z half planar wall",
+                "description": "Large planar wall on the negative-z half of the arm.",
+                "salience": "cad:RepresentativeSalience",
+                "confidence": 0.97,
+                "evidence": [
+                  "PLANE surface",
+                  "area=1870.964007 mm^2",
+                  "bbox z=-190.500000 to -43.179999 mm"
+                ]
+              }
+            ],
+            "confidence": 0.94
+          },
+          {
+            "id": "F008",
+            "name": "Negative-z longitudinal end bore",
+            "ontology_class": "cad:BlindHoleFeature",
+            "parent_feature_id": "F007",
+            "description": "Radius-3.175 mm cylindrical bore extending inward from the negative-z end.",
+            "interface_type": "cad:ShaftInterface",
+            "feature_functions": [
+              {
+                "ontology_class": "cad:FittingFunction",
+                "name": "Receive axial fitting",
+                "description": "Provides a cylindrical end interface for an inserted member.",
+                "primary": true,
+                "confidence": 0.74
+              }
+            ],
+            "feature_behaviors": [
+              {
+                "ontology_class": "cad:ConstrainTranslationBehavior",
+                "name": "Radially locate inserted member",
+                "description": "The bore wall constrains radial movement of an inserted fitting.",
+                "confidence": 0.73
+              }
+            ],
+            "relationships": [
+              {
+                "target_feature_id": "F009",
+                "category": "cad:GeometricFeatureRelationship",
+                "relation": "cad:coaxialWith",
+                "description": "The opposed end bores share the CAD z-axis.",
+                "confidence": 0.99
+              }
+            ],
+            "brep_faces": [
+              {
+                "brep_id": "FACE 23",
+                "face_code": "FACE 23",
+                "entity_type": "cad:Face",
+                "geometry_type": "cad:CylindricalSurface",
+                "semantic_role": "cad:BoreWallRole",
+                "name": "Negative-z end bore wall",
+                "description": "Radius-3.175 mm cylindrical wall from z=-190.500000 to -25.400001 mm.",
+                "salience": "cad:PrimarySalience",
+                "confidence": 0.98,
+                "evidence": [
+                  "CYLINDER surface",
+                  "radius=3.175000 mm",
+                  "axis=(0,0,1)",
+                  "long axial bbox",
+                  "end face at z=-190.500000 has two wires"
+                ]
+              }
+            ],
+            "confidence": 0.86
+          },
+          {
+            "id": "F009",
+            "name": "Positive-z longitudinal end bore",
+            "ontology_class": "cad:BlindHoleFeature",
+            "parent_feature_id": "F007",
+            "description": "Radius-3.175 mm cylindrical bore extending inward from the positive-z end.",
+            "interface_type": "cad:ShaftInterface",
+            "feature_functions": [
+              {
+                "ontology_class": "cad:FittingFunction",
+                "name": "Receive axial fitting",
+                "description": "Provides a cylindrical end interface for an inserted member.",
+                "primary": true,
+                "confidence": 0.74
+              }
+            ],
+            "feature_behaviors": [
+              {
+                "ontology_class": "cad:ConstrainTranslationBehavior",
+                "name": "Radially locate inserted member",
+                "description": "The bore wall constrains radial movement of an inserted fitting.",
+                "confidence": 0.73
+              }
+            ],
+            "relationships": [
+              {
+                "target_feature_id": "F008",
+                "category": "cad:GeometricFeatureRelationship",
+                "relation": "cad:coaxialWith",
+                "description": "The opposed end bores share the CAD z-axis.",
+                "confidence": 0.99
+              }
+            ],
+            "brep_faces": [
+              {
+                "brep_id": "FACE 36",
+                "face_code": "FACE 36",
+                "entity_type": "cad:Face",
+                "geometry_type": "cad:CylindricalSurface",
+                "semantic_role": "cad:BoreWallRole",
+                "name": "Positive-z end bore wall",
+                "description": "Radius-3.175 mm cylindrical wall from z=25.400000 to 190.500000 mm.",
+                "salience": "cad:PrimarySalience",
+                "confidence": 0.98,
+                "evidence": [
+                  "CYLINDER surface",
+                  "radius=3.175000 mm",
+                  "axis=(0,0,-1)",
+                  "long axial bbox",
+                  "end face at z=190.500000 has two wires"
+                ]
+              }
+            ],
+            "confidence": 0.86
+          },
+          {
+            "id": "F010",
+            "name": "Negative-z transverse connection hole",
+            "ontology_class": "cad:ThroughHoleFeature",
+            "parent_feature_id": "F007",
+            "description": "Radius-3.175 mm transverse hole near z=-25.400001 mm.",
+            "interface_type": "cad:PinInterface",
+            "feature_functions": [
+              {
+                "ontology_class": "cad:ReceivePinFunction",
+                "name": "Receive connection pin",
+                "description": "Receives a transverse pin or fastener.",
+                "primary": true,
+                "confidence": 0.87
+              }
+            ],
+            "feature_behaviors": [
+              {
+                "ontology_class": "cad:ReactBearingLoadBehavior",
+                "name": "React pin load",
+                "description": "Reacts radial bearing load from a transverse pin.",
+                "confidence": 0.84
+              }
+            ],
+            "relationships": [
+              {
+                "target_feature_id": "F011",
+                "category": "cad:GeometricFeatureRelationship",
+                "relation": "cad:parallelTo",
+                "description": "The paired transverse holes have parallel y-directed axes.",
+                "confidence": 0.99
+              }
+            ],
+            "brep_faces": [
+              {
+                "brep_id": "FACE 24",
+                "face_code": "FACE 24",
+                "entity_type": "cad:Face",
+                "geometry_type": "cad:CylindricalSurface",
+                "semantic_role": "cad:BoreWallRole",
+                "name": "Negative-z transverse bore wall",
+                "description": "Radius-3.175 mm cylindrical wall centered near z=-25.400001 mm.",
+                "salience": "cad:PrimarySalience",
+                "confidence": 0.98,
+                "evidence": [
+                  "CYLINDER surface",
+                  "axis=(0,-1,0)",
+                  "radius=3.175000 mm",
+                  "localized bbox around z=-25.400001 mm"
+                ]
+              }
+            ],
+            "confidence": 0.92
+          },
+          {
+            "id": "F011",
+            "name": "Positive-z transverse connection hole",
+            "ontology_class": "cad:ThroughHoleFeature",
+            "parent_feature_id": "F007",
+            "description": "Paired radius-3.175 mm transverse hole near z=25.400000 mm.",
+            "interface_type": "cad:PinInterface",
+            "feature_functions": [
+              {
+                "ontology_class": "cad:ReceivePinFunction",
+                "name": "Receive connection pin",
+                "description": "Receives a transverse pin or fastener.",
+                "primary": true,
+                "confidence": 0.87
+              }
+            ],
+            "feature_behaviors": [
+              {
+                "ontology_class": "cad:ReactBearingLoadBehavior",
+                "name": "React pin load",
+                "description": "Reacts radial bearing load from a transverse pin.",
+                "confidence": 0.84
+              }
+            ],
+            "relationships": [
+              {
+                "target_feature_id": "F010",
+                "category": "cad:GeometricFeatureRelationship",
+                "relation": "cad:parallelTo",
+                "description": "The paired transverse holes have parallel y-directed axes.",
+                "confidence": 0.99
+              }
+            ],
+            "brep_faces": [
+              {
+                "brep_id": "FACE 37",
+                "face_code": "FACE 37",
+                "entity_type": "cad:Face",
+                "geometry_type": "cad:CylindricalSurface",
+                "semantic_role": "cad:BoreWallRole",
+                "name": "Positive-z transverse bore wall",
+                "description": "Radius-3.175 mm cylindrical wall centered near z=25.400000 mm.",
+                "salience": "cad:PrimarySalience",
+                "confidence": 0.98,
+                "evidence": [
+                  "CYLINDER surface",
+                  "axis=(0,-1,0)",
+                  "radius=3.175000 mm",
+                  "paired location with FACE 24"
+                ]
+              }
+            ],
+            "confidence": 0.92
+          },
+          {
+            "id": "F012",
+            "name": "Orthogonal-arm central pivot bore",
+            "ontology_class": "cad:ThroughHoleFeature",
+            "parent_feature_id": "F007",
+            "description": "Central radius-6.477 mm pivot/clearance bore through the orthogonal arm.",
+            "interface_type": "cad:PinInterface",
+            "feature_functions": [
+              {
+                "ontology_class": "cad:ReceivePinFunction",
+                "name": "Receive central pivot pin",
+                "description": "Receives or clears the common central pivot element.",
+                "primary": true,
+                "confidence": 0.95
+              },
+              {
+                "ontology_class": "cad:LocateFunction",
+                "name": "Locate common pivot axis",
+                "description": "Locates the arm relative to the clamp bore.",
+                "primary": false,
+                "confidence": 0.92
+              }
+            ],
+            "feature_behaviors": [
+              {
+                "ontology_class": "cad:ReactBearingLoadBehavior",
+                "name": "React pivot load",
+                "description": "Reacts radial load from the central pin.",
+                "confidence": 0.9
+              },
+              {
+                "ontology_class": "cad:PermitRotationBehavior",
+                "name": "Permit relative rotation",
+                "description": "May permit rotation about the common y-axis if not rigidly clamped.",
+                "confidence": 0.67
+              }
+            ],
+            "relationships": [
+              {
+                "target_feature_id": "F005",
+                "category": "cad:GeometricFeatureRelationship",
+                "relation": "cad:coaxialWith",
+                "description": "Shares the central y-axis with the oblique-arm pivot bore.",
+                "confidence": 0.99
+              },
+              {
+                "target_feature_id": "F016",
+                "category": "cad:GeometricFeatureRelationship",
+                "relation": "cad:coaxialWith",
+                "description": "Shares the central y-axis with the clamp through bore.",
+                "confidence": 0.99
+              }
+            ],
+            "brep_faces": [
+              {
+                "brep_id": "FACE 45",
+                "face_code": "FACE 45",
+                "entity_type": "cad:Face",
+                "geometry_type": "cad:CylindricalSurface",
+                "semantic_role": "cad:BoreWallRole",
+                "name": "Orthogonal-arm pivot bore wall",
+                "description": "Radius-6.477 mm cylindrical bore centered at the origin and spanning y=6.350000 to 12.700000 mm.",
+                "salience": "cad:PrimarySalience",
+                "confidence": 0.99,
+                "evidence": [
+                  "CYLINDER surface",
+                  "radius=6.477000 mm",
+                  "axis=(0,1,0)",
+                  "central position",
+                  "coaxial geometry with FACE 15 and FACE 89"
+                ]
+              }
+            ],
+            "confidence": 0.97
+          },
+          {
+            "id": "F013",
+            "name": "Orthogonal-arm rounded transitions",
+            "ontology_class": "cad:FilletFeature",
+            "parent_feature_id": "F007",
+            "description": "Paired B-spline, cylindrical, and planar transition faces around z approximately plus or minus 40.64 mm.",
+            "interface_type": null,
+            "feature_functions": [
+              {
+                "ontology_class": "cad:DistributeStressFunction",
+                "name": "Reduce transition stress",
+                "description": "Smooths local section changes adjacent to the central region.",
+                "primary": true,
+                "confidence": 0.82
+              }
+            ],
+            "feature_behaviors": [
+              {
+                "ontology_class": "cad:DistributeStressBehavior",
+                "name": "Distribute local stress",
+                "description": "Rounded surfaces spread load at profile transitions.",
+                "confidence": 0.83
+              }
+            ],
+            "relationships": [
+              {
+                "target_feature_id": "F007",
+                "category": "cad:StructuralFeatureRelationship",
+                "relation": "cad:blendsInto",
+                "description": "The transition surfaces blend into the main shaft.",
+                "confidence": 0.94
+              }
+            ],
+            "brep_faces": [
+              {
+                "brep_id": "FACE 26",
+                "face_code": "FACE 26",
+                "entity_type": "cad:Face",
+                "geometry_type": "cad:BSplineSurface",
+                "semantic_role": "cad:TransitionSurfaceRole",
+                "name": "Negative-z B-spline transition",
+                "description": "Representative B-spline transition near z=-40.64 mm.",
+                "salience": "cad:RepresentativeSalience",
+                "confidence": 0.92,
+                "evidence": [
+                  "BSPLINE surface",
+                  "area=56.455284 mm^2",
+                  "localized transition bbox"
+                ]
+              },
+              {
+                "brep_id": "FACE 27",
+                "face_code": "FACE 27",
+                "entity_type": "cad:Face",
+                "geometry_type": "cad:CylindricalSurface",
+                "semantic_role": "cad:FilletSurfaceRole",
+                "name": "Negative-z cylindrical blend",
+                "description": "Radius-5.080 mm cylindrical transition.",
+                "salience": "cad:RepresentativeSalience",
+                "confidence": 0.92,
+                "evidence": [
+                  "CYLINDER surface",
+                  "radius=5.080000 mm",
+                  "bbox centered near z=-40.64 mm"
+                ]
+              },
+              {
+                "brep_id": "FACE 31",
+                "face_code": "FACE 31",
+                "entity_type": "cad:Face",
+                "geometry_type": "cad:CylindricalSurface",
+                "semantic_role": "cad:FilletSurfaceRole",
+                "name": "Positive-z cylindrical blend",
+                "description": "Paired radius-5.080 mm transition near z=40.64 mm.",
+                "salience": "cad:RepresentativeSalience",
+                "confidence": 0.92,
+                "evidence": [
+                  "CYLINDER surface",
+                  "radius=5.080000 mm",
+                  "paired geometry with FACE 27"
+                ]
+              },
+              {
+                "brep_id": "FACE 32",
+                "face_code": "FACE 32",
+                "entity_type": "cad:Face",
+                "geometry_type": "cad:BSplineSurface",
+                "semantic_role": "cad:TransitionSurfaceRole",
+                "name": "Positive-z B-spline transition",
+                "description": "Representative B-spline transition near z=40.64 mm.",
+                "salience": "cad:RepresentativeSalience",
+                "confidence": 0.92,
+                "evidence": [
+                  "BSPLINE surface",
+                  "area=56.455284 mm^2",
+                  "paired transition geometry"
+                ]
+              }
+            ],
+            "confidence": 0.87
+          }
+        ],
+        "unclassified_brep_faces": [
+          {
+            "brep_ids": [
+              "FACE 25",
+              "FACE 28",
+              "FACE 29",
+              "FACE 30",
+              "FACE 34",
+              "FACE 35",
+              "FACE 38",
+              "FACE 40",
+              "FACE 44"
+            ],
+            "salience": "cad:SecondarySalience",
+            "description": "Secondary transition, central planar, and terminal annular faces of SOLID 1. FACE 40 and FACE 44 are terminal faces with two wires corresponding to the end-bore openings.",
+            "confidence": 0.95
+          }
+        ],
+        "relationships": [
+          {
+            "target_section_id": "R01",
+            "category": "cad:GeometricFeatureRelationship",
+            "relation": "cad:perpendicularTo",
+            "description": "The orthogonal arm crosses the oblique arm at approximately a right angle.",
+            "confidence": 0.94
+          },
+          {
+            "target_section_id": "R03",
+            "category": "cad:StructuralFeatureRelationship",
+            "relation": "cad:adjacentTo",
+            "description": "The arm passes through and is supported by the central clamp/pivot section.",
+            "confidence": 0.96
+          }
+        ],
+        "confidence": 0.93
+      },
+      {
+        "id": "R03",
+        "name": "Central clamp and pivot housing",
+        "ontology_class": "cad:CentralSection",
+        "description": "Compact SOLID 2 centered around the arm intersection. It comprises two opposed rounded-square support plates and a collar-reinforced central through bore. The solid bounds are x=-25.400000 to 25.400000 mm, y=-15.240000 to 27.940000 mm, and z=-25.400000 to 25.400000 mm.",
+        "location": "Surrounds the common crossing point of the two elongated arms and the shared CAD y-directed pivot axis.",
+        "solid_ids": [
+          "SOLID 2"
+        ],
+        "colour": {
+          "R": 90,
+          "G": 190,
+          "B": 110
+        },
+        "section_functions": [
+          {
+            "ontology_class": "cad:SupportFunction",
+            "name": "Support crossing arms",
+            "description": "Supports and captures the two crossing arm solids at their common center.",
+            "primary": true,
+            "confidence": 0.9
+          },
+          {
+            "ontology_class": "cad:LocateFunction",
+            "name": "Locate the common pivot axis",
+            "description": "Maintains alignment of the central bores and crossing members.",
+            "primary": false,
+            "confidence": 0.91
+          },
+          {
+            "ontology_class": "cad:ConnectFunction",
+            "name": "Connect the crossing members",
+            "description": "Provides the central structural connection between the two arm components.",
+            "primary": false,
+            "confidence": 0.88
+          }
+        ],
+        "section_behaviors": [
+          {
+            "ontology_class": "cad:SpreadLoadBehavior",
+            "name": "Spread clamp load",
+            "description": "The broad opposed plates spread local contact loads over the crossing-arm region.",
+            "confidence": 0.89
+          },
+          {
+            "ontology_class": "cad:ReactBearingLoadBehavior",
+            "name": "React pivot bearing load",
+            "description": "The central bore and collars react radial loading from a pin or pivot.",
+            "confidence": 0.9
+          },
+          {
+            "ontology_class": "cad:ConstrainTranslationBehavior",
+            "name": "Constrain relative translation",
+            "description": "The clamp geometry limits relative translation of the crossing members near the center.",
+            "confidence": 0.82
+          }
+        ],
+        "feature_groups": [
+          {
+            "id": "G004",
+            "name": "Opposed rounded-square clamp plates",
+            "ontology_class": "cad:RepeatedFeatureGroup",
+            "feature_class": "cad:SupportFeature",
+            "pattern_type": "cad:PairedPattern",
+            "member_count": 2,
+            "member_feature_ids": [
+              "F014",
+              "F015"
+            ],
+            "representative_feature_ids": [
+              "F014",
+              "F015"
+            ],
+            "pattern_description": "Two rounded-square plate structures lie on opposite sides of the crossing arms along the CAD y direction.",
+            "confidence": 0.98
+          },
+          {
+            "id": "G005",
+            "name": "Paired pivot collars",
+            "ontology_class": "cad:RepeatedFeatureGroup",
+            "feature_class": "cad:BossFeature",
+            "pattern_type": "cad:PairedPattern",
+            "member_count": 2,
+            "member_feature_ids": [
+              "F017"
+            ],
+            "representative_feature_ids": [
+              "F017"
+            ],
+            "pattern_description": "Two radius-9.525 mm collar segments are positioned on opposite ends of the central y-directed through bore and represented as one compound boss feature.",
+            "confidence": 0.97
+          }
+        ],
+        "features": [
+          {
+            "id": "F014",
+            "name": "Positive-y rounded-square clamp plate",
+            "ontology_class": "cad:SupportFeature",
+            "parent_feature_id": null,
+            "description": "Rounded-square plate portion occupying approximately y=15.240000 to 27.940000 mm, with broad planar faces and radius-7.620 mm rounded corner walls.",
+            "interface_type": "cad:ContactInterface",
+            "feature_functions": [
+              {
+                "ontology_class": "cad:SupportFunction",
+                "name": "Support crossing members",
+                "description": "Provides a broad support surface on one side of the arm stack.",
+                "primary": true,
+                "confidence": 0.9
+              },
+              {
+                "ontology_class": "cad:DistributeStressFunction",
+                "name": "Distribute clamp force",
+                "description": "Spreads clamping and contact force over the central region.",
+                "primary": false,
+                "confidence": 0.87
+              }
+            ],
+            "feature_behaviors": [
+              {
+                "ontology_class": "cad:SpreadLoadBehavior",
+                "name": "Spread contact load",
+                "description": "The broad plate face distributes contact pressure.",
+                "confidence": 0.91
+              },
+              {
+                "ontology_class": "cad:ResistBendingBehavior",
+                "name": "Resist plate bending",
+                "description": "The plate resists bending generated by clamp reaction forces.",
+                "confidence": 0.82
+              }
+            ],
+            "relationships": [
+              {
+                "target_feature_id": "F015",
+                "category": "cad:GeometricFeatureRelationship",
+                "relation": "cad:parallelTo",
+                "description": "The principal support faces of the two clamp plates are parallel.",
+                "confidence": 0.99
+              },
+              {
+                "target_feature_id": "F001",
+                "category": "cad:FunctionalFeatureRelationship",
+                "relation": "cad:supportsFeature",
+                "description": "Supports one side of the oblique arm.",
+                "confidence": 0.82
+              },
+              {
+                "target_feature_id": "F007",
+                "category": "cad:FunctionalFeatureRelationship",
+                "relation": "cad:supportsFeature",
+                "description": "Supports one side of the orthogonal arm.",
+                "confidence": 0.82
+              }
+            ],
+            "brep_faces": [
+              {
+                "brep_id": "FACE 53",
+                "face_code": "FACE 53",
+                "entity_type": "cad:Face",
+                "geometry_type": "cad:PlanarSurface",
+                "semantic_role": "cad:MountingFaceRole",
+                "name": "Positive-y outer plate face",
+                "description": "Broad rounded-square planar outer face at y=27.940000 mm.",
+                "salience": "cad:PrimarySalience",
+                "confidence": 0.99,
+                "evidence": [
+                  "PLANE surface",
+                  "bbox x and z each span approximately 50.800000 mm",
+                  "y=27.940000 mm",
+                  "n_wires=2",
+                  "visual rounded-square plate correspondence"
+                ]
+              },
+              {
+                "brep_id": "FACE 58",
+                "face_code": "FACE 58",
+                "entity_type": "cad:Face",
+                "geometry_type": "cad:PlanarSurface",
+                "semantic_role": "cad:SeatingFaceRole",
+                "name": "Positive-y plate seating face",
+                "description": "Broad inner planar face at y=15.240000 mm facing the crossing-arm stack.",
+                "salience": "cad:PrimarySalience",
+                "confidence": 0.98,
+                "evidence": [
+                  "PLANE surface",
+                  "area=2245.774058 mm^2",
+                  "bbox x,z=-25.400000 to 25.400000 mm",
+                  "location adjacent to central arms"
+                ]
+              },
+              {
+                "brep_id": "FACE 63",
+                "face_code": "FACE 63",
+                "entity_type": "cad:Face",
+                "geometry_type": "cad:PlanarSurface",
+                "semantic_role": "cad:SupportFaceRole",
+                "name": "Positive-y recessed support face",
+                "description": "Rounded-square planar support face at y=17.780000 mm.",
+                "salience": "cad:PrimarySalience",
+                "confidence": 0.96,
+                "evidence": [
+                  "PLANE surface",
+                  "area=2040.475626 mm^2",
+                  "bbox x,z=-22.860001 to 22.860001 mm",
+                  "visual inner plate surface"
+                ]
+              }
+            ],
+            "confidence": 0.93
+          },
+          {
+            "id": "F015",
+            "name": "Negative-y rounded-square clamp plate",
+            "ontology_class": "cad:SupportFeature",
+            "parent_feature_id": null,
+            "description": "Opposed rounded-square support plate occupying approximately y=-15.240000 to -2.540000 mm.",
+            "interface_type": "cad:ContactInterface",
+            "feature_functions": [
+              {
+                "ontology_class": "cad:SupportFunction",
+                "name": "Support crossing members",
+                "description": "Provides the opposed broad support surface for the arm stack.",
+                "primary": true,
+                "confidence": 0.9
+              },
+              {
+                "ontology_class": "cad:DistributeStressFunction",
+                "name": "Distribute clamp force",
+                "description": "Spreads reaction force over the central region.",
+                "primary": false,
+                "confidence": 0.87
+              }
+            ],
+            "feature_behaviors": [
+              {
+                "ontology_class": "cad:SpreadLoadBehavior",
+                "name": "Spread contact load",
+                "description": "The broad plate distributes contact pressure.",
+                "confidence": 0.91
+              },
+              {
+                "ontology_class": "cad:ResistBendingBehavior",
+                "name": "Resist plate bending",
+                "description": "Resists bending under clamp or support reactions.",
+                "confidence": 0.82
+              }
+            ],
+            "relationships": [
+              {
+                "target_feature_id": "F014",
+                "category": "cad:GeometricFeatureRelationship",
+                "relation": "cad:parallelTo",
+                "description": "The principal support faces of the opposed plates are parallel.",
+                "confidence": 0.99
+              },
+              {
+                "target_feature_id": "F001",
+                "category": "cad:FunctionalFeatureRelationship",
+                "relation": "cad:supportsFeature",
+                "description": "Supports the opposite side of the oblique arm.",
+                "confidence": 0.82
+              },
+              {
+                "target_feature_id": "F007",
+                "category": "cad:FunctionalFeatureRelationship",
+                "relation": "cad:supportsFeature",
+                "description": "Supports the opposite side of the orthogonal arm.",
+                "confidence": 0.82
+              }
+            ],
+            "brep_faces": [
+              {
+                "brep_id": "FACE 72",
+                "face_code": "FACE 72",
+                "entity_type": "cad:Face",
+                "geometry_type": "cad:PlanarSurface",
+                "semantic_role": "cad:MountingFaceRole",
+                "name": "Negative-y outer plate face",
+                "description": "Broad rounded-square planar outer face at y=-15.240000 mm.",
+                "salience": "cad:PrimarySalience",
+                "confidence": 0.99,
+                "evidence": [
+                  "PLANE surface",
+                  "bbox x and z each span approximately 50.800000 mm",
+                  "y=-15.240000 mm",
+                  "n_wires=2"
+                ]
+              },
+              {
+                "brep_id": "FACE 77",
+                "face_code": "FACE 77",
+                "entity_type": "cad:Face",
+                "geometry_type": "cad:PlanarSurface",
+                "semantic_role": "cad:SeatingFaceRole",
+                "name": "Negative-y plate seating face",
+                "description": "Broad inner planar face at y=-2.540000 mm facing the arm stack.",
+                "salience": "cad:PrimarySalience",
+                "confidence": 0.98,
+                "evidence": [
+                  "PLANE surface",
+                  "area=2245.774058 mm^2",
+                  "bbox x,z=-25.400000 to 25.400000 mm"
+                ]
+              },
+              {
+                "brep_id": "FACE 82",
+                "face_code": "FACE 82",
+                "entity_type": "cad:Face",
+                "geometry_type": "cad:PlanarSurface",
+                "semantic_role": "cad:SupportFaceRole",
+                "name": "Negative-y recessed support face",
+                "description": "Rounded-square planar support face at y=-5.080000 mm.",
+                "salience": "cad:PrimarySalience",
+                "confidence": 0.96,
+                "evidence": [
+                  "PLANE surface",
+                  "area=2040.475626 mm^2",
+                  "bbox x,z=-22.860001 to 22.860001 mm",
+                  "paired geometry with FACE 63"
+                ]
+              }
+            ],
+            "confidence": 0.93
+          },
+          {
+            "id": "F016",
+            "name": "Central clamp through bore",
+            "ontology_class": "cad:ThroughHoleFeature",
+            "parent_feature_id": null,
+            "description": "Radius-6.350 mm cylindrical through bore centered at the CAD origin and directed along y through the central clamp solid.",
+            "interface_type": "cad:PinInterface",
+            "feature_functions": [
+              {
+                "ontology_class": "cad:ReceivePinFunction",
+                "name": "Receive central pin",
+                "description": "Provides the principal cylindrical passage for a central pin or pivot.",
+                "primary": true,
+                "confidence": 0.96
+              },
+              {
+                "ontology_class": "cad:LocateFunction",
+                "name": "Locate crossing members",
+                "description": "Defines the common alignment axis for the clamp and arm bores.",
+                "primary": false,
+                "confidence": 0.94
+              }
+            ],
+            "feature_behaviors": [
+              {
+                "ontology_class": "cad:ReactBearingLoadBehavior",
+                "name": "React pin bearing load",
+                "description": "The bore wall carries radial contact load from the central pin.",
+                "confidence": 0.92
+              },
+              {
+                "ontology_class": "cad:PermitRotationBehavior",
+                "name": "Permit pin rotation",
+                "description": "The cylindrical interface can permit relative rotation around the y-axis.",
+                "confidence": 0.72
+              }
+            ],
+            "relationships": [
+              {
+                "target_feature_id": "F005",
+                "category": "cad:GeometricFeatureRelationship",
+                "relation": "cad:coaxialWith",
+                "description": "Coaxial with the oblique-arm pivot bore.",
+                "confidence": 0.99
+              },
+              {
+                "target_feature_id": "F012",
+                "category": "cad:GeometricFeatureRelationship",
+                "relation": "cad:coaxialWith",
+                "description": "Coaxial with the orthogonal-arm pivot bore.",
+                "confidence": 0.99
+              },
+              {
+                "target_feature_id": "F017",
+                "category": "cad:GeometricFeatureRelationship",
+                "relation": "cad:insideFeature",
+                "description": "The through bore passes inside the collar boss feature.",
+                "confidence": 0.99
+              }
+            ],
+            "brep_faces": [
+              {
+                "brep_id": "FACE 89",
+                "face_code": "FACE 89",
+                "entity_type": "cad:Face",
+                "geometry_type": "cad:CylindricalSurface",
+                "semantic_role": "cad:BoreWallRole",
+                "name": "Central clamp bore wall",
+                "description": "Radius-6.350 mm cylindrical bore wall spanning y=0 to 12.700000 mm.",
+                "salience": "cad:PrimarySalience",
+                "confidence": 0.99,
+                "evidence": [
+                  "CYLINDER surface",
+                  "radius=6.350000 mm",
+                  "axis=(0,1,0)",
+                  "center=(0,6.350000,0)",
+                  "coaxial with FACE 15 and FACE 45"
+                ]
+              }
+            ],
+            "confidence": 0.98
+          },
+          {
+            "id": "F017",
+            "name": "Paired central pivot collars",
+            "ontology_class": "cad:BossFeature",
+            "parent_feature_id": null,
+            "description": "Two coaxial radius-9.525 mm collar bosses flanking the central arm stack and reinforcing the central through bore.",
+            "interface_type": "cad:SeatingInterface",
+            "feature_functions": [
+              {
+                "ontology_class": "cad:SupportFunction",
+                "name": "Support central pivot",
+                "description": "Increases local material and seating area around the pivot bore.",
+                "primary": true,
+                "confidence": 0.93
+              },
+              {
+                "ontology_class": "cad:DistributeStressFunction",
+                "name": "Distribute bore load",
+                "description": "Spreads bearing load from the pivot bore into the clamp plates.",
+                "primary": false,
+                "confidence": 0.9
+              }
+            ],
+            "feature_behaviors": [
+              {
+                "ontology_class": "cad:ReactBearingLoadBehavior",
+                "name": "React pivot bearing load",
+                "description": "The reinforced collar region carries local radial loading.",
+                "confidence": 0.93
+              },
+              {
+                "ontology_class": "cad:DistributeStressBehavior",
+                "name": "Distribute pivot stress",
+                "description": "The increased diameter reduces local stress concentration around the bore.",
+                "confidence": 0.91
+              }
+            ],
+            "relationships": [
+              {
+                "target_feature_id": "F016",
+                "category": "cad:GeometricFeatureRelationship",
+                "relation": "cad:surroundsFeature",
+                "description": "The paired collars surround the central through bore.",
+                "confidence": 0.99
+              },
+              {
+                "target_feature_id": "F014",
+                "category": "cad:StructuralFeatureRelationship",
+                "relation": "cad:attachedTo",
+                "description": "One collar is materially attached to the positive-y clamp plate region.",
+                "confidence": 0.96
+              },
+              {
+                "target_feature_id": "F015",
+                "category": "cad:StructuralFeatureRelationship",
+                "relation": "cad:attachedTo",
+                "description": "The opposed collar is materially attached to the negative-y clamp plate region.",
+                "confidence": 0.96
+              }
+            ],
+            "brep_faces": [
+              {
+                "brep_id": "FACE 85",
+                "face_code": "FACE 85",
+                "entity_type": "cad:Face",
+                "geometry_type": "cad:PlanarSurface",
+                "semantic_role": "cad:SeatingFaceRole",
+                "name": "First collar annular seat",
+                "description": "Planar annular collar face at y=0.",
+                "salience": "cad:PrimarySalience",
+                "confidence": 0.98,
+                "evidence": [
+                  "PLANE surface",
+                  "n_wires=2",
+                  "bbox x,z=-9.525000 to 9.525000 mm",
+                  "center at CAD origin"
+                ]
+              },
+              {
+                "brep_id": "FACE 86",
+                "face_code": "FACE 86",
+                "entity_type": "cad:Face",
+                "geometry_type": "cad:CylindricalSurface",
+                "semantic_role": "cad:OuterWallRole",
+                "name": "First collar outer wall",
+                "description": "Radius-9.525 mm cylindrical collar wall spanning y=-2.540000 to 0.",
+                "salience": "cad:PrimarySalience",
+                "confidence": 0.99,
+                "evidence": [
+                  "CYLINDER surface",
+                  "radius=9.525000 mm",
+                  "axis=(0,-1,0)",
+                  "coaxial with central bore"
+                ]
+              },
+              {
+                "brep_id": "FACE 87",
+                "face_code": "FACE 87",
+                "entity_type": "cad:Face",
+                "geometry_type": "cad:PlanarSurface",
+                "semantic_role": "cad:SeatingFaceRole",
+                "name": "Second collar annular seat",
+                "description": "Planar annular collar face at y=12.700000 mm.",
+                "salience": "cad:PrimarySalience",
+                "confidence": 0.98,
+                "evidence": [
+                  "PLANE surface",
+                  "n_wires=2",
+                  "bbox x,z=-9.525000 to 9.525000 mm",
+                  "paired geometry with FACE 85"
+                ]
+              },
+              {
+                "brep_id": "FACE 88",
+                "face_code": "FACE 88",
+                "entity_type": "cad:Face",
+                "geometry_type": "cad:CylindricalSurface",
+                "semantic_role": "cad:OuterWallRole",
+                "name": "Second collar outer wall",
+                "description": "Radius-9.525 mm cylindrical collar wall spanning y=12.700000 to 15.240000 mm.",
+                "salience": "cad:PrimarySalience",
+                "confidence": 0.99,
+                "evidence": [
+                  "CYLINDER surface",
+                  "radius=9.525000 mm",
+                  "axis=(0,1,0)",
+                  "paired geometry with FACE 86"
+                ]
+              }
+            ],
+            "confidence": 0.97
+          }
+        ],
+        "unclassified_brep_faces": [
+          {
+            "brep_ids": [
+              "FACE 47",
+              "FACE 48",
+              "FACE 49",
+              "FACE 50",
+              "FACE 51",
+              "FACE 52",
+              "FACE 54",
+              "FACE 55",
+              "FACE 56",
+              "FACE 57",
+              "FACE 59",
+              "FACE 60",
+              "FACE 61",
+              "FACE 62",
+              "FACE 64",
+              "FACE 65"
+            ],
+            "salience": "cad:SecondarySalience",
+            "description": "Planar side walls and radius-7.620 mm rounded corner walls belonging to the positive-y rounded-square clamp plate.",
+            "confidence": 0.98
+          },
+          {
+            "brep_ids": [
+              "FACE 66",
+              "FACE 67",
+              "FACE 68",
+              "FACE 69",
+              "FACE 70",
+              "FACE 71",
+              "FACE 73",
+              "FACE 74",
+              "FACE 75",
+              "FACE 76",
+              "FACE 78",
+              "FACE 79",
+              "FACE 80",
+              "FACE 81",
+              "FACE 83",
+              "FACE 84"
+            ],
+            "salience": "cad:SecondarySalience",
+            "description": "Planar side walls and radius-7.620 mm rounded corner walls belonging to the negative-y rounded-square clamp plate.",
+            "confidence": 0.98
+          }
+        ],
+        "relationships": [
+          {
+            "target_section_id": "R01",
+            "category": "cad:FunctionalFeatureRelationship",
+            "relation": "cad:supportsFeature",
+            "description": "The central clamp supports and locates the oblique crossing arm.",
+            "confidence": 0.9
+          },
+          {
+            "target_section_id": "R02",
+            "category": "cad:FunctionalFeatureRelationship",
+            "relation": "cad:supportsFeature",
+            "description": "The central clamp supports and locates the orthogonal crossing arm.",
+            "confidence": 0.9
+          }
+        ],
+        "confidence": 0.94
+      }
+    ]
+  }
+}
+
+
+The multiview images generated from the code sent in your last response are attached. The CadQuery function and program output from the last iteration are also provided. First, judge whether the required actions identified have been done correctly and whether the current model satisfies the desired final state in aim.json. aim.json is attached immediately after the last-iteration images and code so you can check the current output against it.
+
+The required actions are:
+1. Apply an edge fillet
+   Target: The unrounded longitudinal edge of the oblique crossing arm, located on F001 along the long planar side wall FACE 21 and opposite the existing radius-6.350 mm continuous rounded shaft wall FACE 20.
+   Parameters: radius = 0,635 cm
+   Constraints: The target must be the continuous sharp longitudinal boundary of the blade-like oblique arm R01. Select the edge chain associated with FACE 21 and the elongated planar shaft faces FACE 17 and FACE 19, on the side opposite the already rounded cylindrical wall FACE 20. Do not modify the end edges, bore edges, transverse-hole edges, central pivot-bore edges, or the localized transition geometry.
+
+If yes, report the operation is finished in your response.
+
+If not, analyse errors and update the code accordingly.
+
+Once you have generated the new function, it will be executed in CadQuery on the original CAD model. You will then be provided with the latest rendering of the CAD model created by your function, and any prints, debug or error messages. You will then have the opportunity to refine your function based on this feedback, and it will be re-executed.
+
+Continue this process until the task is complete, or you reach the maximum number of iterations. If the task involves editing an existing model, the path to that model's .step file is passed to your function as args["input_file"], and is also listed as brep_start_path_step in the task information. Load it from args["input_file"] rather than hard-coding a path. For these cases, you might need to print out debug information once the model is loaded in your first iteration.
+
+Return a json object with three fields. Do not include any other text outside of the json object in your response:
+'complete': true if the task has been completed. IMPORTANT: This should only be judged by looking at the output from the last iteration, not whether a function has been returned this iteration. If there is no valid output that corresponds to the instruction, the task is not complete. The first iteration can never be complete. If this is true, then the current function will NOT be executed, and the function from the last iteration will be used.
+'my_cad_function': CadQuery python function as a string. Use the same definition and arguments as the example.
+'error': a description of errors and misalignments within the current model compared to the desired target.
+        
+
+Instruction:
+
+Edit the existing model according to the provided instructions.
+
+Task information:
+
+request_text:
+
+One of the long edges of the blade does not have a radius. Add radius to that long edge R=0,635cm
+
+brep_start_path_step:
+
+/home/adml/Research/Hackathon2026/IDETC26-Hackathon-Autodesk-neuralCAD-Edit/data/edit_192_external/breps/F332D3FXML85WLR2_1770204569.6643417.step
+
+Program output from last iteration:
+
+stdout: Loading function from: /home/adml/Research/Hackathon2026/IDETC26-Hackathon-Autodesk-neuralCAD-Edit/output/gpt-5.6-sol-ontology-full48/gpt-5.6-sol-ontology_cadquery-script_1787121277.8876624/brep_end/1787121277.8876624/temp_script.py
+=== Fillet target grounding ===
+Selected R01 solid index: 0
+R01 bbox: (331.753222, 12.700000, 231.430908)
+Candidate edge 52: length=381.000000 center=(-7.008282, -0.000000, 10.591222) p0=(151.860046, -0.000000, 115.715454) p1=(-165.876611, 0.000000, -94.533010)
+Applying R=6.350000 mm fillet to R01 edge 52
+Error executing LLM-provided function: BRep_API: command not done
+No CadQuery result returned; skipped STEP/STL/image export.
+Script completed.
+
+stderr: Traceback (most recent call last):
+  File "/home/adml/Research/Hackathon2026/IDETC26-Hackathon-Autodesk-neuralCAD-Edit/src/harnesses/cadquery_script.py", line 158, in load_and_execute_function
+    return my_cad_function(args)
+           ^^^^^^^^^^^^^^^^^^^^^
+  File "<string>", line 68, in my_cad_function
+  File "/home/adml/Research/Hackathon2026/IDETC26-Hackathon-Autodesk-neuralCAD-Edit/.venv/lib/python3.12/site-packages/cadquery/cq.py", line 1244, in fillet
+    s = solid.fillet(radius, edgeList)
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/adml/Research/Hackathon2026/IDETC26-Hackathon-Autodesk-neuralCAD-Edit/.venv/lib/python3.12/site-packages/cadquery/occ_impl/shapes.py", line 3987, in fillet
+    return self.__class__(fillet_builder.Shape())
+                          ^^^^^^^^^^^^^^^^^^^^^^
+OCP.OCP.StdFail.StdFail_NotDone: BRep_API: command not done
+
+
+Multi-view images from last iteration:
+
+View: +Z
+
+[IMAGE 0: /home/adml/Research/Hackathon2026/IDETC26-Hackathon-Autodesk-neuralCAD-Edit/output/gpt-5.6-sol-ontology-full48/gpt-5.6-sol-ontology_cadquery-script_1787121277.8876624/brep_end/1787121277.8876624/tmp_+Z.png]
+
+View: -Z
+
+[IMAGE 1: /home/adml/Research/Hackathon2026/IDETC26-Hackathon-Autodesk-neuralCAD-Edit/output/gpt-5.6-sol-ontology-full48/gpt-5.6-sol-ontology_cadquery-script_1787121277.8876624/brep_end/1787121277.8876624/tmp_-Z.png]
+
+View: -X
+
+[IMAGE 2: /home/adml/Research/Hackathon2026/IDETC26-Hackathon-Autodesk-neuralCAD-Edit/output/gpt-5.6-sol-ontology-full48/gpt-5.6-sol-ontology_cadquery-script_1787121277.8876624/brep_end/1787121277.8876624/tmp_-X.png]
+
+View: +X
+
+[IMAGE 3: /home/adml/Research/Hackathon2026/IDETC26-Hackathon-Autodesk-neuralCAD-Edit/output/gpt-5.6-sol-ontology-full48/gpt-5.6-sol-ontology_cadquery-script_1787121277.8876624/brep_end/1787121277.8876624/tmp_+X.png]
+
+View: +Y
+
+[IMAGE 4: /home/adml/Research/Hackathon2026/IDETC26-Hackathon-Autodesk-neuralCAD-Edit/output/gpt-5.6-sol-ontology-full48/gpt-5.6-sol-ontology_cadquery-script_1787121277.8876624/brep_end/1787121277.8876624/tmp_+Y.png]
+
+View: -Y
+
+[IMAGE 5: /home/adml/Research/Hackathon2026/IDETC26-Hackathon-Autodesk-neuralCAD-Edit/output/gpt-5.6-sol-ontology-full48/gpt-5.6-sol-ontology_cadquery-script_1787121277.8876624/brep_end/1787121277.8876624/tmp_-Y.png]
+
+View: iso1
+
+[IMAGE 6: /home/adml/Research/Hackathon2026/IDETC26-Hackathon-Autodesk-neuralCAD-Edit/output/gpt-5.6-sol-ontology-full48/gpt-5.6-sol-ontology_cadquery-script_1787121277.8876624/brep_end/1787121277.8876624/tmp_iso1.png]
+
+View: iso2
+
+[IMAGE 7: /home/adml/Research/Hackathon2026/IDETC26-Hackathon-Autodesk-neuralCAD-Edit/output/gpt-5.6-sol-ontology-full48/gpt-5.6-sol-ontology_cadquery-script_1787121277.8876624/brep_end/1787121277.8876624/tmp_iso2.png]
+
+CadQuery function from last iteration:
+
+def my_cad_function(args):
+    input_file = os.path.expanduser(args["input_file"])
+    model = cq.importers.importStep(input_file)
+    imported = model.val()
+    solids = list(imported.Solids())
+
+    if len(solids) != 3:
+        raise ValueError("Expected 3 solids in the imported assembly, found %d" % len(solids))
+
+    # Ground R01 using its characteristic oblique-arm bounding dimensions.
+    target_index = min(
+        range(len(solids)),
+        key=lambda i: (
+            abs(solids[i].BoundingBox().xlen - 331.753222)
+            + abs(solids[i].BoundingBox().ylen - 12.700000)
+            + abs(solids[i].BoundingBox().zlen - 231.430908)
+        )
+    )
+    target_solid = solids[target_index]
+
+    print("=== Fillet target grounding ===")
+    print("Selected R01 solid index:", target_index)
+    bb = target_solid.BoundingBox()
+    print("R01 bbox: (%.6f, %.6f, %.6f)" % (bb.xlen, bb.ylen, bb.zlen))
+
+    # Inspection of the loaded STEP established that the required boundary is
+    # the unique straight, continuous 381 mm edge at y=0. It is the sharp
+    # longitudinal boundary associated with FACE 21 and the elongated planar
+    # shaft faces, opposite the existing radius-6.35 mm FACE 20 wall.
+    candidates = []
+    for ei, edge in enumerate(target_solid.Edges()):
+        try:
+            edge_type = edge.geomType()
+        except Exception:
+            edge_type = "UNKNOWN"
+
+        if edge_type != "LINE":
+            continue
+
+        length = edge.Length()
+        center = edge.Center()
+        if abs(length - 381.0) < 0.05 and abs(center.y) < 0.01:
+            p0 = edge.startPoint()
+            p1 = edge.endPoint()
+            candidates.append((ei, edge))
+            print(
+                "Candidate edge %d: length=%.6f center=(%.6f, %.6f, %.6f) "
+                "p0=(%.6f, %.6f, %.6f) p1=(%.6f, %.6f, %.6f)"
+                % (ei, length, center.x, center.y, center.z,
+                   p0.x, p0.y, p0.z, p1.x, p1.y, p1.z)
+            )
+
+    if len(candidates) != 1:
+        raise ValueError(
+            "Expected exactly one continuous 381 mm sharp longitudinal edge "
+            "on R01 at y=0, found %d" % len(candidates)
+        )
+
+    selected_index, selected_edge = candidates[0]
+    radius = 6.35  # 0.635 cm
+    print("Applying R=%.6f mm fillet to R01 edge %d" % (radius, selected_index))
+
+    # CadQuery performs edge filleting through Workplane.fillet(). Put only the
+    # grounded edge on the selection stack so no end, bore, hole, pivot, or
+    # localized transition edge can be modified.
+    solid_wp = cq.Workplane(obj=target_solid)
+    edge_selection = solid_wp.newObject([selected_edge])
+    edited_solid = edge_selection.fillet(radius).val()
+
+    if edited_solid.ShapeType() != "Solid":
+        raise ValueError("Fillet did not return a solid")
+    if not edited_solid.isValid():
+        raise ValueError("The filleted R01 solid is invalid")
+
+    print("Original R01 volume: %.6f" % target_solid.Volume())
+    print("Edited R01 volume:   %.6f" % edited_solid.Volume())
+    print("Original R01 faces: %d" % len(target_solid.Faces()))
+    print("Edited R01 faces:   %d" % len(edited_solid.Faces()))
+
+    # Preserve both non-target solids and retain the original three-solid,
+    # assembly-like structure rather than fusing the components.
+    output_solids = list(solids)
+    output_solids[target_index] = edited_solid
+    result = cq.Compound.makeCompound(output_solids)
+
+    print("Result solids:", len(result.Solids()))
+    print("Result valid:", result.isValid())
+    return cq.Workplane(obj=result)
+
+aim.json (desired final state). Check the last-iteration images, CadQuery function, and program output against this:
+
+{
+  "request": "One of the long edges of the blade does not have a radius. Add radius to that long edge R=0,635cm",
+  "request_wording": {
+    "action_words": [
+      "Add",
+      "radius",
+      "R=0,635cm"
+    ],
+    "referenced_feature_words": [
+      "One",
+      "long",
+      "edges",
+      "blade",
+      "not",
+      "have",
+      "radius",
+      "that",
+      "long",
+      "edge"
+    ],
+    "intention_words": [],
+    "grammatical_words": [
+      "of",
+      "the",
+      "of",
+      "the",
+      "does",
+      "a",
+      "to"
+    ]
+  },
+  "actions": [
+    {
+      "operation": "Apply an edge fillet",
+      "parameters": {
+        "radius": "0,635 cm"
+      },
+      "target": "The long edge of the blade that does not currently have a radius",
+      "relational_constraint": "The target must be one of the blade's long edges and must be the edge currently lacking a radius.",
+      "unresolved_reference": "Identify which long edge of the blade is currently unrounded."
+    }
+  ],
+  "intention": []
+}
+
+Iterations remaining: 7

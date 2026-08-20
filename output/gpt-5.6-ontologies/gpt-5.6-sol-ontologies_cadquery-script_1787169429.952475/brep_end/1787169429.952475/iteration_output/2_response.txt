@@ -1,0 +1,54 @@
+Thinking text:
+
+
+Generated script:
+def my_cad_function(args):
+    input_file = os.path.expanduser(args["input_file"])
+    model = cq.importers.importStep(input_file)
+    original = model.val()
+
+    # Create the 1.7 mm diameter transverse connecting hole through both clevis ears.
+    pin_center_y = 3.510000
+    pin_center_z = 2.943179
+    pin_radius = 1.7 / 2.0
+    pin_cutter = cq.Solid.makeCylinder(
+        pin_radius,
+        3.10,
+        cq.Vector(4.60, pin_center_y, pin_center_z),
+        cq.Vector(1, 0, 0)
+    )
+    result = original.cut(pin_cutter)
+
+    # Apply 0.1 mm wide and deep circumferential grip grooves around
+    # the four mounting holes on the mounting contact face.
+    mounting_centers = [
+        (0.293627, 1.473530),
+        (0.293627, -1.526470),
+        (11.953627, 1.123530),
+        (11.953627, -2.986470),
+    ]
+    groove_inner_radius = 0.58
+    groove_width = 0.10
+    groove_outer_radius = groove_inner_radius + groove_width
+    groove_depth = 0.10
+    mounting_face_y = -0.0100
+
+    for x, z in mounting_centers:
+        outer = cq.Solid.makeCylinder(
+            groove_outer_radius,
+            groove_depth + 0.001,
+            cq.Vector(x, mounting_face_y - 0.0005, z),
+            cq.Vector(0, 1, 0)
+        )
+        inner = cq.Solid.makeCylinder(
+            groove_inner_radius,
+            groove_depth + 0.001,
+            cq.Vector(x, mounting_face_y - 0.0005, z),
+            cq.Vector(0, 1, 0)
+        )
+        result = result.cut(outer.cut(inner))
+
+    return cq.Workplane("XY").newObject([result])
+
+Program output:
+CadQuery skipped because complete=true.

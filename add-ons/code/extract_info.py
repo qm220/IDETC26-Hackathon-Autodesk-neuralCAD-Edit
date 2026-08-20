@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Extract CadQuery / OpenCASCADE summary, face, and edge data from a STEP file.
+"""Extract CadQuery / OpenCASCADE summary and FACE data from a STEP file.
 
 Writes a text report and eight PNG views (face-type colored, XYZ trihedron in
 the lower-left). Use --no-views to skip images.
@@ -132,19 +132,6 @@ def _surface_params(face):
     return info
 
 
-def _hash_code(obj):
-    try:
-        return int(obj.hashCode())
-    except Exception:
-        wrapped = getattr(obj, "wrapped", None)
-        if wrapped is None:
-            return None
-        try:
-            return int(wrapped.HashCode(2147483647))
-        except Exception:
-            return id(wrapped)
-
-
 def _face_info(i, face):
     rec = {
         "index": i,
@@ -161,124 +148,18 @@ def _face_info(i, face):
     return rec
 
 
-def _curve_params(edge):
-    """Line / circle / ellipse / hyperbola / parabola parameters via OCP when available."""
-    info = {}
-    try:
-        from OCP.BRepAdaptor import BRepAdaptor_Curve
-        from OCP.GeomAbs import (
-            GeomAbs_BezierCurve,
-            GeomAbs_BSplineCurve,
-            GeomAbs_Circle,
-            GeomAbs_Ellipse,
-            GeomAbs_Hyperbola,
-            GeomAbs_Line,
-            GeomAbs_Parabola,
-        )
-
-        occ = edge.wrapped if hasattr(edge, "wrapped") else edge
-        crv = BRepAdaptor_Curve(occ)
-        ct = crv.GetType()
-        if ct == GeomAbs_Line:
-            line = crv.Line()
-            loc = line.Location()
-            direc = line.Direction()
-            info["line_origin"] = [float(loc.X()), float(loc.Y()), float(loc.Z())]
-            info["line_direction"] = [float(direc.X()), float(direc.Y()), float(direc.Z())]
-        elif ct == GeomAbs_Circle:
-            circ = crv.Circle()
-            ax = circ.Axis()
-            loc = ax.Location()
-            direc = ax.Direction()
-            info["circle_radius"] = float(circ.Radius())
-            info["circle_center"] = [float(loc.X()), float(loc.Y()), float(loc.Z())]
-            info["circle_axis"] = [float(direc.X()), float(direc.Y()), float(direc.Z())]
-        elif ct == GeomAbs_Ellipse:
-            ell = crv.Ellipse()
-            ax = ell.Axis()
-            loc = ax.Location()
-            direc = ax.Direction()
-            info["ellipse_major_radius"] = float(ell.MajorRadius())
-            info["ellipse_minor_radius"] = float(ell.MinorRadius())
-            info["ellipse_center"] = [float(loc.X()), float(loc.Y()), float(loc.Z())]
-            info["ellipse_axis"] = [float(direc.X()), float(direc.Y()), float(direc.Z())]
-        elif ct == GeomAbs_Hyperbola:
-            hyp = crv.Hyperbola()
-            loc = hyp.Location()
-            info["hyperbola_major_radius"] = float(hyp.MajorRadius())
-            info["hyperbola_minor_radius"] = float(hyp.MinorRadius())
-            info["hyperbola_center"] = [float(loc.X()), float(loc.Y()), float(loc.Z())]
-        elif ct == GeomAbs_Parabola:
-            par = crv.Parabola()
-            loc = par.Location()
-            info["parabola_focal"] = float(par.Focal())
-            info["parabola_center"] = [float(loc.X()), float(loc.Y()), float(loc.Z())]
-        elif ct == GeomAbs_BSplineCurve:
-            info["bspline_degree"] = int(crv.Degree())
-            info["bspline_periodic"] = bool(crv.IsPeriodic())
-        elif ct == GeomAbs_BezierCurve:
-            info["bezier_degree"] = int(crv.Degree())
-        info["param_range"] = [float(crv.FirstParameter()), float(crv.LastParameter())]
-    except Exception as exc:
-        info["ocp_curve_error"] = str(exc)
-    return info
-
-
-def _edge_info(i, edge, adjacent_faces=None):
-    start = _xyz(_safe(edge.startPoint))
-    end = _xyz(_safe(edge.endPoint))
-    rec = {
-        "index": i,
-        "type": _geom_type(edge),
-        "length": _safe(lambda: float(edge.Length())),
-        "start": start,
-        "end": end,
-        "closed": _safe(lambda: bool(edge.Closed()), False),
-        "n_vertices": _safe(lambda: len(edge.Vertices()), 0),
-        "bbox": _bbox(edge),
-        "adjacent_faces": list(adjacent_faces or []),
-    }
-    rec.update(_curve_params(edge))
-    return rec
-
-
 def extract_shape_info(shape, input_file=None):
-    """Collect B-rep / mass-property data from a CadQuery shape."""
+    """Collect B-rep / mass-property and FACE data from a CadQuery shape."""
     shp = shape.val() if hasattr(shape, "val") else shape
 
     faces = _safe(lambda: list(shp.Faces()), []) or []
-    edges = _safe(lambda: list(shp.Edges()), []) or []
     vertices = _safe(lambda: list(shp.Vertices()), []) or []
     wires = _safe(lambda: list(shp.Wires()), []) or []
     solids = _safe(lambda: list(shp.Solids()), []) or []
     shells = _safe(lambda: list(shp.Shells()), []) or []
-
-    edge_index_by_hash = {}
-    for i, edge in enumerate(edges):
-        h = _hash_code(edge)
-        if h is not None and h not in edge_index_by_hash:
-            edge_index_by_hash[h] = i
-
-    edge_to_faces = {i: [] for i in range(len(edges))}
-    face_to_edges = []
-    for fi, face in enumerate(faces):
-        idxs = []
-        for edge in _safe(lambda f=face: list(f.Edges()), []) or []:
-            h = _hash_code(edge)
-            ei = edge_index_by_hash.get(h)
-            if ei is None:
-                continue
-            if ei not in idxs:
-                idxs.append(ei)
-            if fi not in edge_to_faces[ei]:
-                edge_to_faces[ei].append(fi)
-        face_to_edges.append(idxs)
+    n_edges = _safe(lambda: len(shp.Edges()), 0) or 0
 
     face_recs = [_face_info(i, f) for i, f in enumerate(faces)]
-    for rec, idxs in zip(face_recs, face_to_edges):
-        rec["edge_indices"] = idxs
-
-    edge_recs = [_edge_info(i, e, adjacent_faces=edge_to_faces.get(i, [])) for i, e in enumerate(edges)]
 
     info = {
         "input_file": input_file,
@@ -292,11 +173,10 @@ def extract_shape_info(shape, input_file=None):
             "shells": len(shells),
             "faces": len(faces),
             "wires": len(wires),
-            "edges": len(edges),
+            "edges": n_edges,
             "vertices": len(vertices),
         },
         "face_type_counts": dict(Counter(r["type"] for r in face_recs)),
-        "edge_type_counts": dict(Counter(r["type"] for r in edge_recs)),
         "solids": [
             {
                 "index": i,
@@ -310,7 +190,6 @@ def extract_shape_info(shape, input_file=None):
             for i, s in enumerate(solids)
         ],
         "faces": face_recs,
-        "edges": edge_recs,
     }
     return info
 
@@ -385,7 +264,6 @@ def format_info_text(info) -> str:
         f"edges={counts.get('edges')} vertices={counts.get('vertices')}"
     )
     lines.append(f"Face types: {info.get('face_type_counts')}")
-    lines.append(f"Edge types: {info.get('edge_type_counts')}")
     lines.append("")
     lines.append("=== FACE COLOR LEGEND (PNG views, not stored in STEP) ===")
     for name, rgb in FACE_TYPE_COLORS.items():
@@ -409,11 +287,6 @@ def format_info_text(info) -> str:
     lines.append("=== FACES ===")
     for rec in info.get("faces") or []:
         lines.extend(_fmt_record_lines("FACE", rec))
-
-    lines.append("")
-    lines.append("=== EDGES ===")
-    for rec in info.get("edges") or []:
-        lines.extend(_fmt_record_lines("EDGE", rec))
 
     lines.append("")
     return "\n".join(lines)
@@ -468,7 +341,7 @@ def my_cad_function(args):
 
 
 def parse_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description="Dump CadQuery face and edge information from a STEP file as text.")
+    parser = argparse.ArgumentParser(description="Dump CadQuery face information from a STEP file as text.")
     parser.add_argument("--input", required=True, help="Path to the input STEP file")
     parser.add_argument(
         "--output",

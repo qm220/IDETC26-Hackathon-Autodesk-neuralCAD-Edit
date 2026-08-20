@@ -1,0 +1,175 @@
+Thinking text:
+**Analyzing port creation**
+
+The user asked about creating ports, and I'm considering the design. The model seems to have capped circular bosses, which might actually be the desired holes. Last time, the holes appeared a bit shallow. I wonder if a Boolean operation might still be invalid if the cutter stops within solid material, but that can create a blind hole, and the body would still be valid. Should I aim for a depth of 18 or maybe 25 to reach the tank cavity? Let's focus on ensuring only valid cuts!
+
+Generated script:
+def my_cad_function(args):
+    import os
+    import cadquery as cq
+
+    input_file = os.path.expanduser(args["input_file"])
+    model = cq.importers.importStep(input_file)
+    original = model.val()
+    original_solids = list(original.Solids())
+
+    if not original_solids:
+        raise ValueError("The input STEP file contains no solids")
+
+    # Preserve the source assembly structure. The largest solid contains the
+    # radiator, tanks, shrouds, guards, and the two capped corner bosses.
+    body_index = max(
+        range(len(original_solids)),
+        key=lambda i: original_solids[i].Volume()
+    )
+    body = original_solids[body_index]
+
+    # Locations established from the canonical +X/front view: +Y is right and
+    # +Z is top. These coincide with the existing capped corner bosses.
+    targets = [
+        ("outlet", 152.4, 231.1),
+        ("inlet", -152.4, -233.7),
+    ]
+    bore_radius = 8.5
+
+    def find_cap_face(shape, y_target, z_target):
+        """Find the planar end face of the capped X-axis corner boss."""
+        candidates = []
+        for face in shape.Faces():
+            try:
+                if face.geomType() != "PLANE":
+                    continue
+                center = face.Center()
+                dy = center.y - y_target
+                dz = center.z - z_target
+                radial_error = (dy * dy + dz * dz) ** 0.5
+                if radial_error > 18.0:
+                    continue
+                normal = face.normalAt()
+                if abs(normal.x) < 0.80:
+                    continue
+                area = face.Area()
+                # Prefer a compact boss cap over a large nearby frame wall.
+                area_penalty = 0.0
+                if area < 40.0:
+                    area_penalty += (40.0 - area) * 0.05
+                if area > 1200.0:
+                    area_penalty += (area - 1200.0) * 0.02
+                score = radial_error + area_penalty
+                candidates.append((score, face, center, normal, area))
+            except Exception:
+                continue
+
+        if not candidates:
+            raise ValueError(
+                "Could not locate capped port face near Y=%.1f Z=%.1f" %
+                (y_target, z_target)
+            )
+        candidates.sort(key=lambda item: item[0])
+        return candidates[0][1:]
+
+    edited_body = body
+    port_debug = []
+
+    for role, y_target, z_target in targets:
+        cap_face, cap_center, outward, cap_area = find_cap_face(
+            edited_body, y_target, z_target
+        )
+
+        # Begin outside the selected cap and cut only inward through the local
+        # boss/tank wall. The previous full-width cutters also pierced the rear
+        # wall and intersected unrelated integrated fan geometry, producing an
+        # invalid main solid and unwanted openings on both sides.
+        outward = outward.normalized()
+        inward = cq.Vector(-outward.x, -outward.y, -outward.z)
+        start = cq.Vector(
+            cap_center.x + outward.x * 2.0,
+            y_target + outward.y * 2.0,
+            z_target + outward.z * 2.0
+        )
+
+        selected = None
+        selected_depth = None
+        # Prefer the deepest valid local bore, with shorter fallbacks for
+        # complex internal tank topology or nearby fillets.
+        for depth in (32.0, 26.0, 21.0, 17.0, 13.0):
+            cutter = cq.Solid.makeCylinder(
+                bore_radius,
+                depth + 2.0,
+                start,
+                inward
+            )
+            try:
+                candidate = edited_body.cut(cutter)
+                candidate_solids = list(candidate.Solids())
+                volume_removed = edited_body.Volume() - candidate.Volume()
+                if (candidate.isValid() and len(candidate_solids) == 1 and
+                        volume_removed > 1.0):
+                    selected = candidate
+                    selected_depth = depth
+                    break
+            except Exception:
+                continue
+
+        if selected is None:
+            raise ValueError(
+                "Unable to create a valid local %s bore at Y=%.1f Z=%.1f" %
+                (role, y_target, z_target)
+            )
+
+        edited_body = selected
+        port_debug.append((
+            role, y_target, z_target, cap_center.x, outward.x,
+            cap_area, selected_depth
+        ))
+
+    # Reassemble the edited body with every untouched discrete blade and
+    # fitting. No assembly-wide fuse or cut is performed.
+    result_shapes = []
+    for index, solid in enumerate(original_solids):
+        if index == body_index:
+            result_shapes.extend(list(edited_body.Solids()))
+        else:
+            result_shapes.append(solid)
+
+    result_shape = cq.Compound.makeCompound(result_shapes)
+    result = cq.Workplane(obj=result_shape)
+
+    print("INPUT: solids=%d main_body_index=%d body_valid=%s" % (
+        len(original_solids), body_index, body.isValid()
+    ))
+    for data in port_debug:
+        print(
+            "%s port: Y=%.1f Z=%.1f cap_x=%.3f outward_x=%.3f "
+            "cap_area=%.3f bore_radius=%.1f depth=%.1f" % data
+        )
+    print("EDITED BODY: valid=%s solids=%d volume=%.3f" % (
+        edited_body.isValid(), len(edited_body.Solids()), edited_body.Volume()
+    ))
+    print("RESULT: valid=%s children_valid=%d/%d solids=%d faces=%d" % (
+        result_shape.isValid(),
+        sum(1 for shape in result_shapes if shape.isValid()),
+        len(result_shapes),
+        len(result_shape.Solids()),
+        len(result_shape.Faces())
+    ))
+
+    return result
+
+Program output:
+stdout: Loading function from: /home/adml/Research/Hackathon2026/IDETC26-Hackathon-Autodesk-neuralCAD-Edit/output/gpt-5.6-ontologies/gpt-5.6-sol-ontologies_cadquery-script_1787171846.485535/brep_end/1787171846.485535/temp_script.py
+Error executing LLM-provided function: Could not locate capped port face near Y=152.4 Z=231.1
+No CadQuery result returned; skipped STEP/STL/image export.
+Script completed.
+
+stderr: Traceback (most recent call last):
+  File "/home/adml/Research/Hackathon2026/IDETC26-Hackathon-Autodesk-neuralCAD-Edit/src/harnesses/cadquery_script.py", line 158, in load_and_execute_function
+    return my_cad_function(args)
+           ^^^^^^^^^^^^^^^^^^^^^
+  File "<string>", line 69, in my_cad_function
+  File "<string>", line 58, in find_cap_face
+ValueError: Could not locate capped port face near Y=152.4 Z=231.1
+
+
+Exported this iteration:
+tmp.step, tmp.stl, tmp_+Z.png, tmp_-Z.png, tmp_-X.png, tmp_+X.png, tmp_+Y.png, tmp_-Y.png, tmp_iso1.png, tmp_iso2.png

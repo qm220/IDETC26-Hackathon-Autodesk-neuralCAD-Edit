@@ -1,0 +1,234 @@
+Thinking text:
+**Exploring circle geometry**
+
+I'm considering how to define the edges of a circle. The center might play a role here, so I'm wondering if using the term "CenterOfMass" could help identify the center of the curve. It seems like there's a connection between the edges and the center that could lead to more clarity in geometrical concepts. Let's take a closer look at how this all relates to defining those edges more precisely!
+
+Generated script:
+def my_cad_function(args):
+    input_file = os.path.expanduser(args["input_file"])
+    imported = cq.importers.importStep(input_file)
+    root = imported.val() if hasattr(imported, "val") else imported
+    solids = list(root.Solids())
+
+    print(f"Loaded STEP: {input_file}")
+    print(f"Root valid={root.isValid()}, solids={len(solids)}, faces={len(root.Faces())}")
+
+    # Bind R04 / SOLID 3 to geometry rather than relying on STEP solid ordering.
+    # The heat break is the slender solid centered near (0,-40), with z≈0.4..21.
+    target_index = None
+    best_score = 1.0e99
+    for i, solid in enumerate(solids):
+        bb = solid.BoundingBox()
+        c = bb.center
+        print(
+            f"SOLID {i}: center=({c.x:.4f},{c.y:.4f},{c.z:.4f}) "
+            f"bbox=({bb.xmin:.4f},{bb.ymin:.4f},{bb.zmin:.4f}).."
+            f"({bb.xmax:.4f},{bb.ymax:.4f},{bb.zmax:.4f}) "
+            f"size=({bb.xlen:.4f},{bb.ylen:.4f},{bb.zlen:.4f})"
+        )
+        score = (
+            (c.x - 0.0) ** 2
+            + (c.y + 40.0) ** 2
+            + 0.2 * (c.z - 10.7) ** 2
+            + 20.0 * abs(bb.zlen - 20.6)
+        )
+        if bb.xlen < 10.0 and bb.ylen < 10.0 and 18.0 < bb.zlen < 24.0 and score < best_score:
+            best_score = score
+            target_index = i
+
+    if target_index is None:
+        raise RuntimeError("Could not geometrically identify the R04 tubular heat-break solid")
+
+    heatbreak = solids[target_index]
+    print(f"Bound R04 tubular heat break to actual solid index {target_index}")
+
+    # Inspect and bind F014 / planned FACE 749 by its actual geometry.
+    sleeve_face = None
+    sleeve_score = 1.0e99
+    for i, face in enumerate(heatbreak.Faces()):
+        bb = face.BoundingBox()
+        c = bb.center
+        gt = face.geomType()
+        print(
+            f"R04 FACE {i}: type={gt}, area={face.Area():.6f}, "
+            f"center=({c.x:.4f},{c.y:.4f},{c.z:.4f}), "
+            f"bbox=({bb.xmin:.4f},{bb.ymin:.4f},{bb.zmin:.4f}).."
+            f"({bb.xmax:.4f},{bb.ymax:.4f},{bb.zmax:.4f})"
+        )
+        if gt == "CYLINDER":
+            # Expected main sleeve: radius 3.45, z=7.5..20.8, axis along Z.
+            radius_est = 0.25 * (bb.xlen + bb.ylen)
+            score = (
+                20.0 * abs(radius_est - 3.45)
+                + abs(bb.zmin - 7.5)
+                + abs(bb.zmax - 20.8)
+                + abs(c.x)
+                + abs(c.y + 40.0)
+            )
+            if bb.zlen > 10.0 and score < sleeve_score:
+                sleeve_score = score
+                sleeve_face = face
+
+    if sleeve_face is None:
+        raise RuntimeError("Could not bind F014 main radius-3.45 outer sleeve face")
+
+    sbb = sleeve_face.BoundingBox()
+    sleeve_radius = 0.25 * (sbb.xlen + sbb.ylen)
+    lower_z = sbb.zmin
+    upper_z = sbb.zmax
+    print(
+        f"Bound F014 main sleeve: estimated radius={sleeve_radius:.6f}, "
+        f"z={lower_z:.6f}..{upper_z:.6f}"
+    )
+
+    # Derive the requested lower circular edge directly from the grounded face.
+    lower_edge = None
+    lower_edge_score = 1.0e99
+    for i, edge in enumerate(sleeve_face.Edges()):
+        bb = edge.BoundingBox()
+        c = bb.center
+        gt = edge.geomType()
+        radius_est = 0.25 * (bb.xlen + bb.ylen)
+        print(
+            f"F014 boundary EDGE {i}: type={gt}, center=({c.x:.4f},{c.y:.4f},{c.z:.4f}), "
+            f"radius_est={radius_est:.6f}, z={bb.zmin:.6f}..{bb.zmax:.6f}"
+        )
+        if gt == "CIRCLE":
+            score = (
+                100.0 * abs(c.z - lower_z)
+                + 20.0 * abs(radius_est - sleeve_radius)
+                + abs(c.x)
+                + abs(c.y + 40.0)
+            )
+            if score < lower_edge_score:
+                lower_edge_score = score
+                lower_edge = edge
+
+    if lower_edge is None:
+        raise RuntimeError("Could not derive the lower circular boundary of F014")
+
+    ebb = lower_edge.BoundingBox()
+    print(
+        f"Selected lower sleeve edge at z={ebb.center.z:.6f}, "
+        f"diameter≈{0.5 * (ebb.xlen + ebb.ylen):.6f}"
+    )
+
+    # Measure the existing upper chamfer. The main cylinder ends at z≈20.8 and
+    # the upper annular seat is at z=21 with outer radius≈3.25, giving equal
+    # axial and radial setbacks of 0.2 mm. Determine these values from geometry.
+    top_plane_z = None
+    top_outer_radius = None
+    for face in heatbreak.Faces():
+        bb = face.BoundingBox()
+        if face.geomType() == "PLANE" and abs(bb.zlen) < 1.0e-5 and bb.zmin > upper_z - 1.0e-6:
+            radius_est = 0.25 * (bb.xlen + bb.ylen)
+            if radius_est > 2.5 and radius_est <= sleeve_radius + 0.1:
+                if top_plane_z is None or bb.zmin < top_plane_z:
+                    top_plane_z = bb.zmin
+                    top_outer_radius = radius_est
+
+    if top_plane_z is None:
+        # Grounded STEP observations provide z=21 and radius=3.25.
+        top_plane_z = 21.0
+        top_outer_radius = 3.25
+
+    axial_setback = abs(top_plane_z - upper_z)
+    radial_setback = abs(sleeve_radius - top_outer_radius)
+    chamfer_size = 0.5 * (axial_setback + radial_setback)
+    if not (0.05 <= chamfer_size <= 0.75):
+        chamfer_size = 0.2
+
+    print(
+        f"Existing top chamfer measurement: axial={axial_setback:.6f}, "
+        f"radial={radial_setback:.6f}; applying equal-distance chamfer "
+        f"size={chamfer_size:.6f} mm"
+    )
+
+    # Apply the matching chamfer only to the lower edge of the main sleeve.
+    edited_wp = cq.Workplane(obj=heatbreak).newObject([lower_edge]).chamfer(chamfer_size)
+    edited_heatbreak = edited_wp.val()
+    if not edited_heatbreak.isValid():
+        raise RuntimeError("Chamfer operation produced an invalid heat-break solid")
+
+    # Preserve all eight unrelated solids exactly and replace only R04.
+    output_solids = []
+    for i, solid in enumerate(solids):
+        output_solids.append(edited_heatbreak if i == target_index else solid)
+    result = cq.Compound.makeCompound(output_solids)
+
+    print(
+        f"Chamfer complete. Output solids={len(result.Solids())}, "
+        f"valid={result.isValid()}; only R04 was modified."
+    )
+    return cq.Workplane(obj=result)
+
+Program output:
+stdout: Loading function from: /home/adml/Research/Hackathon2026/IDETC26-Hackathon-Autodesk-neuralCAD-Edit/output/gpt-5.6-sol-ontology-full48/gpt-5.6-sol-ontology_cadquery-script_1787128297.1926386/brep_end/1787128297.1926386/temp_script.py
+Loaded STEP: /home/adml/Research/Hackathon2026/IDETC26-Hackathon-Autodesk-neuralCAD-Edit/data/edit_192_external/breps/B7A2N74ZJBF9MZHU_1770169581.2959814.step
+Root valid=True, solids=9, faces=1278
+SOLID 0: center=(-40.0000,-10.5000,12.5000) bbox=(-55.0000,-21.0000,-0.0000)..(-25.0000,0.0000,25.0000) size=(30.0000,21.0000,25.0000)
+SOLID 1: center=(40.0000,-9.0000,15.0000) bbox=(24.0000,-18.0000,-0.0000)..(56.0000,0.0000,30.0000) size=(32.0000,18.0000,30.0000)
+SOLID 2: center=(-40.0000,-39.0000,0.7500) bbox=(-57.0000,-48.0000,-6.0000)..(-23.0000,-30.0000,7.5000) size=(34.0000,18.0000,13.5000)
+SOLID 3: center=(0.0000,-40.0000,10.7000) bbox=(-3.4500,-43.4500,0.4000)..(3.4500,-36.5500,21.0000) size=(6.9000,6.9000,20.6000)
+SOLID 4: center=(-3.5000,0.0000,5.7500) bbox=(-15.0000,-8.0000,-0.0000)..(8.0000,8.0000,11.5000) size=(23.0000,16.0000,11.5000)
+SOLID 5: center=(36.5000,-40.0000,10.0000) bbox=(24.5000,-45.7500,-0.0000)..(48.5000,-34.2500,20.0000) size=(24.0000,11.5000,20.0000)
+SOLID 6: center=(-40.0000,-60.0000,4.1000) bbox=(-43.0000,-63.4641,0.2000)..(-37.0000,-56.5359,8.0000) size=(6.0000,6.9282,7.8000)
+SOLID 7: center=(0.0000,-60.0000,6.2500) bbox=(-3.5000,-64.0415,-0.0000)..(3.5000,-55.9585,12.5000) size=(7.0000,8.0829,12.5000)
+SOLID 8: center=(40.0000,-60.0000,10.5000) bbox=(36.5000,-64.0415,-0.0000)..(43.5000,-55.9585,21.0000) size=(7.0000,8.0829,21.0000)
+Bound R04 tubular heat break to actual solid index 3
+R04 FACE 0: type=CYLINDER, area=1.011504, center=(0.0017,-38.5287,2.1500), bbox=(-2.9420,-40.0000,1.9000)..(2.9455,-37.0574,2.4000)
+R04 FACE 1: type=CYLINDER, area=2.310982, center=(-0.0021,-40.0013,2.8375), bbox=(-2.9422,-42.9466,2.2750)..(2.9380,-37.0561,3.4000)
+R04 FACE 2: type=CYLINDER, area=1.526010, center=(-0.0110,-41.1843,4.0767), bbox=(-2.3720,-42.3687,3.7292)..(2.3500,-40.0000,4.4242)
+R04 FACE 3: type=CYLINDER, area=3.214633, center=(0.0016,-40.0009,3.3267), bbox=(-2.3719,-42.3751,2.7292)..(2.3751,-37.6268,3.9242)
+R04 FACE 4: type=CYLINDER, area=3.008509, center=(0.0014,-40.0011,2.4229), bbox=(-2.3718,-42.3754,1.9000)..(2.3746,-37.6267,2.9458)
+R04 FACE 5: type=CONE, area=1.954868, center=(0.0000,-40.0000,0.5000), bbox=(-1.2000,-41.2000,0.4000)..(1.2000,-38.8000,0.6000)
+R04 FACE 6: type=CYLINDER, area=99.080154, center=(0.0000,-40.0000,8.4845), bbox=(-1.0000,-41.0000,0.6000)..(1.0000,-39.0000,16.3691)
+R04 FACE 7: type=PLANE, area=12.825552, center=(0.0000,-40.0000,0.4000), bbox=(-2.3500,-42.3500,0.4000)..(2.3500,-37.6500,0.4000)
+R04 FACE 8: type=CONE, area=3.820879, center=(0.0000,-40.0000,20.9000), bbox=(-2.2500,-42.2500,20.8000)..(2.2500,-37.7500,21.0000)
+R04 FACE 9: type=PLANE, area=17.278760, center=(0.0000,-40.0000,21.0000), bbox=(-3.2500,-43.2500,21.0000)..(3.2500,-36.7500,21.0000)
+R04 FACE 10: type=CYLINDER, area=48.946014, center=(0.0000,-40.0000,18.9000), bbox=(-2.0500,-42.0500,17.0000)..(2.0500,-37.9500,20.8000)
+R04 FACE 11: type=CONE, area=5.953463, center=(0.0000,-40.0000,20.9000), bbox=(-3.4500,-43.4500,20.8000)..(3.4500,-36.5500,21.0000)
+R04 FACE 12: type=CYLINDER, area=288.303958, center=(0.0000,-40.0000,14.1500), bbox=(-3.4500,-43.4500,7.5000)..(3.4500,-36.5500,20.8000)
+R04 FACE 13: type=PLANE, area=1.277439, center=(2.6443,-39.8630,3.9000), bbox=(2.3465,-41.4959,3.9000)..(2.9420,-38.2300,3.9000)
+R04 FACE 14: type=PLANE, area=3.053297, center=(2.3500,-40.0000,4.6500), bbox=(2.3500,-41.7700,3.9000)..(2.3500,-38.2300,5.4000)
+R04 FACE 15: type=PLANE, area=0.009302, center=(-2.3609,-40.0000,3.9000), bbox=(-2.3718,-40.3205,3.9000)..(-2.3500,-39.6795,3.9000)
+R04 FACE 16: type=PLANE, area=3.387985, center=(-2.3499,-40.0000,4.6500), bbox=(-2.3500,-41.7700,3.9000)..(-2.3497,-38.2300,5.4000)
+R04 FACE 17: type=CYLINDER, area=1.469826, center=(0.0000,-41.3447,5.0754), bbox=(-2.3500,-42.3690,4.7508)..(2.3500,-40.3205,5.4000)
+R04 FACE 18: type=CYLINDER, area=0.165799, center=(1.7413,-38.7978,5.3254), bbox=(1.1326,-39.6795,5.2508)..(2.3500,-37.9160,5.4000)
+R04 FACE 19: type=CYLINDER, area=0.015664, center=(-2.3231,-39.6632,1.9229), bbox=(-2.3718,-40.0000,1.9000)..(-2.2744,-39.3264,1.9458)
+R04 FACE 20: type=CYLINDER, area=1.474188, center=(-0.0000,-38.6559,4.5875), bbox=(-2.3500,-39.6795,4.2508)..(2.3500,-37.6322,4.9242)
+R04 FACE 21: type=BSPLINE, area=2.303088, center=(-0.0378,-41.5281,5.1837), bbox=(-2.3500,-42.7358,4.9673)..(2.2744,-40.3205,5.4000)
+R04 FACE 22: type=BSPLINE, area=23.571473, center=(0.0021,-40.0013,3.0361), bbox=(-2.9421,-42.9466,1.9000)..(2.9462,-37.0561,4.1723)
+R04 FACE 23: type=BSPLINE, area=3.864137, center=(-0.0000,-41.6288,4.3198), bbox=(-2.3500,-42.9371,3.9673)..(2.3500,-40.3205,4.6723)
+R04 FACE 24: type=BSPLINE, area=3.864151, center=(0.0000,-38.3712,4.8198), bbox=(-2.3500,-39.6795,4.4673)..(2.3500,-37.0629,5.1723)
+R04 FACE 25: type=CYLINDER, area=0.004576, center=(-2.2147,-41.9250,5.3889), bbox=(-2.3500,-42.0803,5.3777)..(-2.0794,-41.7696,5.4000)
+R04 FACE 26: type=CYLINDER, area=0.680528, center=(0.0000,-42.3532,4.5875), bbox=(-2.3500,-42.9371,4.3777)..(2.3500,-41.7693,4.7973)
+R04 FACE 27: type=CYLINDER, area=1.974948, center=(0.0019,-40.0009,3.7861), bbox=(-2.9423,-42.9390,3.2750)..(2.9462,-37.0629,4.2973)
+R04 FACE 28: type=BSPLINE, area=3.867572, center=(0.0000,-41.6288,4.8552), bbox=(-2.3500,-42.9371,4.5027)..(2.3500,-40.3205,5.2077)
+R04 FACE 29: type=BSPLINE, area=23.110070, center=(0.0016,-40.0012,3.0538), bbox=(-2.9423,-42.9462,1.9000)..(2.9455,-37.0562,4.2077)
+R04 FACE 30: type=BSPLINE, area=3.867552, center=(-0.0000,-38.3712,4.3552), bbox=(-2.3500,-39.6795,4.0027)..(2.3500,-37.0629,4.7077)
+R04 FACE 31: type=BSPLINE, area=2.767789, center=(-0.0000,-38.3689,5.2014), bbox=(-2.3500,-39.6795,5.0027)..(2.3500,-37.0583,5.4000)
+R04 FACE 32: type=PLANE, area=13.750581, center=(0.0000,-40.1054,5.4000), bbox=(-2.3500,-42.7358,5.4000)..(2.3500,-37.4750,5.4000)
+R04 FACE 33: type=CYLINDER, area=19.462166, center=(0.0000,-40.0000,6.4500), bbox=(-1.4750,-41.4750,5.4000)..(1.4750,-38.5250,7.5000)
+R04 FACE 34: type=PLANE, area=30.557879, center=(0.0000,-40.0000,7.5000), bbox=(-3.4500,-43.4500,7.5000)..(3.4500,-36.5500,7.5000)
+R04 FACE 35: type=CONE, area=11.737441, center=(-0.0000,-40.0000,16.6845), bbox=(-2.0500,-42.0500,16.3691)..(2.0500,-37.9500,17.0000)
+R04 FACE 36: type=CYLINDER, area=22.148228, center=(0.0000,-40.0000,1.1500), bbox=(-2.3500,-42.3500,0.4000)..(2.3500,-37.6500,1.9000)
+R04 FACE 37: type=PLANE, area=4.513175, center=(0.2869,-39.8913,1.9000), bbox=(-2.3718,-42.5201,1.9000)..(2.9455,-37.2626,1.9000)
+R04 FACE 38: type=CYLINDER, area=0.680309, center=(0.0000,-37.6445,5.0875), bbox=(-2.3500,-38.2307,4.8777)..(2.3500,-37.0583,5.2973)
+Bound F014 main sleeve: estimated radius=3.450000, z=7.500000..20.800000
+F014 boundary EDGE 0: type=CIRCLE, center=(0.0000,-38.2750,20.8000), radius_est=2.587500, z=20.800000..20.800000
+F014 boundary EDGE 1: type=CIRCLE, center=(0.0000,-41.7250,20.8000), radius_est=2.587500, z=20.800000..20.800000
+F014 boundary EDGE 2: type=LINE, center=(-3.4500,-40.0000,14.1500), radius_est=0.000000, z=7.500000..20.800000
+F014 boundary EDGE 3: type=CIRCLE, center=(0.0000,-40.0000,7.5000), radius_est=3.450000, z=7.500000..7.500000
+Selected lower sleeve edge at z=7.500000, diameter≈6.900000
+Existing top chamfer measurement: axial=0.200000, radial=0.200000; applying equal-distance chamfer size=0.200000 mm
+Chamfer complete. Output solids=9, valid=True; only R04 was modified.
+Exported shape to: /home/adml/Research/Hackathon2026/IDETC26-Hackathon-Autodesk-neuralCAD-Edit/output/gpt-5.6-sol-ontology-full48/gpt-5.6-sol-ontology_cadquery-script_1787128297.1926386/brep_end/1787128297.1926386/tmp.step
+Exported STL to: /home/adml/Research/Hackathon2026/IDETC26-Hackathon-Autodesk-neuralCAD-Edit/output/gpt-5.6-sol-ontology-full48/gpt-5.6-sol-ontology_cadquery-script_1787128297.1926386/brep_end/1787128297.1926386/tmp.stl
+Exported PNG image to: /home/adml/Research/Hackathon2026/IDETC26-Hackathon-Autodesk-neuralCAD-Edit/output/gpt-5.6-sol-ontology-full48/gpt-5.6-sol-ontology_cadquery-script_1787128297.1926386/brep_end/1787128297.1926386/tmp.png
+Script completed.
+
+stderr: 
+
+Exported this iteration:
+tmp.step, tmp.stl, tmp.png, tmp_+Z.png, tmp_-Z.png, tmp_-X.png, tmp_+X.png, tmp_+Y.png, tmp_-Y.png, tmp_iso1.png, tmp_iso2.png

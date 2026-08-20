@@ -1,0 +1,34 @@
+def my_cad_function(args):
+    input_file = os.path.expanduser(args["input_file"])
+    imported = cq.importers.importStep(input_file)
+    base = imported.val().Solids()[0]
+
+    faces = base.Faces()
+    target_face = faces[32]
+    target_bb = target_face.BoundingBox()
+
+    surface_x = 0.5 * (target_bb.xmin + target_bb.xmax)
+    center_y = 0.5 * (target_bb.ymin + target_bb.ymax)
+    center_z = 0.5 * (target_bb.zmin + target_bb.zmax)
+
+    outer_radius = 20.0
+    hole_radius = 10.0
+    thickness = 30.0
+    overlap = 0.5
+
+    origin = cq.Vector(
+        surface_x - outer_radius + overlap,
+        center_y - thickness / 2.0,
+        center_z
+    )
+    axis = cq.Vector(0.0, 1.0, 0.0)
+
+    outer = cq.Solid.makeCylinder(outer_radius, thickness, origin, axis)
+    hole = cq.Solid.makeCylinder(hole_radius, thickness, origin, axis)
+    rope_eye = outer.cut(hole)
+    result = base.fuse(rope_eye)
+
+    if not result.isValid() or len(result.Solids()) != 1:
+        raise ValueError("Failed to create a valid fused rope attachment")
+
+    return cq.Workplane(obj=result)

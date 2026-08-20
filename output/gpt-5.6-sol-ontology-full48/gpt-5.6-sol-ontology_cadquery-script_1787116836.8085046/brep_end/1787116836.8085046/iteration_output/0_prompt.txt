@@ -1,0 +1,1178 @@
+The planning stage produced model.json (hierarchical part → sections → features
+→ B-rep faces), aim.json (desired final state from the edit request), and
+operation.json (grounded edit operations, parameters, constraints, targets,
+and modeling plans). Use those artifacts when writing my_cad_function.
+
+Section ids look like R01. Feature ids look like F001. FACE N values are
+CadQuery Faces() indices from the STEP analysis. Bind them to actual STEP
+geometry by inspecting the loaded model (print faces and coordinates) before
+editing. If an operation needs boundary topology such as a chamfer or fillet
+edge, derive it in CadQuery from the grounded face(s).
+
+Implement each operation's modeling_plan steps. Load the start model from
+args["input_file"].
+
+model.json from the planning stage:
+
+{
+  "part": {
+    "id": "P01",
+    "name": "Computer mouse housing with scroll wheel",
+    "description": "Two-solid mechanical model interpreted as an ergonomic computer mouse exterior. SOLID 0 forms the contoured housing, lower support surface, and an integrated central wheel-support pedestal. SOLID 1 is a separate lenticular scroll wheel positioned at the longitudinal centerline. The computer-mouse interpretation is semantic and based on the combined rendered appearance and B-rep geometry.",
+    "source_views": [
+      "+X",
+      "-X",
+      "+Y",
+      "-Y",
+      "+Z",
+      "-Z",
+      "iso1"
+    ],
+    "solid_ids": [
+      "SOLID 0",
+      "SOLID 1"
+    ],
+    "symmetry_note": "The housing is approximately bilaterally symmetric about a longitudinal vertical plane through the central scroll wheel. The separate wheel is approximately rotationally symmetric about an axis predominantly parallel to the CAD X direction, with a small Z-direction inclination evident from its planar face normals. No repeated hole or fastener pattern is present.",
+    "semantic_orientation": {
+      "status": "inferred",
+      "description": "The narrow, low-profile end at negative CAD Z is interpreted as the mouse front, while the broader and higher end at positive CAD Z is interpreted as the rear/palm end. Positive CAD Y corresponds to the upper operating side and negative CAD Y to the underside. CAD X spans the lateral width.",
+      "confidence": 0.88,
+      "view_sides": {
+        "+X": "right",
+        "-X": "left",
+        "+Y": "top",
+        "-Y": "bottom",
+        "+Z": "back",
+        "-Z": "front"
+      }
+    },
+    "sections": [
+      {
+        "id": "R01",
+        "name": "Ergonomic housing and wheel support",
+        "ontology_class": "cad:MainBodySection",
+        "description": "The dominant contoured body represented by SOLID 0. It includes the exterior housing surfaces, a lower support surface, and an integrated planar-sided pedestal or cradle beneath the scroll wheel.",
+        "location": "Surrounds the mouse interior and extends from the narrow front end to the raised rear palm region; the wheel-support feature lies near the longitudinal centerline.",
+        "solid_ids": [
+          "SOLID 0"
+        ],
+        "colour": {
+          "R": 55,
+          "G": 105,
+          "B": 190
+        },
+        "section_functions": [
+          {
+            "ontology_class": "cad:ProtectFunction",
+            "name": "Protect enclosed mechanisms",
+            "description": "Provides the exterior enclosure around the inferred internal mouse mechanisms.",
+            "primary": true,
+            "confidence": 0.92
+          },
+          {
+            "ontology_class": "cad:SupportFunction",
+            "name": "Support operating loads",
+            "description": "Supports hand contact and transfers wheel-support and resting loads through the body.",
+            "primary": false,
+            "confidence": 0.86
+          },
+          {
+            "ontology_class": "cad:LocateFunction",
+            "name": "Locate the scroll wheel",
+            "description": "The integrated central pedestal establishes the position of the separate wheel relative to the housing.",
+            "primary": false,
+            "confidence": 0.79
+          }
+        ],
+        "section_behaviors": [
+          {
+            "ontology_class": "cad:ResistBendingBehavior",
+            "name": "Resist housing bending",
+            "description": "The broad curved shell carries distributed hand loads while maintaining the exterior form.",
+            "confidence": 0.84
+          },
+          {
+            "ontology_class": "cad:SpreadLoadBehavior",
+            "name": "Spread contact loads",
+            "description": "The contoured shell distributes localized hand and support reactions over the housing.",
+            "confidence": 0.83
+          }
+        ],
+        "feature_groups": [],
+        "features": [
+          {
+            "id": "F001",
+            "name": "Contoured outer housing shell",
+            "ontology_class": "cad:ShellFeature",
+            "parent_feature_id": null,
+            "description": "Large freeform exterior shell surfaces defining the top, front, rear, and lateral sides of the mouse body.",
+            "interface_type": null,
+            "feature_functions": [
+              {
+                "ontology_class": "cad:ProtectFunction",
+                "name": "Enclose and protect",
+                "description": "Forms the main protective exterior around the inferred internal mechanisms.",
+                "primary": true,
+                "confidence": 0.94
+              },
+              {
+                "ontology_class": "cad:SupportFunction",
+                "name": "Support hand contact",
+                "description": "Provides a broad ergonomic surface for external hand loading.",
+                "primary": false,
+                "confidence": 0.91
+              }
+            ],
+            "feature_behaviors": [
+              {
+                "ontology_class": "cad:ResistBendingBehavior",
+                "name": "Resist shell bending",
+                "description": "The curved freeform surfaces provide bending stiffness under distributed external loads.",
+                "confidence": 0.85
+              },
+              {
+                "ontology_class": "cad:SpreadLoadBehavior",
+                "name": "Distribute surface pressure",
+                "description": "The broad compound curvature spreads hand-contact pressure across the housing.",
+                "confidence": 0.86
+              }
+            ],
+            "relationships": [
+              {
+                "target_feature_id": "F002",
+                "category": "cad:StructuralFeatureRelationship",
+                "relation": "cad:attachedTo",
+                "description": "The lower support surface is an integral boundary of the housing body.",
+                "confidence": 0.98
+              },
+              {
+                "target_feature_id": "F003",
+                "category": "cad:StructuralFeatureRelationship",
+                "relation": "cad:attachedTo",
+                "description": "The wheel-support pedestal is integral with SOLID 0 and attached to the surrounding housing.",
+                "confidence": 0.96
+              },
+              {
+                "target_feature_id": "F004",
+                "category": "cad:GeometricFeatureRelationship",
+                "relation": "cad:surroundsFeature",
+                "description": "The housing surrounds the lower portion of the centrally positioned scroll wheel while allowing the wheel to protrude through the operating side.",
+                "confidence": 0.78
+              }
+            ],
+            "brep_faces": [
+              {
+                "brep_id": "FACE 5",
+                "face_code": "FACE 5",
+                "entity_type": "cad:Face",
+                "geometry_type": "cad:BSplineSurface",
+                "semantic_role": "cad:OuterWallRole",
+                "name": "Rear upper housing wall",
+                "description": "Freeform outer surface at the raised rear end of the housing.",
+                "salience": "cad:PrimarySalience",
+                "confidence": 0.89,
+                "evidence": [
+                  "CadQuery type BSPLINE",
+                  "Area 1192.845683 mm^2",
+                  "Bounding box z=68.751940 to 77.619310 mm",
+                  "Visual correspondence with the raised rear housing end"
+                ]
+              },
+              {
+                "brep_id": "FACE 6",
+                "face_code": "FACE 6",
+                "entity_type": "cad:Face",
+                "geometry_type": "cad:BSplineSurface",
+                "semantic_role": "cad:OuterWallRole",
+                "name": "Upper ergonomic housing surface",
+                "description": "Largest upper freeform surface, including a secondary wire around the central wheel-support region.",
+                "salience": "cad:PrimarySalience",
+                "confidence": 0.97,
+                "evidence": [
+                  "CadQuery type BSPLINE",
+                  "Area 4692.218538 mm^2",
+                  "Two wires and eight edges",
+                  "Bounding box y=13.053631 to 34.059328 mm",
+                  "Normal predominantly positive Y",
+                  "Dominant upper surface in the rendered views"
+                ]
+              },
+              {
+                "brep_id": "FACE 7",
+                "face_code": "FACE 7",
+                "entity_type": "cad:Face",
+                "geometry_type": "cad:BSplineSurface",
+                "semantic_role": "cad:SideWallRole",
+                "name": "Negative-X lateral housing wall",
+                "description": "Freeform lateral wall on the negative-X side of the housing.",
+                "salience": "cad:PrimarySalience",
+                "confidence": 0.96,
+                "evidence": [
+                  "CadQuery type BSPLINE",
+                  "Area 2421.918724 mm^2",
+                  "Bounding box x=-5.889907 to 4.859100 mm",
+                  "Normal predominantly negative X",
+                  "Visual correspondence with one long side of the housing"
+                ]
+              },
+              {
+                "brep_id": "FACE 8",
+                "face_code": "FACE 8",
+                "entity_type": "cad:Face",
+                "geometry_type": "cad:BSplineSurface",
+                "semantic_role": "cad:OuterWallRole",
+                "name": "Front housing wall",
+                "description": "Freeform outer surface closing the narrow, low-profile front end.",
+                "salience": "cad:PrimarySalience",
+                "confidence": 0.9,
+                "evidence": [
+                  "CadQuery type BSPLINE",
+                  "Area 1650.525115 mm^2",
+                  "Bounding box z=-24.899423 to -5.506403 mm",
+                  "Normal has dominant negative Z component",
+                  "Visual correspondence with the tapered front end"
+                ]
+              },
+              {
+                "brep_id": "FACE 10",
+                "face_code": "FACE 10",
+                "entity_type": "cad:Face",
+                "geometry_type": "cad:BSplineSurface",
+                "semantic_role": "cad:SideWallRole",
+                "name": "Positive-X lateral housing wall",
+                "description": "Freeform lateral wall on the positive-X side of the housing.",
+                "salience": "cad:PrimarySalience",
+                "confidence": 0.96,
+                "evidence": [
+                  "CadQuery type BSPLINE",
+                  "Area 2421.939887 mm^2",
+                  "Bounding box x=48.844956 to 59.654953 mm",
+                  "Normal predominantly positive X",
+                  "Geometric counterpart to FACE 7"
+                ]
+              }
+            ],
+            "confidence": 0.95
+          },
+          {
+            "id": "F002",
+            "name": "Lower housing support surface",
+            "ontology_class": "cad:WallFeature",
+            "parent_feature_id": null,
+            "description": "Broad freeform underside boundary of the housing, interpreted as the principal external support and resting surface.",
+            "interface_type": "cad:SeatingInterface",
+            "feature_functions": [
+              {
+                "ontology_class": "cad:SupportFunction",
+                "name": "Support the housing",
+                "description": "Provides the underside through which the housing reacts external resting and handling loads.",
+                "primary": true,
+                "confidence": 0.9
+              }
+            ],
+            "feature_behaviors": [
+              {
+                "ontology_class": "cad:ReactContactLoadBehavior",
+                "name": "React underside contact",
+                "description": "Reacts distributed contact loads applied to the lower surface.",
+                "confidence": 0.82
+              }
+            ],
+            "relationships": [
+              {
+                "target_feature_id": "F001",
+                "category": "cad:StructuralFeatureRelationship",
+                "relation": "cad:attachedTo",
+                "description": "The underside blends into and closes the surrounding exterior shell.",
+                "confidence": 0.98
+              }
+            ],
+            "brep_faces": [
+              {
+                "brep_id": "FACE 9",
+                "face_code": "FACE 9",
+                "entity_type": "cad:Face",
+                "geometry_type": "cad:BSplineSurface",
+                "semantic_role": "cad:SupportFaceRole",
+                "name": "Housing underside",
+                "description": "Broad lower freeform face with a normal predominantly in the negative CAD Y direction.",
+                "salience": "cad:PrimarySalience",
+                "confidence": 0.96,
+                "evidence": [
+                  "CadQuery type BSPLINE",
+                  "Area 3629.769288 mm^2",
+                  "Bounding box y=2.159763 to 3.295713 mm",
+                  "Normal approximately (0.002117,-0.999998,0.000004)",
+                  "Rendered underside correspondence"
+                ]
+              }
+            ],
+            "confidence": 0.91
+          },
+          {
+            "id": "F003",
+            "name": "Integrated scroll-wheel support pedestal",
+            "ontology_class": "cad:CradleFeature",
+            "parent_feature_id": null,
+            "description": "Five-faced planar support feature integrated into SOLID 0 beneath and around the separate scroll wheel. Its long direction is CAD Y, and its lateral planar walls are nearly normal to CAD X.",
+            "interface_type": "cad:MountingInterface",
+            "feature_functions": [
+              {
+                "ontology_class": "cad:SupportFunction",
+                "name": "Support scroll wheel",
+                "description": "Provides structural support beneath the separate wheel component.",
+                "primary": true,
+                "confidence": 0.85
+              },
+              {
+                "ontology_class": "cad:LocateFunction",
+                "name": "Locate scroll wheel",
+                "description": "Establishes the wheel position near the housing centerline.",
+                "primary": false,
+                "confidence": 0.82
+              },
+              {
+                "ontology_class": "cad:ConstrainMotionFunction",
+                "name": "Constrain non-rotational motion",
+                "description": "Is inferred to restrain wheel translation while permitting intended rotation.",
+                "primary": false,
+                "confidence": 0.75
+              }
+            ],
+            "feature_behaviors": [
+              {
+                "ontology_class": "cad:ReactBearingLoadBehavior",
+                "name": "React wheel loads",
+                "description": "Transfers loads from the wheel region into the main housing.",
+                "confidence": 0.77
+              },
+              {
+                "ontology_class": "cad:CarryShearBehavior",
+                "name": "Carry support shear",
+                "description": "The pedestal walls carry shear between the wheel support region and housing.",
+                "confidence": 0.74
+              }
+            ],
+            "relationships": [
+              {
+                "target_feature_id": "F001",
+                "category": "cad:StructuralFeatureRelationship",
+                "relation": "cad:attachedTo",
+                "description": "The pedestal is an integral portion of the main housing solid.",
+                "confidence": 0.98
+              },
+              {
+                "target_feature_id": "F004",
+                "category": "cad:FunctionalFeatureRelationship",
+                "relation": "cad:supportsFeature",
+                "description": "The pedestal supports the separate scroll-wheel body.",
+                "confidence": 0.84
+              },
+              {
+                "target_feature_id": "F004",
+                "category": "cad:FunctionalFeatureRelationship",
+                "relation": "cad:constrainsFeature",
+                "description": "The pedestal is inferred to constrain wheel translation relative to the housing.",
+                "confidence": 0.73
+              },
+              {
+                "target_feature_id": "F006",
+                "category": "cad:FunctionalFeatureRelationship",
+                "relation": "cad:locatesFeature",
+                "description": "The support pedestal is inferred to locate the wheel's lateral seating interfaces.",
+                "confidence": 0.72
+              }
+            ],
+            "brep_faces": [
+              {
+                "brep_id": "FACE 0",
+                "face_code": "FACE 0",
+                "entity_type": "cad:Face",
+                "geometry_type": "cad:PlanarSurface",
+                "semantic_role": "cad:SideWallRole",
+                "name": "Negative-X pedestal side wall",
+                "description": "One long planar lateral wall of the integrated wheel-support pedestal.",
+                "salience": "cad:RepresentativeSalience",
+                "confidence": 0.94,
+                "evidence": [
+                  "CadQuery type PLANE",
+                  "Area 229.601413 mm^2",
+                  "Normal approximately positive X",
+                  "Bounding box x=24.929596 to 25.299694 mm",
+                  "Geometric counterpart to FACE 2"
+                ]
+              },
+              {
+                "brep_id": "FACE 1",
+                "face_code": "FACE 1",
+                "entity_type": "cad:Face",
+                "geometry_type": "cad:PlanarSurface",
+                "semantic_role": "cad:SupportFaceRole",
+                "name": "Lower inclined pedestal wall",
+                "description": "Narrow planar boundary of the support pedestal near z=43.58 mm.",
+                "salience": "cad:SecondarySalience",
+                "confidence": 0.87,
+                "evidence": [
+                  "CadQuery type PLANE",
+                  "Area 95.738389 mm^2",
+                  "Normal predominantly positive Z",
+                  "Bounding box z=43.513915 to 43.639587 mm"
+                ]
+              },
+              {
+                "brep_id": "FACE 2",
+                "face_code": "FACE 2",
+                "entity_type": "cad:Face",
+                "geometry_type": "cad:PlanarSurface",
+                "semantic_role": "cad:SideWallRole",
+                "name": "Positive-X pedestal side wall",
+                "description": "The opposing long planar lateral wall of the integrated wheel-support pedestal.",
+                "salience": "cad:RepresentativeSalience",
+                "confidence": 0.94,
+                "evidence": [
+                  "CadQuery type PLANE",
+                  "Area 229.499683 mm^2",
+                  "Normal approximately negative X",
+                  "Bounding box x=30.242269 to 30.612366 mm",
+                  "Geometric counterpart to FACE 0"
+                ]
+              },
+              {
+                "brep_id": "FACE 3",
+                "face_code": "FACE 3",
+                "entity_type": "cad:Face",
+                "geometry_type": "cad:PlanarSurface",
+                "semantic_role": "cad:SupportFaceRole",
+                "name": "Upper inclined pedestal wall",
+                "description": "Planar boundary of the support pedestal near z=59.22 mm.",
+                "salience": "cad:SecondarySalience",
+                "confidence": 0.86,
+                "evidence": [
+                  "CadQuery type PLANE",
+                  "Area 59.211795 mm^2",
+                  "Normal predominantly negative Z",
+                  "Bounding box z=59.159543 to 59.285214 mm"
+                ]
+              },
+              {
+                "brep_id": "FACE 4",
+                "face_code": "FACE 4",
+                "entity_type": "cad:Face",
+                "geometry_type": "cad:PlanarSurface",
+                "semantic_role": "cad:MountingSeatRole",
+                "name": "Pedestal attachment face",
+                "description": "Planar end face at CAD y=10 mm where the pedestal transitions into the surrounding housing.",
+                "salience": "cad:SecondarySalience",
+                "confidence": 0.88,
+                "evidence": [
+                  "CadQuery type PLANE",
+                  "Area 83.166612 mm^2",
+                  "Constant y=10.000000 mm",
+                  "Normal parallel to the CAD Y axis",
+                  "Visual location beneath the wheel"
+                ]
+              }
+            ],
+            "confidence": 0.86
+          }
+        ],
+        "unclassified_brep_faces": [],
+        "relationships": [],
+        "confidence": 0.95
+      },
+      {
+        "id": "R02",
+        "name": "Scroll wheel section",
+        "ontology_class": "cad:CentralSection",
+        "description": "Separate SOLID 1 interpreted as the scroll wheel. The solid has two toroidal outer surfaces and two planar circular side faces and is centered near (27.92, 22.10, 51.27) mm.",
+        "location": "Near the longitudinal centerline of the housing, partially protruding through the upper operating side and adjacent to the integrated support pedestal.",
+        "solid_ids": [
+          "SOLID 1"
+        ],
+        "colour": {
+          "R": 70,
+          "G": 175,
+          "B": 85
+        },
+        "section_functions": [
+          {
+            "ontology_class": "cad:EngageFunction",
+            "name": "Provide user-operated rotary engagement",
+            "description": "Provides a raised rolling control surface for manual engagement.",
+            "primary": true,
+            "confidence": 0.93
+          },
+          {
+            "ontology_class": "cad:ConstrainMotionFunction",
+            "name": "Provide controlled rotation",
+            "description": "Works with the inferred support to permit rotation while limiting translation.",
+            "primary": false,
+            "confidence": 0.82
+          }
+        ],
+        "section_behaviors": [
+          {
+            "ontology_class": "cad:PermitRotationBehavior",
+            "name": "Permit rotation",
+            "description": "The wheel geometry is consistent with rotation about its predominantly CAD-X-directed lateral axis.",
+            "confidence": 0.92
+          },
+          {
+            "ontology_class": "cad:ReactContactLoadBehavior",
+            "name": "React finger contact",
+            "description": "The rounded toroidal exterior reacts tangential and normal contact loads during operation.",
+            "confidence": 0.9
+          }
+        ],
+        "feature_groups": [],
+        "features": [
+          {
+            "id": "F004",
+            "name": "Scroll wheel body",
+            "ontology_class": "cad:ReelFeature",
+            "parent_feature_id": null,
+            "description": "Compound lenticular wheel represented by SOLID 1, comprising a rounded toroidal tread and two planar lateral seating faces.",
+            "interface_type": null,
+            "feature_functions": [
+              {
+                "ontology_class": "cad:EngageFunction",
+                "name": "Provide rotary control",
+                "description": "Acts as the manually engaged rotating control element.",
+                "primary": true,
+                "confidence": 0.94
+              },
+              {
+                "ontology_class": "cad:ConnectFunction",
+                "name": "Connect user input to internal mechanism",
+                "description": "Semantically interpreted as transferring manual rolling input to an internal sensing mechanism not represented in the supplied solids.",
+                "primary": false,
+                "confidence": 0.75
+              }
+            ],
+            "feature_behaviors": [
+              {
+                "ontology_class": "cad:PermitRotationBehavior",
+                "name": "Rotate about lateral axis",
+                "description": "The rounded body permits rolling about an axis predominantly parallel to CAD X.",
+                "confidence": 0.93
+              },
+              {
+                "ontology_class": "cad:ResistTorsionBehavior",
+                "name": "Carry operating torque",
+                "description": "Carries small torsional loads generated by tangential finger contact.",
+                "confidence": 0.83
+              }
+            ],
+            "relationships": [
+              {
+                "target_feature_id": "F003",
+                "category": "cad:GeometricFeatureRelationship",
+                "relation": "cad:adjacentTo",
+                "description": "The wheel body is positioned within and adjacent to the integrated support pedestal.",
+                "confidence": 0.83
+              }
+            ],
+            "brep_faces": [],
+            "confidence": 0.93
+          },
+          {
+            "id": "F005",
+            "name": "Rounded scroll-wheel tread",
+            "ontology_class": "cad:ContactInterface",
+            "parent_feature_id": "F004",
+            "description": "Two toroidal patches forming the exposed rounded perimeter of the scroll wheel.",
+            "interface_type": "cad:ContactInterface",
+            "feature_functions": [
+              {
+                "ontology_class": "cad:GripFunction",
+                "name": "Receive finger traction",
+                "description": "Provides the rounded exterior contact region through which a user applies tangential rolling force.",
+                "primary": true,
+                "confidence": 0.92
+              },
+              {
+                "ontology_class": "cad:EngageFunction",
+                "name": "Engage the user",
+                "description": "Forms the principal manual interface of the wheel.",
+                "primary": false,
+                "confidence": 0.94
+              }
+            ],
+            "feature_behaviors": [
+              {
+                "ontology_class": "cad:ReactContactLoadBehavior",
+                "name": "React rolling contact",
+                "description": "Reacts normal pressure and tangential traction on the wheel perimeter.",
+                "confidence": 0.93
+              },
+              {
+                "ontology_class": "cad:PermitRotationBehavior",
+                "name": "Provide rolling motion",
+                "description": "The rounded perimeter supports smooth rotational operation.",
+                "confidence": 0.91
+              }
+            ],
+            "relationships": [
+              {
+                "target_feature_id": "F004",
+                "category": "cad:StructuralFeatureRelationship",
+                "relation": "cad:partOfFeature",
+                "description": "The tread is the outer contact subfeature of the scroll-wheel body.",
+                "confidence": 0.99
+              },
+              {
+                "target_feature_id": "F006",
+                "category": "cad:StructuralFeatureRelationship",
+                "relation": "cad:attachedTo",
+                "description": "The toroidal tread terminates at the two planar wheel side faces.",
+                "confidence": 0.98
+              }
+            ],
+            "brep_faces": [
+              {
+                "brep_id": "FACE 11",
+                "face_code": "FACE 11",
+                "entity_type": "cad:Face",
+                "geometry_type": "cad:ToroidalSurface",
+                "semantic_role": "cad:InterfaceFaceRole",
+                "name": "Negative-X-side tread patch",
+                "description": "Toroidal portion of the wheel perimeter on the lower-X side of the wheel.",
+                "salience": "cad:PrimarySalience",
+                "confidence": 0.98,
+                "evidence": [
+                  "CadQuery type TORUS",
+                  "Area 127.508985 mm^2",
+                  "Major radius 4.282455 mm",
+                  "Minor radius 3.000000 mm",
+                  "Torus center (28.524548,22.101459,51.240913)",
+                  "Bounding box y=15.069459 to 29.133459 mm"
+                ]
+              },
+              {
+                "brep_id": "FACE 13",
+                "face_code": "FACE 13",
+                "entity_type": "cad:Face",
+                "geometry_type": "cad:ToroidalSurface",
+                "semantic_role": "cad:InterfaceFaceRole",
+                "name": "Positive-X-side tread patch",
+                "description": "Second toroidal portion completing the rounded wheel perimeter.",
+                "salience": "cad:PrimarySalience",
+                "confidence": 0.98,
+                "evidence": [
+                  "CadQuery type TORUS",
+                  "Area 175.931403 mm^2",
+                  "Major radius 4.032000 mm",
+                  "Minor radius 3.000000 mm",
+                  "Torus center (27.324883,22.101459,51.269291)",
+                  "Bounding box y=15.069459 to 29.133459 mm"
+                ]
+              }
+            ],
+            "confidence": 0.96
+          },
+          {
+            "id": "F006",
+            "name": "Scroll-wheel lateral seating faces",
+            "ontology_class": "cad:SeatingInterface",
+            "parent_feature_id": "F004",
+            "description": "Opposed planar circular side faces of the wheel, interpreted as lateral seating or locating interfaces. No bore or cylindrical axle face is present in the supplied B-rep.",
+            "interface_type": "cad:SeatingInterface",
+            "feature_functions": [
+              {
+                "ontology_class": "cad:LocateFunction",
+                "name": "Laterally locate wheel",
+                "description": "Provides opposed side surfaces capable of controlling the lateral position of the wheel.",
+                "primary": true,
+                "confidence": 0.79
+              },
+              {
+                "ontology_class": "cad:ConstrainMotionFunction",
+                "name": "Constrain axial translation",
+                "description": "The opposed faces can react axial contact and limit lateral wheel translation.",
+                "primary": false,
+                "confidence": 0.77
+              }
+            ],
+            "feature_behaviors": [
+              {
+                "ontology_class": "cad:ConstrainTranslationBehavior",
+                "name": "Constrain lateral translation",
+                "description": "Opposed planar faces can react contact normal to the wheel's rotation axis.",
+                "confidence": 0.8
+              },
+              {
+                "ontology_class": "cad:ReactContactLoadBehavior",
+                "name": "React side contact",
+                "description": "Carries axial seating contact against an inferred support or retainer.",
+                "confidence": 0.76
+              }
+            ],
+            "relationships": [
+              {
+                "target_feature_id": "F004",
+                "category": "cad:StructuralFeatureRelationship",
+                "relation": "cad:partOfFeature",
+                "description": "The two side seating faces are subfeatures of the wheel body.",
+                "confidence": 0.99
+              },
+              {
+                "target_feature_id": "F003",
+                "category": "cad:GeometricFeatureRelationship",
+                "relation": "cad:alignedWith",
+                "description": "The side faces are aligned with the lateral walls of the inferred wheel-support pedestal.",
+                "confidence": 0.76
+              }
+            ],
+            "brep_faces": [
+              {
+                "brep_id": "FACE 12",
+                "face_code": "FACE 12",
+                "entity_type": "cad:Face",
+                "geometry_type": "cad:PlanarSurface",
+                "semantic_role": "cad:SeatingFaceRole",
+                "name": "Negative-X wheel side face",
+                "description": "Planar circular side face of the wheel with normal predominantly negative X.",
+                "salience": "cad:PrimarySalience",
+                "confidence": 0.96,
+                "evidence": [
+                  "CadQuery type PLANE",
+                  "Area 57.614979 mm^2",
+                  "One edge and one vertex in the periodic face representation",
+                  "Normal approximately (-0.999720,0.000000,0.023648)",
+                  "Center (25.525387,22.101459,51.311858)"
+                ]
+              },
+              {
+                "brep_id": "FACE 14",
+                "face_code": "FACE 14",
+                "entity_type": "cad:Face",
+                "geometry_type": "cad:PlanarSurface",
+                "semantic_role": "cad:SeatingFaceRole",
+                "name": "Positive-X wheel side face",
+                "description": "Opposing planar circular side face of the wheel with normal predominantly positive X.",
+                "salience": "cad:PrimarySalience",
+                "confidence": 0.96,
+                "evidence": [
+                  "CadQuery type PLANE",
+                  "Area 51.072947 mm^2",
+                  "One edge and one vertex in the periodic face representation",
+                  "Normal approximately (0.999720,0.000000,-0.023648)",
+                  "Center (30.324044,22.101459,51.198346)"
+                ]
+              }
+            ],
+            "confidence": 0.84
+          }
+        ],
+        "unclassified_brep_faces": [],
+        "relationships": [],
+        "confidence": 0.94
+      }
+    ]
+  }
+}
+
+aim.json from the planning stage:
+
+{
+  "request": "Add a 2 millimetre fillet to the edges of the scrolling wheel slot to ensure a smooth surface.",
+  "request_wording": {
+    "action_words": [
+      "Add",
+      "2",
+      "millimetre",
+      "fillet"
+    ],
+    "referenced_feature_words": [
+      "edges",
+      "scrolling",
+      "wheel",
+      "slot"
+    ],
+    "intention_words": [
+      "ensure",
+      "smooth",
+      "surface"
+    ],
+    "grammatical_words": [
+      "a",
+      "to",
+      "the",
+      "of",
+      "the",
+      "to",
+      "a"
+    ]
+  },
+  "actions": [
+    {
+      "operation": "Add fillet",
+      "parameters": {
+        "fillet_radius": "2 millimetres"
+      },
+      "target": "Edges of the scrolling wheel slot",
+      "relational_constraint": "Apply the fillet to the edges belonging to the scrolling wheel slot.",
+      "unresolved_reference": "Identify the scrolling wheel slot and its applicable edges in the original CAD model."
+    }
+  ],
+  "intention": [
+    "Ensure a smooth surface."
+  ]
+}
+
+operation.json from the planning stage:
+
+{
+  "request": "Add a 2 millimetre fillet to the edges of the scrolling wheel slot to ensure a smooth surface.",
+  "request_wording": {
+    "action_words": [
+      "Add",
+      "2",
+      "millimetre",
+      "fillet"
+    ],
+    "referenced_feature_words": [
+      "edges",
+      "scrolling",
+      "wheel",
+      "slot"
+    ],
+    "intention_words": [
+      "ensure",
+      "smooth",
+      "surface"
+    ],
+    "grammatical_words": [
+      "a",
+      "to",
+      "the",
+      "of",
+      "the",
+      "to",
+      "a"
+    ]
+  },
+  "actions": [
+    {
+      "operation": "Add fillet",
+      "parameters": {
+        "fillet_radius": "2 millimetres"
+      },
+      "target": "Opening-perimeter edges of the scrolling wheel slot in the main housing, adjacent to the integrated scroll-wheel support pedestal; do not fillet the separate scroll wheel.",
+      "relational_constraint": "Apply the 2 mm constant-radius fillet only to the continuous rim edges belonging to the wheel-slot opening around the scroll wheel. These are the edges associated with the secondary inner wire of the upper ergonomic housing surface, FACE 6, and its boundaries with the planar pedestal/slot faces FACE 0, FACE 1, FACE 2, and FACE 3. Preserve the wheel clearance, the wheel geometry in SOLID 1, and unrelated exterior housing edges.",
+      "unresolved_reference": "The scrolling wheel slot is localized by the visible rectangular opening around the wheel and by the secondary wire reported on FACE 6. Exact CadQuery EDGE indices are not supplied in model.json, so the applicable edge loop must be resolved topologically as the inner wire of FACE 6 and verified by adjacency to FACE 0, FACE 1, FACE 2, and FACE 3 before applying the fillet.",
+      "target section code": [
+        "R01"
+      ],
+      "target face code": [
+        "F001",
+        "FACE 6",
+        "F003",
+        "FACE 0",
+        "FACE 1",
+        "FACE 2",
+        "FACE 3"
+      ],
+      "steps": [
+        "Operate on SOLID 0 in section R01, Ergonomic housing and wheel support. Retain SOLID 1 and section R02 as an unmodified reference for checking scroll-wheel clearance.",
+        "Temporarily hide or isolate the separate scroll-wheel solid so that the complete perimeter of the wheel opening can be inspected without selecting the toroidal tread faces FACE 11 and FACE 13 or the wheel seating faces FACE 12 and FACE 14.",
+        "Locate feature F001, Contoured outer housing shell, and identify FACE 6, Upper ergonomic housing surface. Use the secondary inner wire on FACE 6 to identify the rectangular wheel-slot rim visible around the central wheel in the +Y and isometric views.",
+        "Confirm that the selected rim belongs to the wheel-support/slot region F003 by checking adjacency to the opposing planar side walls FACE 0 and FACE 2 and the transverse planar boundaries FACE 1 and FACE 3. FACE 4 is the pedestal attachment face and is not part of the exposed slot rim unless topology inspection shows that it directly terminates the same opening loop.",
+        "Resolve the corresponding CadQuery edge objects from the inner wire of FACE 6 or by finding edges shared between FACE 6 and FACE 0, FACE 1, FACE 2, or FACE 3. Select the complete opening-perimeter loop only; exclude pedestal base edges, exterior housing seams, and every edge belonging to SOLID 1.",
+        "No new sketch, extrusion, or cut is required because the requested change modifies existing B-rep edges. Apply a constant-radius edge fillet of 2.0 mm to the selected wheel-slot rim edges on SOLID 0.",
+        "If the full-loop fillet fails at a short corner or because the local wall width is insufficient, verify that the intended edges were selected and apply the same 2.0 mm radius in compatible edge groups while maintaining tangency and a continuous rounded transition around the slot. Do not reduce the specified radius without further instruction.",
+        "Regenerate the model and inspect the result from the +Y top view, the +X and -X side views, and iso1. Confirm that the sharp slot rim has been replaced by smooth tangent fillet faces and that no unrelated housing edge has been rounded.",
+        "Restore SOLID 1 and perform an interference and minimum-clearance check through the wheel's permitted rotation about its predominantly CAD-X-directed axis. Confirm that the 2 mm fillet does not intersect FACE 11, FACE 12, FACE 13, or FACE 14 and does not obstruct the exposed scrolling surface.",
+        "Validate that SOLID 0 remains a valid closed solid, that the wheel remains a separate solid, and that the finished slot has a continuous smooth surface without self-intersections, sliver faces, or broken edge transitions."
+      ]
+    }
+  ],
+  "intention": [
+    "Ensure a smooth surface."
+  ]
+}
+
+
+        Given the instructions and task information in operation.json, generate a CadQuery Python function that execute the modeling tasks you designed. First use CadQuery to extract information you need regarding the model, such as surfaces you want to use as reference faces. Then write CadQuery code with correct dimensions and coordinates to perform the edit.
+
+        The script that runs the function is provided for reference, as well as an example function, but you should only create your version of the function my_cad_function. Do not include any of the rest of the script.
+
+        Once you have generated the function, it will be executed in CadQuery. You will then be provided with a rendering of the CAD model created by your function, and any prints, debug or error messages. You will then have the opportunity to refine your function based on this feedback, and it will be re-executed. Continue this process until the task is complete, or you reach the maximum number of iterations.
+
+        If the task involves editing an existing model, the path to that model's .step file is passed to your function as args["input_file"], and is also listed as brep_start_path_step in the task information. Load it from args["input_file"] rather than hard-coding a path. For these cases, you might need to print out debug information once the model is loaded in your first iteration.
+
+        Return a json object with two fields. Do not include any other text outside of the json object in your response:
+        'complete': true if the task has been completed. IMPORTANT: This should only be judged by looking at the output from the last iteration, not whether a function has been returned this iteration. If there is no valid output that corresponds to the instruction, the task is not complete. The first iteration can never be complete. If this is true, then the current function will NOT be executed, and the function from the last iteration will be used.
+        'my_cad_function': CadQuery python function as a string. Use the same definition and arguments as the example.
+        Script example:
+
+        
+
+#!/usr/bin/env python3
+
+import cadquery as cq
+from cadquery import exporters
+import os
+import sys
+
+###
+# Function definitions
+###
+
+def _shape_from_result(result):
+    if hasattr(result, "val"):
+        return result.val()
+    if isinstance(result, cq.Assembly):
+        return result.toCompound()
+    return result
+
+
+def export_as_step(result, output_dir):
+    """Export CadQuery result as STEP file"""
+    try:
+        output_path = os.path.join(output_dir, "tmp.step")
+        if isinstance(result, cq.Assembly):
+            result.save(output_path)
+            print(f"Exported assembly to: {output_path}")
+            return
+        exporters.export(_shape_from_result(result), output_path, exportType="STEP")
+        print(f"Exported shape to: {output_path}")
+    except Exception as e:
+        print(f"Error exporting STEP file: {e}")
+        import traceback
+        traceback.print_exc()
+
+
+def export_as_stl(result, output_dir):
+    """Export CadQuery result as STL file"""
+    try:
+        output_path = os.path.join(output_dir, "tmp.stl")
+        exporters.export(_shape_from_result(result), output_path, exportType="STL")
+        print(f"Exported STL to: {output_path}")
+    except Exception as e:
+        print(f"Error exporting STL file: {e}")
+        import traceback
+        traceback.print_exc()
+
+
+def export_as_image(result, output_dir):
+    """Export CadQuery result as an image (SVG or PNG if VTK available)"""
+    try:
+        # Get the shape from result
+        if hasattr(result, 'val'):
+            shape = result.val()
+        elif isinstance(result, cq.Assembly):
+            # For assemblies, try to get combined shape
+            shape = result.toCompound()
+        else:
+            shape = result
+        
+        # Try PNG export using VTK (requires cadquery with ocp/vtk support)
+        png_path = os.path.join(output_dir, "tmp.png")
+        try:
+            from cadquery.vis import show
+            # Use show() with screenshot parameter instead of vis.screenshot()
+            show(
+                shape,
+                screenshot=png_path,
+                width=1920,
+                height=1080,
+                interact=False  # Don't open interactive GUI
+            )
+            print(f"Exported PNG image to: {png_path}")
+            return
+        except Exception as e:
+            print(f"Error exporting PNG image: {e}")
+            pass
+        
+        # Try using ocp_vscode or jupyter_cadquery for rendering
+        try:
+            from ocp_tessellate.convert import to_svg
+            svg_path = os.path.join(output_dir, "tmp.svg")
+            svg_content = to_svg(shape)
+            with open(svg_path, 'w') as f:
+                f.write(svg_content)
+            print(f"Exported SVG image to: {svg_path}")
+            return
+        except ImportError:
+            pass
+        
+        # Fallback: export SVG using CadQuery's built-in SVG exporter
+        svg_path = os.path.join(output_dir, "tmp.svg")
+        exporters.export(shape, svg_path, exportType="SVG")
+        print(f"Exported SVG image to: {svg_path}")
+        
+    except Exception as e:
+        print(f"Error exporting image: {e}")
+        import traceback
+        traceback.print_exc()
+
+
+def parse_cadquery_args(argv, required_args=None):
+    """
+    Parses command line arguments passed to CadQuery scripts.
+    Args will be passed as --passkey value(s)
+    Only required args are processed
+    """
+    if required_args is None:
+        required_args = ['--output_dir', '--input_file', '--function_file']
+    
+    args = {}
+    i = 0
+    while i < len(argv):
+        arg = argv[i]
+        if arg in required_args:
+            if i + 1 < len(argv):
+                args[arg.lstrip('-')] = argv[i + 1]
+                i += 1  # skip next since it's a value
+            else:
+                print(f"Warning: No value provided for argument {arg}")
+        i += 1
+    return args
+
+
+def load_and_execute_function(function_string, args):
+    """
+    Load a my_cad_function function from a string and execute it.
+    
+    Args:
+        function_string (str): The complete function definition as a string
+        args (dict): Arguments to pass to the function
+    
+    Returns:
+        CadQuery Workplane, Shape, or Assembly, or None
+    """
+    try:
+        # Create a safe execution environment with necessary imports
+        exec_globals = {
+            'cq': cq,
+            'cadquery': cq,
+            'Workplane': cq.Workplane,
+            'Assembly': cq.Assembly,
+            'exporters': exporters,
+            'os': os,
+            'sys': sys,
+            '__builtins__': __builtins__
+        }
+        
+        # Execute the function definition
+        exec(function_string, exec_globals)
+        
+        # Get the function from the execution environment
+        if 'my_cad_function' not in exec_globals:
+            raise ValueError("Function 'my_cad_function' not found in provided code")
+        
+        my_cad_function = exec_globals['my_cad_function']
+        
+        # Execute the function with arguments
+        return my_cad_function(args)
+        
+    except Exception as e:
+        print(f"Error executing LLM-provided function: {e}")
+        import traceback
+        traceback.print_exc()
+        return None
+
+
+###
+# Example my_cad_function that creates three boxes.
+###
+# def my_cad_function(args):
+#     boxes = []
+#     for translation in [(100, 0, 0), (0, 100, 0), (0, 0, 100)]:
+#         box = cq.Workplane("XY").box(10, 20, 30).translate(translation)
+#         boxes.append(box)
+#     # Combine all boxes into a compound
+#     result = boxes[0]
+#     for box in boxes[1:]:
+#         result = result.union(box)
+#     print(f"Created compound with multiple boxes at different locations.")
+#     return result
+
+###
+# Example my_cad_function that loads a STEP file and prints information.
+###
+# def my_cad_function(args):
+#     if "input_file" in args:
+#         input_file = os.path.expanduser(args["input_file"])
+#         shape = cq.importers.importStep(input_file)
+#         # Get the underlying OCC shape for analysis
+#         if hasattr(shape, 'val'):
+#             occ_shape = shape.val()
+#         else:
+#             occ_shape = shape
+#         print(f"Is Valid: {occ_shape.isValid()}")
+#         print(f"Volume: {occ_shape.Volume():.6f} mm^3")
+#         print(f"Number of faces: {len(occ_shape.Faces())}")
+#         bbox = occ_shape.BoundingBox()
+#         center = bbox.center
+#         print(f"Bbox Center: ({center.x:.4f}, {center.y:.4f}, {center.z:.4f})")
+#         return shape
+#     return None
+
+
+###
+# Main script execution
+###
+
+if __name__ == "__main__":
+    # Process command line arguments
+    argv = sys.argv
+    args = parse_cadquery_args(argv)
+    output_dir = args.get("output_dir", "~/Desktop")
+    output_dir = os.path.expanduser(output_dir)
+    if not os.path.exists(output_dir):
+        os.makedirs(output_dir)
+
+    # Do not delete tmp.step / tmp.stl from a previous successful iteration.
+    # A later failed or timed-out run must leave the last good solid in place
+    # so ingest/eval still have geometry. Preview files can be replaced.
+    for stale_name in ("tmp.png", "tmp.svg"):
+        stale_path = os.path.join(output_dir, stale_name)
+        if os.path.exists(stale_path):
+            os.remove(stale_path)
+
+    # Load function from file or use default
+    result = None
+    if "function_file" in args:
+        function_file = os.path.expanduser(args["function_file"])
+        if os.path.exists(function_file):
+            try:
+                with open(function_file, 'r') as f:
+                    function_string = f.read()
+                print(f"Loading function from: {function_file}")
+                result = load_and_execute_function(function_string, args)
+            except Exception as e:
+                print(f"Error loading function from file: {e}")
+        else:
+            print(f"Function file not found: {function_file}")
+    else:
+        print("No function file provided")
+
+    # Export results if a result was returned
+    if result is not None:
+        export_as_step(result, output_dir)
+        export_as_stl(result, output_dir)
+        export_as_image(result, output_dir)
+    else:
+        print("No CadQuery result returned; skipped STEP/STL/image export.")
+    
+    print("Script completed.")
+
+Instruction:
+
+Edit the existing model according to the provided instructions.
+
+Task information:
+
+request_text:
+
+Add a 2 millimetre fillet to the edges of the scrolling wheel slot to ensure a smooth surface.
+
+brep_start_path_step:
+
+/home/adml/Research/Hackathon2026/IDETC26-Hackathon-Autodesk-neuralCAD-Edit/data/edit_192_external/breps/4S7JQK6ZQMAD25GL_1758863189.5437753.step
+
+Last output rendering: None (this is the first iteration)
+
+Iterations remaining: 10

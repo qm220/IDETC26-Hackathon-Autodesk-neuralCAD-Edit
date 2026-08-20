@@ -1,0 +1,163 @@
+Thinking text:
+
+
+Generated script:
+def my_cad_function(args):
+    import os
+    input_file = os.path.expanduser(args["input_file"])
+    model = cq.importers.importStep(input_file)
+    shape = model.val() if hasattr(model, "val") else model
+
+    solids = shape.Solids()
+    faces = shape.Faces()
+    bb = shape.BoundingBox()
+    print("MODEL valid=", shape.isValid(), "solids=", len(solids), "faces=", len(faces))
+    print("MODEL bbox:", (bb.xmin, bb.ymin, bb.zmin), "to", (bb.xmax, bb.ymax, bb.zmax), "center=", (bb.center.x, bb.center.y, bb.center.z))
+
+    for i, solid in enumerate(solids):
+        sb = solid.BoundingBox()
+        print("SOLID", i,
+              "faces=", len(solid.Faces()),
+              "volume=", round(solid.Volume(), 3),
+              "bbox=", tuple(round(v, 3) for v in (sb.xmin, sb.ymin, sb.zmin, sb.xmax, sb.ymax, sb.zmax)),
+              "center=", tuple(round(v, 3) for v in (sb.center.x, sb.center.y, sb.center.z)))
+
+    target_indices = list(range(296, 308)) + list(range(361, 373))
+    for idx in target_indices:
+        if idx >= len(faces):
+            print("FACE", idx, "OUT OF RANGE")
+            continue
+        face = faces[idx]
+        fb = face.BoundingBox()
+        c = face.Center()
+        owners = []
+        for si, solid in enumerate(solids):
+            if any(face.isSame(sf) for sf in solid.Faces()):
+                owners.append(si)
+        try:
+            gt = face.geomType()
+        except Exception:
+            gt = "unknown"
+        print("FACE", idx,
+              "type=", gt,
+              "owner_solids=", owners,
+              "area=", round(face.Area(), 3),
+              "center=", tuple(round(v, 3) for v in (c.x, c.y, c.z)),
+              "bbox=", tuple(round(v, 3) for v in (fb.xmin, fb.ymin, fb.zmin, fb.xmax, fb.ymax, fb.zmax)))
+
+    # Print detailed edge/vertex information for the grounded Cordholder and handle solids.
+    grounded_faces = [296, 361]
+    grounded_solids = set()
+    for idx in grounded_faces:
+        if idx < len(faces):
+            for si, solid in enumerate(solids):
+                if any(faces[idx].isSame(sf) for sf in solid.Faces()):
+                    grounded_solids.add(si)
+    for si in sorted(grounded_solids):
+        solid = solids[si]
+        print("DETAIL SOLID", si)
+        for vi, vertex in enumerate(solid.Vertices()):
+            p = vertex.Center()
+            print("  V", vi, tuple(round(v, 3) for v in (p.x, p.y, p.z)))
+
+    return model
+
+Program output:
+stdout: Loading function from: /home/adml/Research/Hackathon2026/IDETC26-Hackathon-Autodesk-neuralCAD-Edit/output/gpt-5.6-ontologies/gpt-5.6-sol-ontologies_cadquery-script_1787178720.9488409/brep_end/1787178720.9488409/temp_script.py
+MODEL valid= True solids= 20 faces= 414
+MODEL bbox: (-169.95580263734408, 0.0, -290.722067770243) to (126.999998574121, 362.67381509088995, 128.70278247644504) center= (-21.477902031611542, 181.33690754544497, -81.00964264689897)
+SOLID 0 faces= 47 volume= 6519959.271 bbox= (-101.6, 0.0, -127.0, 101.6, 355.6, 127.0) center= (0.0, 177.8, 0.0)
+SOLID 1 faces= 8 volume= 283249.276 bbox= (-76.2, 26.359, -38.1, 76.2, 39.059, 127.0) center= (0.0, 32.709, 44.45)
+SOLID 2 faces= 23 volume= 258216.959 bbox= (-95.224, 356.324, -116.417, 95.276, 362.674, 128.703) center= (0.026, 359.499, 6.143)
+SOLID 3 faces= 66 volume= 52563.292 bbox= (-82.052, 347.488, -109.924, 83.048, 353.838, -1.97) center= (0.498, 350.663, -55.947)
+SOLID 4 faces= 6 volume= 196.645 bbox= (-4.582, 353.838, -62.936, 5.578, 357.648, -57.856) center= (0.498, 355.743, -60.396)
+SOLID 5 faces= 78 volume= 45348.634 bbox= (-82.052, 347.488, -109.924, 83.048, 353.838, -1.97) center= (0.498, 350.663, -55.947)
+SOLID 6 faces= 24 volume= 113222.134 bbox= (-88.9, 342.9, -114.298, 88.9, 347.98, 114.3) center= (-0.0, 345.44, 0.001)
+SOLID 7 faces= 7 volume= 119603.947 bbox= (-66.855, 332.756, -121.438, 53.795, 341.646, 77.465) center= (-6.53, 337.201, -21.987)
+SOLID 8 faces= 16 volume= 189558.701 bbox= (-94.446, 224.301, -56.05, 83.354, 328.441, 83.65) center= (-5.546, 276.371, 13.8)
+SOLID 9 faces= 6 volume= 79857.519 bbox= (-73.959, 234.461, -54.612, 62.866, 310.661, 82.213) center= (-5.546, 272.561, 13.8)
+SOLID 10 faces= 4 volume= 1209.815 bbox= (-60.325, 35.884, -34.925, 60.325, 38.424, 85.725) center= (0.0, 37.154, 25.4)
+SOLID 11 faces= 11 volume= 102147.875 bbox= (-62.23, 38.424, -38.1, 62.23, 178.124, 87.63) center= (0.0, 108.274, 24.765)
+SOLID 12 faces= 12 volume= 41068.593 bbox= (-10.16, 48.26, 83.82, 10.16, 139.7, 121.92) center= (0.0, 93.98, 102.87)
+SOLID 13 faces= 6 volume= 279030.963 bbox= (-60.967, 178.124, -35.567, 60.967, 203.524, 86.367) center= (0.0, 190.824, 25.4)
+SOLID 14 faces= 9 volume= 22321.929 bbox= (-12.7, 228.6, -95.25, 12.7, 330.2, -69.85) center= (0.0, 279.4, -82.55)
+SOLID 15 faces= 19 volume= 4349.388 bbox= (-27.94, 2.54, -142.861, -10.16, 20.32, -117.461) center= (-19.05, 11.43, -130.161)
+SOLID 16 faces= 19 volume= 4349.388 bbox= (10.16, 2.54, -142.861, 27.94, 20.32, -117.461) center= (19.05, 11.43, -130.161)
+SOLID 17 faces= 12 volume= 295929.467 bbox= (-127.0, 279.4, -152.398, 127.0, 304.8, 38.1) center= (0.0, 292.1, -57.149)
+SOLID 18 faces= 21 volume= 7873.625 bbox= (-155.591, 30.099, -267.474, 16.043, 33.401, -38.1) center= (-69.774, 31.75, -152.787)
+SOLID 19 faces= 20 volume= 1845.825 bbox= (-169.956, 30.48, -290.722, -145.158, 35.56, -262.98) center= (-157.557, 33.02, -276.851)
+FACE 296 type= CYLINDER owner_solids= [12] area= 405.366 center= (-0.0, 52.875, 117.305) bbox= (-10.16, 48.26, 109.22, 10.16, 60.96, 121.92)
+FACE 297 type= PLANE owner_solids= [12] area= 2021.092 center= (-10.16, 93.98, 107.569) bbox= (-10.16, 48.26, 83.82, -10.16, 139.7, 121.92)
+FACE 298 type= PLANE owner_solids= [12] area= 1341.933 center= (-0.0, 93.98, 121.92) bbox= (-10.16, 60.96, 121.92, 10.16, 127.0, 121.92)
+FACE 299 type= CYLINDER owner_solids= [12] area= 405.366 center= (-0.0, 135.085, 117.305) bbox= (-10.16, 127.0, 109.22, 10.16, 139.7, 121.92)
+FACE 300 type= PLANE owner_solids= [12] area= 1238.707 center= (-0.0, 93.98, 106.68) bbox= (-10.16, 63.5, 106.68, 10.16, 124.46, 106.68)
+FACE 301 type= PLANE owner_solids= [12] area= 464.515 center= (-0.0, 63.5, 95.25) bbox= (-10.16, 63.5, 83.82, 10.16, 63.5, 106.68)
+FACE 302 type= PLANE owner_solids= [12] area= 309.677 center= (-0.0, 55.88, 83.82) bbox= (-10.16, 48.26, 83.82, 10.16, 63.5, 83.82)
+FACE 303 type= PLANE owner_solids= [12] area= 516.128 center= (-0.0, 48.26, 96.52) bbox= (-10.16, 48.26, 83.82, 10.16, 48.26, 109.22)
+FACE 304 type= PLANE owner_solids= [12] area= 516.128 center= (-0.0, 139.7, 96.52) bbox= (-10.16, 139.7, 83.82, 10.16, 139.7, 109.22)
+FACE 305 type= PLANE owner_solids= [12] area= 309.677 center= (0.0, 132.08, 83.82) bbox= (-10.16, 124.46, 83.82, 10.16, 139.7, 83.82)
+FACE 306 type= PLANE owner_solids= [12] area= 464.515 center= (-0.0, 124.46, 95.25) bbox= (-10.16, 124.46, 83.82, 10.16, 124.46, 106.68)
+FACE 307 type= PLANE owner_solids= [12] area= 2021.092 center= (10.16, 93.98, 107.569) bbox= (10.16, 48.26, 83.82, 10.16, 139.7, 121.92)
+FACE 361 type= CYLINDER owner_solids= [17] area= 1216.098 center= (114.3, 291.713, 18.675) bbox= (101.6, 284.093, 11.055, 127.0, 299.333, 26.295)
+FACE 362 type= CYLINDER owner_solids= [17] area= 1216.098 center= (-114.3, 291.869, 18.321) bbox= (-127.0, 284.249, 10.701, -101.6, 299.489, 25.941)
+FACE 363 type= PLANE owner_solids= [17] area= 755.045 center= (127.0, 292.193, 18.401) bbox= (127.0, 279.4, 0.0, 127.0, 304.8, 36.908)
+FACE 364 type= PLANE owner_solids= [17] area= 755.045 center= (101.6, 292.193, 18.401) bbox= (101.6, 279.4, 0.0, 101.6, 304.8, 36.908)
+FACE 365 type= BSPLINE owner_solids= [17] area= 11175.671 center= (0.001, 292.1, -94.15) bbox= (-127.0, 279.4, -152.398, 127.0, 304.8, 0.0)
+FACE 366 type= BSPLINE owner_solids= [17] area= 9160.177 center= (0.0, 292.1, -77.95) bbox= (-101.6, 279.4, -127.0, 101.6, 304.8, 0.0)
+FACE 367 type= PLANE owner_solids= [17] area= 645.16 center= (114.3, 292.1, 36.908) bbox= (101.6, 279.4, 36.908, 127.0, 304.8, 36.908)
+FACE 368 type= PLANE owner_solids= [17] area= 12067.001 center= (-0.285, 304.8, -69.708) bbox= (-127.0, 304.8, -152.398, 127.0, 304.8, 38.1)
+FACE 369 type= PLANE owner_solids= [17] area= 645.16 center= (-114.3, 292.1, 38.1) bbox= (-127.0, 279.4, 38.1, -101.6, 304.8, 38.1)
+FACE 370 type= PLANE owner_solids= [17] area= 12067.169 center= (-0.285, 279.4, -69.708) bbox= (-127.0, 279.4, -152.398, 127.0, 279.4, 38.1)
+FACE 371 type= PLANE owner_solids= [17] area= 785.325 center= (-127.0, 292.154, 19.219) bbox= (-127.0, 279.4, 0.0, -127.0, 304.8, 38.1)
+FACE 372 type= PLANE owner_solids= [17] area= 785.325 center= (-101.6, 292.154, 19.219) bbox= (-101.6, 279.4, 0.0, -101.6, 304.8, 38.1)
+DETAIL SOLID 12
+  V 0 (10.16, 48.26, 109.22)
+  V 1 (10.16, 60.96, 121.92)
+  V 2 (-10.16, 60.96, 121.92)
+  V 3 (-10.16, 48.26, 109.22)
+  V 4 (-10.16, 127.0, 121.92)
+  V 5 (-10.16, 139.7, 109.22)
+  V 6 (-10.16, 139.7, 83.82)
+  V 7 (-10.16, 124.46, 83.82)
+  V 8 (-10.16, 124.46, 106.68)
+  V 9 (-10.16, 63.5, 106.68)
+  V 10 (-10.16, 63.5, 83.82)
+  V 11 (-10.16, 48.26, 83.82)
+  V 12 (10.16, 127.0, 121.92)
+  V 13 (10.16, 139.7, 109.22)
+  V 14 (10.16, 124.46, 106.68)
+  V 15 (10.16, 63.5, 106.68)
+  V 16 (10.16, 63.5, 83.82)
+  V 17 (10.16, 48.26, 83.82)
+  V 18 (10.16, 139.7, 83.82)
+  V 19 (10.16, 124.46, 83.82)
+DETAIL SOLID 17
+  V 0 (127.0, 284.093, 18.675)
+  V 1 (101.6, 284.093, 18.675)
+  V 2 (-127.0, 299.489, 18.321)
+  V 3 (-101.6, 299.489, 18.321)
+  V 4 (127.0, 279.4, 0.0)
+  V 5 (127.0, 304.8, 0.0)
+  V 6 (127.0, 304.8, 36.908)
+  V 7 (127.0, 279.4, 36.908)
+  V 8 (101.6, 304.8, 0.0)
+  V 9 (101.6, 279.4, 0.0)
+  V 10 (101.6, 279.4, 36.908)
+  V 11 (101.6, 304.8, 36.908)
+  V 12 (-127.0, 279.4, 0.0)
+  V 13 (-127.0, 304.8, 0.0)
+  V 14 (-101.6, 304.8, 0.0)
+  V 15 (-101.6, 279.4, 0.0)
+  V 16 (-101.6, 304.8, 38.1)
+  V 17 (-127.0, 304.8, 38.1)
+  V 18 (-101.6, 279.4, 38.1)
+  V 19 (-127.0, 279.4, 38.1)
+Exported shape to: /home/adml/Research/Hackathon2026/IDETC26-Hackathon-Autodesk-neuralCAD-Edit/output/gpt-5.6-ontologies/gpt-5.6-sol-ontologies_cadquery-script_1787178720.9488409/brep_end/1787178720.9488409/tmp.step
+Exported STL to: /home/adml/Research/Hackathon2026/IDETC26-Hackathon-Autodesk-neuralCAD-Edit/output/gpt-5.6-ontologies/gpt-5.6-sol-ontologies_cadquery-script_1787178720.9488409/brep_end/1787178720.9488409/tmp.stl
+Exported PNG image to: /home/adml/Research/Hackathon2026/IDETC26-Hackathon-Autodesk-neuralCAD-Edit/output/gpt-5.6-ontologies/gpt-5.6-sol-ontologies_cadquery-script_1787178720.9488409/brep_end/1787178720.9488409/tmp.png
+Script completed.
+
+stderr: 
+
+Exported this iteration:
+tmp.step, tmp.stl, tmp.png, tmp_+Z.png, tmp_-Z.png, tmp_-X.png, tmp_+X.png, tmp_+Y.png, tmp_-Y.png, tmp_iso1.png, tmp_iso2.png

@@ -1,0 +1,1749 @@
+Now use all the given information:
+1. model.json
+2. operation.json
+3. Multiview images labelled with CAD look directions (+X, -X, +Y, -Y, +Z, -Z, and iso1 / iso2 when present)
+
+Decide which sections and features of the original model should be modified, removed, interacted with, or whether new features should be created. Use as much information from the multiview images, model.json, and operation.json as possible.
+
+Make this decision using the following evidence, in this order:
+
+1. If the action target clearly identifies geometry, locate the corresponding section(s), feature(s), and B-rep FACE/EDGE IDs in model.json (part.sections, features, brep_faces, brep_edges, unclassified_brep_faces).
+2. If the request indicates a side using "front", "back", "top", "bottom", "left", or "right", use part.semantic_orientation from model.json.
+   - Prefer view_sides: that maps each CAD view label (+X, -Y, …) to a human-semantic side.
+   - Also use status, description, and confidence.
+   - If status is "unknown", the requested side is missing from view_sides, or confidence is below 0.6, treat the directional word as ambiguous. Do not guess an axis from the camera label alone. Use other evidence instead.
+3. If no clear geometry is identified, use referenced_feature_words and relational_constraint to identify candidate sections and features.
+4. Also consider the intention of the edit. Based on each section's and feature's functions and behaviors, decide which entity most needs the action. Then record the corresponding section id, feature id, and FACE IDs from model.json.
+
+Brep_id values are CadQuery Faces()/Edges() indices from the STEP analysis report (for example FACE 0, EDGE 12). Prefer listing those exact IDs in "target face code" (and in steps when they help later CadQuery implementation). You may also list feature ids (F001) and section ids (R01).
+
+Plan the modeling procedure needed to perform each action. Describe it in professional CAD modelling language, from choosing the plane and drawing sketches through extrusion, cuts, fillets, and chamfers. Be thorough and detailed.
+
+Edit operation.json accordingly. Keep the previous request_wording and actions, and add localization plus steps.
+
+OUTPUT FORMAT (JSON, operation.json, no markdown fences, use this schema):
+{
+  "request": "",
+  "request_wording": {
+    "action_words": ["..."],
+    "referenced_feature_words": ["..."],
+    "intention_words": ["..."],
+    "grammatical_words": ["..."]
+  },
+  "actions": [
+    {
+      "operation": "...",
+      "parameters": {
+        "parameter_name": "..."
+      },
+      "target": "...",
+      "relational_constraint": "...",
+      "unresolved_reference": "...",
+      "target section code": ["R01"],
+      "target face code": ["F001", "FACE 0"],
+      "steps": [
+        "...",
+        "..."
+      ]
+    }
+  ],
+  "intention": ["..."]
+}
+
+The model.json, operation.json, and labeled multi-view images follow.
+
+
+aim.json:
+
+{
+  "request": "Add 0.2 mm chamfer to the hole edges to improve fitting.",
+  "request_wording": {
+    "action_words": [
+      "Add",
+      "0.2",
+      "mm",
+      "chamfer"
+    ],
+    "referenced_feature_words": [
+      "hole",
+      "edges"
+    ],
+    "intention_words": [
+      "improve",
+      "fitting"
+    ],
+    "grammatical_words": [
+      "to",
+      "the",
+      "to"
+    ]
+  },
+  "actions": [
+    {
+      "operation": "Add chamfer",
+      "parameters": {
+        "chamfer_size": "0.2 mm"
+      },
+      "target": "the hole edges",
+      "relational_constraint": "The chamfer must be applied to edges belonging to the referenced hole.",
+      "unresolved_reference": "Identify the referenced hole and the specific hole edges to be chamfered in the original CAD model."
+    }
+  ],
+  "intention": [
+    "Improve fitting."
+  ]
+}
+
+model.json:
+
+{
+  "part": {
+    "id": "P001",
+    "name": "Integral clevis mounting bracket",
+    "description": "A single-solid structural bracket with four mounting lugs and through holes, an elevated two-ear clevis with a coaxial pin passage, and a network of load-carrying webs surrounding an underside relief cavity. The part appears intended to connect a pinned linkage to a four-point mounted structure.",
+    "source_views": [
+      "+Z",
+      "-Z",
+      "-X",
+      "+X",
+      "+Y",
+      "-Y",
+      "iso1"
+    ],
+    "solid_ids": [
+      "SOLID 0"
+    ],
+    "symmetry_note": "The clevis ears and pin bores form an exact coaxial pair along the CAD X direction. The four mounting-hole stations form two end pairs but are not a simple globally circular pattern. The structural web layout is approximately bilateral about the clevis center region, with visible geometric asymmetry at the two longitudinal ends.",
+    "semantic_orientation": {
+      "status": "partially inferred",
+      "description": "The broad four-hole flange is interpreted as the mounting underside, and the projecting clevis is interpreted as the upper or outward side. CAD +Y therefore most likely points upward/outward and CAD -Y toward the mounting side. No reliable human-semantic front/back or left/right assignment can be inferred for the remaining CAD directions.",
+      "confidence": 0.82,
+      "view_sides": {
+        "+X": "unknown",
+        "-X": "unknown",
+        "+Y": "top",
+        "-Y": "bottom",
+        "+Z": "unknown",
+        "-Z": "unknown"
+      }
+    },
+    "sections": [
+      {
+        "id": "R01",
+        "name": "Four-point mounting flange",
+        "ontology_class": "cad:EndSection",
+        "description": "The broad base region containing four reinforced mounting lugs and four coaxial-through-thickness fastener holes.",
+        "location": "At the mounting side of the bracket, opposite the projecting clevis; distributed around the outer ends of the structural body.",
+        "solid_ids": [
+          "SOLID 0"
+        ],
+        "colour": {
+          "R": 56,
+          "G": 118,
+          "B": 210
+        },
+        "section_functions": [
+          {
+            "ontology_class": "cad:MountFunction",
+            "name": "Mount bracket",
+            "description": "Provides the primary four-point attachment of the bracket to an external supporting structure.",
+            "primary": true,
+            "confidence": 0.96
+          },
+          {
+            "ontology_class": "cad:TransferLoadFunction",
+            "name": "Transfer mounting loads",
+            "description": "Transfers reaction loads between the fasteners and the integral webbed body.",
+            "primary": false,
+            "confidence": 0.93
+          }
+        ],
+        "section_behaviors": [
+          {
+            "ontology_class": "cad:SpreadLoadBehavior",
+            "name": "Spread fastener loads",
+            "description": "The broad flange and enlarged lug regions distribute concentrated fastener reactions into the body.",
+            "confidence": 0.94
+          },
+          {
+            "ontology_class": "cad:CarryShearBehavior",
+            "name": "Carry mounting shear",
+            "description": "The flange carries in-plane and transverse shear between the mounting holes and supporting webs.",
+            "confidence": 0.89
+          }
+        ],
+        "feature_groups": [
+          {
+            "id": "G001",
+            "name": "Four mounting lugs",
+            "ontology_class": "cad:RepeatedFeatureGroup",
+            "feature_class": "cad:LugFeature",
+            "pattern_type": "cad:MirrorPattern",
+            "member_count": 4,
+            "member_feature_ids": [
+              "F002",
+              "F003",
+              "F004",
+              "F005"
+            ],
+            "representative_feature_ids": [
+              "F002",
+              "F004"
+            ],
+            "pattern_description": "Four enlarged peripheral lug regions arranged as two end pairs around the mounting flange. The stations are visually paired but not asserted to form an exact rectangular pattern.",
+            "confidence": 0.91
+          },
+          {
+            "id": "G002",
+            "name": "Four mounting through holes",
+            "ontology_class": "cad:RepeatedFeatureGroup",
+            "feature_class": "cad:ThroughHoleFeature",
+            "pattern_type": "cad:MirrorPattern",
+            "member_count": 4,
+            "member_feature_ids": [
+              "F006",
+              "F007",
+              "F008",
+              "F009"
+            ],
+            "representative_feature_ids": [
+              "F006",
+              "F008"
+            ],
+            "pattern_description": "Four equal-radius through holes with CAD Y-directed axes, each centered within one mounting lug.",
+            "confidence": 0.98
+          }
+        ],
+        "features": [
+          {
+            "id": "F001",
+            "name": "Integral base flange",
+            "ontology_class": "cad:FlangeFeature",
+            "parent_feature_id": null,
+            "description": "Broad integral flange joining the four mounting stations and providing the mounting-side support surface.",
+            "interface_type": "cad:MountingInterface",
+            "feature_functions": [
+              {
+                "ontology_class": "cad:MountFunction",
+                "name": "Provide mounting base",
+                "description": "Provides the principal structural base through which the bracket is attached.",
+                "primary": true,
+                "confidence": 0.95
+              }
+            ],
+            "feature_behaviors": [
+              {
+                "ontology_class": "cad:SpreadLoadBehavior",
+                "name": "Distribute base reactions",
+                "description": "Spreads loads among the four mounting stations and into the webbed body.",
+                "confidence": 0.93
+              }
+            ],
+            "relationships": [
+              {
+                "target_feature_id": "F014",
+                "category": "cad:StructuralFeatureRelationship",
+                "relation": "cad:attachedTo",
+                "description": "The first major web rises integrally from the base flange.",
+                "confidence": 0.94
+              },
+              {
+                "target_feature_id": "F015",
+                "category": "cad:StructuralFeatureRelationship",
+                "relation": "cad:attachedTo",
+                "description": "The second major web rises integrally from the base flange.",
+                "confidence": 0.94
+              },
+              {
+                "target_feature_id": "F016",
+                "category": "cad:StructuralFeatureRelationship",
+                "relation": "cad:attachedTo",
+                "description": "The central bridge web is integral with the base flange.",
+                "confidence": 0.91
+              }
+            ],
+            "brep_faces": [
+              {
+                "brep_id": "FACE 77",
+                "face_code": "FACE 77",
+                "entity_type": "cad:Face",
+                "geometry_type": "cad:PlanarSurface",
+                "semantic_role": "cad:MountingFaceRole",
+                "name": "Broad mounting underside",
+                "description": "Large planar mounting-side face at CAD y=-0.010000 mm, perforated by four hole wires.",
+                "salience": "cad:PrimarySalience",
+                "confidence": 0.98,
+                "evidence": [
+                  "CadQuery reports a PLANE with area 37.914710 mm^2.",
+                  "The face lies at constant CAD y=-0.010000 mm.",
+                  "It has five wires, consistent with one outer boundary and four mounting holes.",
+                  "Visual correspondence identifies it as the broad underside of the mounting flange."
+                ]
+              },
+              {
+                "brep_id": "FACE 103",
+                "face_code": "FACE 103",
+                "entity_type": "cad:Face",
+                "geometry_type": "cad:PlanarSurface",
+                "semantic_role": "cad:SupportFaceRole",
+                "name": "Inner flange support plane",
+                "description": "Large internal planar face parallel to the mounting underside at CAD y=0.190000 mm.",
+                "salience": "cad:PrimarySalience",
+                "confidence": 0.88,
+                "evidence": [
+                  "CadQuery reports a PLANE with area 16.750312 mm^2.",
+                  "The face is at constant CAD y=0.190000 mm.",
+                  "Its bounding box spans most of the bracket length and width."
+                ]
+              }
+            ],
+            "confidence": 0.95
+          },
+          {
+            "id": "F002",
+            "name": "Mounting lug A",
+            "ontology_class": "cad:LugFeature",
+            "parent_feature_id": "F001",
+            "description": "Reinforced mounting lug centered near CAD (x=0.293627, z=-1.526470) mm.",
+            "interface_type": "cad:MountingInterface",
+            "feature_functions": [
+              {
+                "ontology_class": "cad:MountFunction",
+                "name": "Reinforce fastener station",
+                "description": "Provides material around mounting hole F006.",
+                "primary": true,
+                "confidence": 0.96
+              }
+            ],
+            "feature_behaviors": [
+              {
+                "ontology_class": "cad:SpreadLoadBehavior",
+                "name": "Spread local fastener load",
+                "description": "The enlarged circular region distributes bearing and clamp loads into the flange.",
+                "confidence": 0.94
+              }
+            ],
+            "relationships": [
+              {
+                "target_feature_id": "F006",
+                "category": "cad:GeometricFeatureRelationship",
+                "relation": "cad:surroundsFeature",
+                "description": "The lug surrounds its mounting through hole.",
+                "confidence": 0.99
+              }
+            ],
+            "brep_faces": [
+              {
+                "brep_id": "FACE 83",
+                "face_code": "FACE 83",
+                "entity_type": "cad:Face",
+                "geometry_type": "cad:CylindricalSurface",
+                "semantic_role": "cad:OuterWallRole",
+                "name": "Lug A outer wall",
+                "description": "Radius 0.800000 mm cylindrical outer wall centered on the lug station.",
+                "salience": "cad:RepresentativeSalience",
+                "confidence": 0.96,
+                "evidence": [
+                  "CYLINDER radius 0.800000 mm.",
+                  "Cylinder origin (0.293627,4.910000,-1.526470) mm.",
+                  "Cylinder axis is parallel to CAD Y."
+                ]
+              },
+              {
+                "brep_id": "FACE 84",
+                "face_code": "FACE 84",
+                "entity_type": "cad:Face",
+                "geometry_type": "cad:PlanarSurface",
+                "semantic_role": "cad:MountingSeatRole",
+                "name": "Lug A annular seat",
+                "description": "Planar annular surface around mounting hole F006 at CAD y=0.590000 mm.",
+                "salience": "cad:PrimarySalience",
+                "confidence": 0.97,
+                "evidence": [
+                  "PLANE at constant CAD y=0.590000 mm.",
+                  "Two wires indicate an annular face.",
+                  "The face surrounds the bore centered at the same station."
+                ]
+              },
+              {
+                "brep_id": "FACE 265",
+                "face_code": "FACE 265",
+                "entity_type": "cad:Face",
+                "geometry_type": "cad:ToroidalSurface",
+                "semantic_role": "cad:FilletSurfaceRole",
+                "name": "Lug A rim blend",
+                "description": "Toroidal edge blend around the enlarged lug perimeter.",
+                "salience": "cad:SecondarySalience",
+                "confidence": 0.95,
+                "evidence": [
+                  "TORUS major radius 0.760000 mm and minor radius 0.040000 mm.",
+                  "Torus center shares the lug centerline."
+                ]
+              }
+            ],
+            "confidence": 0.96
+          },
+          {
+            "id": "F003",
+            "name": "Mounting lug B",
+            "ontology_class": "cad:LugFeature",
+            "parent_feature_id": "F001",
+            "description": "Reinforced mounting lug centered near CAD (x=0.293627, z=1.473530) mm.",
+            "interface_type": "cad:MountingInterface",
+            "feature_functions": [
+              {
+                "ontology_class": "cad:MountFunction",
+                "name": "Reinforce fastener station",
+                "description": "Provides material around mounting hole F007.",
+                "primary": true,
+                "confidence": 0.96
+              }
+            ],
+            "feature_behaviors": [
+              {
+                "ontology_class": "cad:SpreadLoadBehavior",
+                "name": "Spread local fastener load",
+                "description": "Distributes bearing and clamp loads into the flange.",
+                "confidence": 0.94
+              }
+            ],
+            "relationships": [
+              {
+                "target_feature_id": "F007",
+                "category": "cad:GeometricFeatureRelationship",
+                "relation": "cad:surroundsFeature",
+                "description": "The lug surrounds its mounting through hole.",
+                "confidence": 0.99
+              }
+            ],
+            "brep_faces": [
+              {
+                "brep_id": "FACE 85",
+                "face_code": "FACE 85",
+                "entity_type": "cad:Face",
+                "geometry_type": "cad:CylindricalSurface",
+                "semantic_role": "cad:OuterWallRole",
+                "name": "Lug B outer wall",
+                "description": "Radius 0.800000 mm cylindrical outer wall centered on the lug station.",
+                "salience": "cad:RepresentativeSalience",
+                "confidence": 0.96,
+                "evidence": [
+                  "CYLINDER radius 0.800000 mm.",
+                  "Cylinder origin (0.293627,4.910000,1.473530) mm.",
+                  "Cylinder axis is parallel to CAD Y."
+                ]
+              },
+              {
+                "brep_id": "FACE 86",
+                "face_code": "FACE 86",
+                "entity_type": "cad:Face",
+                "geometry_type": "cad:PlanarSurface",
+                "semantic_role": "cad:MountingSeatRole",
+                "name": "Lug B annular seat",
+                "description": "Planar annular surface around mounting hole F007 at CAD y=0.590000 mm.",
+                "salience": "cad:PrimarySalience",
+                "confidence": 0.97,
+                "evidence": [
+                  "PLANE at constant CAD y=0.590000 mm.",
+                  "Two wires indicate an annular face."
+                ]
+              },
+              {
+                "brep_id": "FACE 264",
+                "face_code": "FACE 264",
+                "entity_type": "cad:Face",
+                "geometry_type": "cad:ToroidalSurface",
+                "semantic_role": "cad:FilletSurfaceRole",
+                "name": "Lug B rim blend",
+                "description": "Toroidal blend around the enlarged lug perimeter.",
+                "salience": "cad:SecondarySalience",
+                "confidence": 0.95,
+                "evidence": [
+                  "TORUS major radius 0.760000 mm and minor radius 0.040000 mm.",
+                  "Torus center matches the lug station."
+                ]
+              }
+            ],
+            "confidence": 0.96
+          },
+          {
+            "id": "F004",
+            "name": "Mounting lug C",
+            "ontology_class": "cad:LugFeature",
+            "parent_feature_id": "F001",
+            "description": "Reinforced mounting lug centered near CAD (x=11.953627, z=1.123530) mm.",
+            "interface_type": "cad:MountingInterface",
+            "feature_functions": [
+              {
+                "ontology_class": "cad:MountFunction",
+                "name": "Reinforce fastener station",
+                "description": "Provides material around mounting hole F008.",
+                "primary": true,
+                "confidence": 0.96
+              }
+            ],
+            "feature_behaviors": [
+              {
+                "ontology_class": "cad:SpreadLoadBehavior",
+                "name": "Spread local fastener load",
+                "description": "Distributes bearing and clamp loads into the flange.",
+                "confidence": 0.94
+              }
+            ],
+            "relationships": [
+              {
+                "target_feature_id": "F008",
+                "category": "cad:GeometricFeatureRelationship",
+                "relation": "cad:surroundsFeature",
+                "description": "The lug surrounds its mounting through hole.",
+                "confidence": 0.99
+              }
+            ],
+            "brep_faces": [
+              {
+                "brep_id": "FACE 41",
+                "face_code": "FACE 41",
+                "entity_type": "cad:Face",
+                "geometry_type": "cad:CylindricalSurface",
+                "semantic_role": "cad:OuterWallRole",
+                "name": "Lug C outer wall",
+                "description": "Radius 0.800000 mm cylindrical outer wall centered on the lug station.",
+                "salience": "cad:RepresentativeSalience",
+                "confidence": 0.96,
+                "evidence": [
+                  "CYLINDER radius 0.800000 mm.",
+                  "Cylinder origin (11.953627,4.910000,1.123530) mm.",
+                  "Cylinder axis is parallel to CAD Y."
+                ]
+              },
+              {
+                "brep_id": "FACE 87",
+                "face_code": "FACE 87",
+                "entity_type": "cad:Face",
+                "geometry_type": "cad:PlanarSurface",
+                "semantic_role": "cad:MountingSeatRole",
+                "name": "Lug C annular seat",
+                "description": "Planar annular surface around mounting hole F008 at CAD y=0.590000 mm.",
+                "salience": "cad:PrimarySalience",
+                "confidence": 0.97,
+                "evidence": [
+                  "PLANE at constant CAD y=0.590000 mm.",
+                  "Two wires indicate an annular face."
+                ]
+              },
+              {
+                "brep_id": "FACE 263",
+                "face_code": "FACE 263",
+                "entity_type": "cad:Face",
+                "geometry_type": "cad:ToroidalSurface",
+                "semantic_role": "cad:FilletSurfaceRole",
+                "name": "Lug C rim blend",
+                "description": "Toroidal blend around the enlarged lug perimeter.",
+                "salience": "cad:SecondarySalience",
+                "confidence": 0.95,
+                "evidence": [
+                  "TORUS major radius 0.760000 mm and minor radius 0.040000 mm.",
+                  "Torus center matches the lug station."
+                ]
+              }
+            ],
+            "confidence": 0.96
+          },
+          {
+            "id": "F005",
+            "name": "Mounting lug D",
+            "ontology_class": "cad:LugFeature",
+            "parent_feature_id": "F001",
+            "description": "Reinforced mounting lug centered near CAD (x=11.953627, z=-2.986470) mm.",
+            "interface_type": "cad:MountingInterface",
+            "feature_functions": [
+              {
+                "ontology_class": "cad:MountFunction",
+                "name": "Reinforce fastener station",
+                "description": "Provides material around mounting hole F009.",
+                "primary": true,
+                "confidence": 0.96
+              }
+            ],
+            "feature_behaviors": [
+              {
+                "ontology_class": "cad:SpreadLoadBehavior",
+                "name": "Spread local fastener load",
+                "description": "Distributes bearing and clamp loads into the flange.",
+                "confidence": 0.94
+              }
+            ],
+            "relationships": [
+              {
+                "target_feature_id": "F009",
+                "category": "cad:GeometricFeatureRelationship",
+                "relation": "cad:surroundsFeature",
+                "description": "The lug surrounds its mounting through hole.",
+                "confidence": 0.99
+              }
+            ],
+            "brep_faces": [
+              {
+                "brep_id": "FACE 40",
+                "face_code": "FACE 40",
+                "entity_type": "cad:Face",
+                "geometry_type": "cad:CylindricalSurface",
+                "semantic_role": "cad:OuterWallRole",
+                "name": "Lug D outer wall",
+                "description": "Radius 0.800000 mm cylindrical outer wall centered on the lug station.",
+                "salience": "cad:RepresentativeSalience",
+                "confidence": 0.96,
+                "evidence": [
+                  "CYLINDER radius 0.800000 mm.",
+                  "Cylinder origin (11.953627,4.910000,-2.986470) mm.",
+                  "Cylinder axis is parallel to CAD Y."
+                ]
+              },
+              {
+                "brep_id": "FACE 88",
+                "face_code": "FACE 88",
+                "entity_type": "cad:Face",
+                "geometry_type": "cad:PlanarSurface",
+                "semantic_role": "cad:MountingSeatRole",
+                "name": "Lug D annular seat",
+                "description": "Planar annular surface around mounting hole F009 at CAD y=0.590000 mm.",
+                "salience": "cad:PrimarySalience",
+                "confidence": 0.97,
+                "evidence": [
+                  "PLANE at constant CAD y=0.590000 mm.",
+                  "Two wires indicate an annular face."
+                ]
+              },
+              {
+                "brep_id": "FACE 262",
+                "face_code": "FACE 262",
+                "entity_type": "cad:Face",
+                "geometry_type": "cad:ToroidalSurface",
+                "semantic_role": "cad:FilletSurfaceRole",
+                "name": "Lug D rim blend",
+                "description": "Toroidal blend around the enlarged lug perimeter.",
+                "salience": "cad:SecondarySalience",
+                "confidence": 0.95,
+                "evidence": [
+                  "TORUS major radius 0.760000 mm and minor radius 0.040000 mm.",
+                  "Torus center matches the lug station."
+                ]
+              }
+            ],
+            "confidence": 0.96
+          },
+          {
+            "id": "F006",
+            "name": "Mounting through hole A",
+            "ontology_class": "cad:ThroughHoleFeature",
+            "parent_feature_id": "F002",
+            "description": "Radius 0.400000 mm through hole centered within mounting lug A and directed along CAD Y.",
+            "interface_type": "cad:MountingInterface",
+            "feature_functions": [
+              {
+                "ontology_class": "cad:FasteningFunction",
+                "name": "Receive mounting fastener",
+                "description": "Provides passage for a bolt or equivalent mounting fastener.",
+                "primary": true,
+                "confidence": 0.98
+              }
+            ],
+            "feature_behaviors": [
+              {
+                "ontology_class": "cad:ReactBearingLoadBehavior",
+                "name": "React fastener bearing load",
+                "description": "The cylindrical bore wall reacts transverse contact from the fastener shank.",
+                "confidence": 0.94
+              }
+            ],
+            "relationships": [
+              {
+                "target_feature_id": "F002",
+                "category": "cad:GeometricFeatureRelationship",
+                "relation": "cad:insideFeature",
+                "description": "The through hole is inside mounting lug A.",
+                "confidence": 0.99
+              }
+            ],
+            "brep_faces": [
+              {
+                "brep_id": "FACE 50",
+                "face_code": "FACE 50",
+                "entity_type": "cad:Face",
+                "geometry_type": "cad:CylindricalSurface",
+                "semantic_role": "cad:BoreWallRole",
+                "name": "Mounting bore A",
+                "description": "Cylindrical bore wall of radius 0.400000 mm extending from CAD y=-0.010000 to 0.590000 mm.",
+                "salience": "cad:PrimarySalience",
+                "confidence": 0.99,
+                "evidence": [
+                  "CYLINDER radius 0.400000 mm.",
+                  "Cylinder axis is parallel to CAD Y.",
+                  "Bounding box y=(-0.010000,0.590000) mm.",
+                  "Centerline is (x=0.293627,z=-1.526470) mm."
+                ]
+              }
+            ],
+            "confidence": 0.99
+          },
+          {
+            "id": "F007",
+            "name": "Mounting through hole B",
+            "ontology_class": "cad:ThroughHoleFeature",
+            "parent_feature_id": "F003",
+            "description": "Radius 0.400000 mm through hole centered within mounting lug B and directed along CAD Y.",
+            "interface_type": "cad:MountingInterface",
+            "feature_functions": [
+              {
+                "ontology_class": "cad:FasteningFunction",
+                "name": "Receive mounting fastener",
+                "description": "Provides passage for a bolt or equivalent mounting fastener.",
+                "primary": true,
+                "confidence": 0.98
+              }
+            ],
+            "feature_behaviors": [
+              {
+                "ontology_class": "cad:ReactBearingLoadBehavior",
+                "name": "React fastener bearing load",
+                "description": "The cylindrical bore wall reacts transverse contact from the fastener shank.",
+                "confidence": 0.94
+              }
+            ],
+            "relationships": [
+              {
+                "target_feature_id": "F003",
+                "category": "cad:GeometricFeatureRelationship",
+                "relation": "cad:insideFeature",
+                "description": "The through hole is inside mounting lug B.",
+                "confidence": 0.99
+              }
+            ],
+            "brep_faces": [
+              {
+                "brep_id": "FACE 49",
+                "face_code": "FACE 49",
+                "entity_type": "cad:Face",
+                "geometry_type": "cad:CylindricalSurface",
+                "semantic_role": "cad:BoreWallRole",
+                "name": "Mounting bore B",
+                "description": "Cylindrical bore wall of radius 0.400000 mm extending from CAD y=-0.010000 to 0.590000 mm.",
+                "salience": "cad:PrimarySalience",
+                "confidence": 0.99,
+                "evidence": [
+                  "CYLINDER radius 0.400000 mm.",
+                  "Cylinder axis is parallel to CAD Y.",
+                  "Centerline is (x=0.293627,z=1.473530) mm."
+                ]
+              }
+            ],
+            "confidence": 0.99
+          },
+          {
+            "id": "F008",
+            "name": "Mounting through hole C",
+            "ontology_class": "cad:ThroughHoleFeature",
+            "parent_feature_id": "F004",
+            "description": "Radius 0.400000 mm through hole centered within mounting lug C and directed along CAD Y.",
+            "interface_type": "cad:MountingInterface",
+            "feature_functions": [
+              {
+                "ontology_class": "cad:FasteningFunction",
+                "name": "Receive mounting fastener",
+                "description": "Provides passage for a bolt or equivalent mounting fastener.",
+                "primary": true,
+                "confidence": 0.98
+              }
+            ],
+            "feature_behaviors": [
+              {
+                "ontology_class": "cad:ReactBearingLoadBehavior",
+                "name": "React fastener bearing load",
+                "description": "The cylindrical bore wall reacts transverse contact from the fastener shank.",
+                "confidence": 0.94
+              }
+            ],
+            "relationships": [
+              {
+                "target_feature_id": "F004",
+                "category": "cad:GeometricFeatureRelationship",
+                "relation": "cad:insideFeature",
+                "description": "The through hole is inside mounting lug C.",
+                "confidence": 0.99
+              }
+            ],
+            "brep_faces": [
+              {
+                "brep_id": "FACE 51",
+                "face_code": "FACE 51",
+                "entity_type": "cad:Face",
+                "geometry_type": "cad:CylindricalSurface",
+                "semantic_role": "cad:BoreWallRole",
+                "name": "Mounting bore C",
+                "description": "Cylindrical bore wall of radius 0.400000 mm extending from CAD y=-0.010000 to 0.590000 mm.",
+                "salience": "cad:PrimarySalience",
+                "confidence": 0.99,
+                "evidence": [
+                  "CYLINDER radius 0.400000 mm.",
+                  "Cylinder axis is parallel to CAD Y.",
+                  "Centerline is (x=11.953627,z=1.123530) mm."
+                ]
+              }
+            ],
+            "confidence": 0.99
+          },
+          {
+            "id": "F009",
+            "name": "Mounting through hole D",
+            "ontology_class": "cad:ThroughHoleFeature",
+            "parent_feature_id": "F005",
+            "description": "Radius 0.400000 mm through hole centered within mounting lug D and directed along CAD Y.",
+            "interface_type": "cad:MountingInterface",
+            "feature_functions": [
+              {
+                "ontology_class": "cad:FasteningFunction",
+                "name": "Receive mounting fastener",
+                "description": "Provides passage for a bolt or equivalent mounting fastener.",
+                "primary": true,
+                "confidence": 0.98
+              }
+            ],
+            "feature_behaviors": [
+              {
+                "ontology_class": "cad:ReactBearingLoadBehavior",
+                "name": "React fastener bearing load",
+                "description": "The cylindrical bore wall reacts transverse contact from the fastener shank.",
+                "confidence": 0.94
+              }
+            ],
+            "relationships": [
+              {
+                "target_feature_id": "F005",
+                "category": "cad:GeometricFeatureRelationship",
+                "relation": "cad:insideFeature",
+                "description": "The through hole is inside mounting lug D.",
+                "confidence": 0.99
+              }
+            ],
+            "brep_faces": [
+              {
+                "brep_id": "FACE 52",
+                "face_code": "FACE 52",
+                "entity_type": "cad:Face",
+                "geometry_type": "cad:CylindricalSurface",
+                "semantic_role": "cad:BoreWallRole",
+                "name": "Mounting bore D",
+                "description": "Cylindrical bore wall of radius 0.400000 mm extending from CAD y=-0.010000 to 0.590000 mm.",
+                "salience": "cad:PrimarySalience",
+                "confidence": 0.99,
+                "evidence": [
+                  "CYLINDER radius 0.400000 mm.",
+                  "Cylinder axis is parallel to CAD Y.",
+                  "Centerline is (x=11.953627,z=-2.986470) mm."
+                ]
+              }
+            ],
+            "confidence": 0.99
+          }
+        ],
+        "unclassified_brep_faces": [],
+        "relationships": [],
+        "confidence": 0.95
+      },
+      {
+        "id": "R02",
+        "name": "Webbed structural body",
+        "ontology_class": "cad:MainBodySection",
+        "description": "The integral load-transfer body between the mounting flange and clevis, including inclined webs, curved transitions, edge blends, and an underside relief cavity.",
+        "location": "Between and surrounding the four mounting stations, extending from the flange toward the elevated clevis ears.",
+        "solid_ids": [
+          "SOLID 0"
+        ],
+        "colour": {
+          "R": 227,
+          "G": 137,
+          "B": 43
+        },
+        "section_functions": [
+          {
+            "ontology_class": "cad:TransferLoadFunction",
+            "name": "Transfer clevis load",
+            "description": "Transfers forces from the clevis ears to the four-point mounting flange.",
+            "primary": true,
+            "confidence": 0.96
+          },
+          {
+            "ontology_class": "cad:ReduceMassFunction",
+            "name": "Reduce mass",
+            "description": "The underside cavity removes material while retaining a webbed load path.",
+            "primary": false,
+            "confidence": 0.88
+          }
+        ],
+        "section_behaviors": [
+          {
+            "ontology_class": "cad:ResistBendingBehavior",
+            "name": "Resist global bending",
+            "description": "The separated webs and deep section resist bending between the clevis and mounting flange.",
+            "confidence": 0.95
+          },
+          {
+            "ontology_class": "cad:CarryTensionBehavior",
+            "name": "Carry tensile load paths",
+            "description": "Inclined webs carry tensile components between the clevis and mounting stations.",
+            "confidence": 0.84
+          },
+          {
+            "ontology_class": "cad:CarryCompressionBehavior",
+            "name": "Carry compressive load paths",
+            "description": "The web network carries compressive components into the flange.",
+            "confidence": 0.88
+          }
+        ],
+        "feature_groups": [],
+        "features": [
+          {
+            "id": "F014",
+            "name": "First inclined load web",
+            "ontology_class": "cad:WebFeature",
+            "parent_feature_id": null,
+            "description": "Broad inclined web on one side of the body, joining the mounting region to the clevis support zone.",
+            "interface_type": null,
+            "feature_functions": [
+              {
+                "ontology_class": "cad:TransferLoadFunction",
+                "name": "Transfer load to flange",
+                "description": "Carries clevis reactions toward one group of mounting stations.",
+                "primary": true,
+                "confidence": 0.92
+              }
+            ],
+            "feature_behaviors": [
+              {
+                "ontology_class": "cad:ResistBendingBehavior",
+                "name": "Resist web bending",
+                "description": "Its depth and inclined orientation resist bending under clevis loading.",
+                "confidence": 0.91
+              }
+            ],
+            "relationships": [
+              {
+                "target_feature_id": "F010",
+                "category": "cad:FunctionalFeatureRelationship",
+                "relation": "cad:supportsFeature",
+                "description": "The web supports the first clevis ear.",
+                "confidence": 0.91
+              },
+              {
+                "target_feature_id": "F001",
+                "category": "cad:FunctionalFeatureRelationship",
+                "relation": "cad:transmitsLoadTo",
+                "description": "The web transmits clevis reaction into the base flange.",
+                "confidence": 0.94
+              }
+            ],
+            "brep_faces": [
+              {
+                "brep_id": "FACE 53",
+                "face_code": "FACE 53",
+                "entity_type": "cad:Face",
+                "geometry_type": "cad:PlanarSurface",
+                "semantic_role": "cad:SideWallRole",
+                "name": "First web broad side",
+                "description": "Large inclined planar side face of the first structural web.",
+                "salience": "cad:PrimarySalience",
+                "confidence": 0.88,
+                "evidence": [
+                  "PLANE area 13.546085 mm^2.",
+                  "Bounding box spans x=-0.467052 to 4.697641 mm and a broad range of z.",
+                  "Visual correspondence with one inclined side of the body."
+                ]
+              },
+              {
+                "brep_id": "FACE 80",
+                "face_code": "FACE 80",
+                "entity_type": "cad:Face",
+                "geometry_type": "cad:PlanarSurface",
+                "semantic_role": "cad:SupportFaceRole",
+                "name": "First web inclined support face",
+                "description": "Triangular inclined plane forming a principal load path.",
+                "salience": "cad:PrimarySalience",
+                "confidence": 0.9,
+                "evidence": [
+                  "PLANE area 6.303047 mm^2.",
+                  "Plane normal (0.000000,0.906308,0.422618).",
+                  "Three-edge topology is consistent with a triangular web face."
+                ]
+              },
+              {
+                "brep_id": "FACE 98",
+                "face_code": "FACE 98",
+                "entity_type": "cad:Face",
+                "geometry_type": "cad:PlanarSurface",
+                "semantic_role": "cad:SideWallRole",
+                "name": "First web inner side",
+                "description": "Opposing broad planar surface associated with the first inclined web.",
+                "salience": "cad:SecondarySalience",
+                "confidence": 0.8,
+                "evidence": [
+                  "PLANE area 7.767158 mm^2.",
+                  "Bounding box lies within the first half of the bracket body."
+                ]
+              }
+            ],
+            "confidence": 0.9
+          },
+          {
+            "id": "F015",
+            "name": "Second inclined load web",
+            "ontology_class": "cad:WebFeature",
+            "parent_feature_id": null,
+            "description": "Broad inclined web on the opposite side of the body, joining the mounting region to the clevis support zone.",
+            "interface_type": null,
+            "feature_functions": [
+              {
+                "ontology_class": "cad:TransferLoadFunction",
+                "name": "Transfer load to flange",
+                "description": "Carries clevis reactions toward the opposite mounting stations.",
+                "primary": true,
+                "confidence": 0.92
+              }
+            ],
+            "feature_behaviors": [
+              {
+                "ontology_class": "cad:ResistBendingBehavior",
+                "name": "Resist web bending",
+                "description": "Its depth and inclined orientation resist bending under clevis loading.",
+                "confidence": 0.91
+              }
+            ],
+            "relationships": [
+              {
+                "target_feature_id": "F011",
+                "category": "cad:FunctionalFeatureRelationship",
+                "relation": "cad:supportsFeature",
+                "description": "The web supports the second clevis ear.",
+                "confidence": 0.91
+              },
+              {
+                "target_feature_id": "F001",
+                "category": "cad:FunctionalFeatureRelationship",
+                "relation": "cad:transmitsLoadTo",
+                "description": "The web transmits clevis reaction into the base flange.",
+                "confidence": 0.94
+              }
+            ],
+            "brep_faces": [
+              {
+                "brep_id": "FACE 55",
+                "face_code": "FACE 55",
+                "entity_type": "cad:Face",
+                "geometry_type": "cad:PlanarSurface",
+                "semantic_role": "cad:SideWallRole",
+                "name": "Second web broad side",
+                "description": "Large inclined planar side face of the second structural web.",
+                "salience": "cad:PrimarySalience",
+                "confidence": 0.88,
+                "evidence": [
+                  "PLANE area 15.453166 mm^2.",
+                  "Bounding box spans x=7.547638 to 12.783028 mm.",
+                  "Visual correspondence with the opposite inclined side of the body."
+                ]
+              },
+              {
+                "brep_id": "FACE 81",
+                "face_code": "FACE 81",
+                "entity_type": "cad:Face",
+                "geometry_type": "cad:PlanarSurface",
+                "semantic_role": "cad:SupportFaceRole",
+                "name": "Second web inclined support face",
+                "description": "Triangular inclined plane forming the opposing principal load path.",
+                "salience": "cad:PrimarySalience",
+                "confidence": 0.9,
+                "evidence": [
+                  "PLANE area 5.806291 mm^2.",
+                  "Plane normal (0.000000,0.906308,0.422618).",
+                  "Three-edge topology is consistent with a triangular web face."
+                ]
+              },
+              {
+                "brep_id": "FACE 97",
+                "face_code": "FACE 97",
+                "entity_type": "cad:Face",
+                "geometry_type": "cad:PlanarSurface",
+                "semantic_role": "cad:SideWallRole",
+                "name": "Second web inner side",
+                "description": "Opposing broad planar surface associated with the second inclined web.",
+                "salience": "cad:SecondarySalience",
+                "confidence": 0.8,
+                "evidence": [
+                  "PLANE area 9.573341 mm^2.",
+                  "Bounding box lies within the second half of the bracket body."
+                ]
+              }
+            ],
+            "confidence": 0.9
+          },
+          {
+            "id": "F016",
+            "name": "Central bridge web",
+            "ontology_class": "cad:WebFeature",
+            "parent_feature_id": null,
+            "description": "Central web and bridge surfaces tying the clevis support region into the surrounding body.",
+            "interface_type": null,
+            "feature_functions": [
+              {
+                "ontology_class": "cad:SupportFunction",
+                "name": "Support clevis bridge",
+                "description": "Maintains separation and support beneath the two clevis ears.",
+                "primary": true,
+                "confidence": 0.91
+              }
+            ],
+            "feature_behaviors": [
+              {
+                "ontology_class": "cad:DistributeStressBehavior",
+                "name": "Distribute clevis stress",
+                "description": "Spreads pin reaction from the ear roots into multiple web paths.",
+                "confidence": 0.91
+              }
+            ],
+            "relationships": [
+              {
+                "target_feature_id": "F010",
+                "category": "cad:StructuralFeatureRelationship",
+                "relation": "cad:attachedTo",
+                "description": "The bridge web is integral with the first clevis ear.",
+                "confidence": 0.92
+              },
+              {
+                "target_feature_id": "F011",
+                "category": "cad:StructuralFeatureRelationship",
+                "relation": "cad:attachedTo",
+                "description": "The bridge web is integral with the second clevis ear.",
+                "confidence": 0.92
+              }
+            ],
+            "brep_faces": [
+              {
+                "brep_id": "FACE 91",
+                "face_code": "FACE 91",
+                "entity_type": "cad:Face",
+                "geometry_type": "cad:PlanarSurface",
+                "semantic_role": "cad:SupportFaceRole",
+                "name": "Central bridge support plane",
+                "description": "Large central inclined plane between the clevis support walls.",
+                "salience": "cad:PrimarySalience",
+                "confidence": 0.92,
+                "evidence": [
+                  "PLANE area 7.774535 mm^2.",
+                  "Bounding box x=(5.357640,6.887640) mm lies between the clevis ears."
+                ]
+              },
+              {
+                "brep_id": "FACE 92",
+                "face_code": "FACE 92",
+                "entity_type": "cad:Face",
+                "geometry_type": "cad:PlanarSurface",
+                "semantic_role": "cad:SupportFaceRole",
+                "name": "Upper bridge plane",
+                "description": "Broad inclined plane connecting the central web to the upper body.",
+                "salience": "cad:PrimarySalience",
+                "confidence": 0.86,
+                "evidence": [
+                  "PLANE area 8.769343 mm^2.",
+                  "Bounding box spans the central bracket width."
+                ]
+              },
+              {
+                "brep_id": "FACE 99",
+                "face_code": "FACE 99",
+                "entity_type": "cad:Face",
+                "geometry_type": "cad:PlanarSurface",
+                "semantic_role": "cad:SupportFaceRole",
+                "name": "Central body support plane",
+                "description": "Large nine-edge inclined planar face forming a major central structural surface.",
+                "salience": "cad:PrimarySalience",
+                "confidence": 0.87,
+                "evidence": [
+                  "PLANE area 20.170858 mm^2.",
+                  "Bounding box spans x=2.281608 to 9.792945 mm."
+                ]
+              }
+            ],
+            "confidence": 0.9
+          },
+          {
+            "id": "F017",
+            "name": "Underside mass-relief cavity",
+            "ontology_class": "cad:CavityFeature",
+            "parent_feature_id": null,
+            "description": "Large open underside relief bounded by planar, cylindrical, and blended walls between the structural webs.",
+            "interface_type": null,
+            "feature_functions": [
+              {
+                "ontology_class": "cad:ReduceMassFunction",
+                "name": "Reduce body mass",
+                "description": "Removes low-utility interior material while preserving peripheral and diagonal load paths.",
+                "primary": true,
+                "confidence": 0.9
+              },
+              {
+                "ontology_class": "cad:ProvideClearanceFunction",
+                "name": "Provide underside clearance",
+                "description": "Provides an open volume beneath the central web structure.",
+                "primary": false,
+                "confidence": 0.73
+              }
+            ],
+            "feature_behaviors": [
+              {
+                "ontology_class": "cad:DistributeStressBehavior",
+                "name": "Retain load paths around relief",
+                "description": "The cavity leaves material concentrated in surrounding webs and wall transitions.",
+                "confidence": 0.84
+              }
+            ],
+            "relationships": [
+              {
+                "target_feature_id": "F014",
+                "category": "cad:GeometricFeatureRelationship",
+                "relation": "cad:between",
+                "description": "The relief lies inward of the first load web and the opposing structural web network.",
+                "confidence": 0.83
+              }
+            ],
+            "brep_faces": [
+              {
+                "brep_id": "FACE 57",
+                "face_code": "FACE 57",
+                "entity_type": "cad:Face",
+                "geometry_type": "cad:PlanarSurface",
+                "semantic_role": "cad:CavityWallRole",
+                "name": "First cavity wall",
+                "description": "Inclined planar wall forming one boundary of the underside relief.",
+                "salience": "cad:RepresentativeSalience",
+                "confidence": 0.82,
+                "evidence": [
+                  "PLANE area 0.690087 mm^2.",
+                  "Visual correspondence with an interior relief boundary."
+                ]
+              },
+              {
+                "brep_id": "FACE 66",
+                "face_code": "FACE 66",
+                "entity_type": "cad:Face",
+                "geometry_type": "cad:PlanarSurface",
+                "semantic_role": "cad:CavityWallRole",
+                "name": "Large cavity wall",
+                "description": "Large inclined planar boundary of the underside cavity.",
+                "salience": "cad:PrimarySalience",
+                "confidence": 0.88,
+                "evidence": [
+                  "PLANE area 4.902348 mm^2.",
+                  "Bounding box spans much of the central body."
+                ]
+              },
+              {
+                "brep_id": "FACE 93",
+                "face_code": "FACE 93",
+                "entity_type": "cad:Face",
+                "geometry_type": "cad:PlanarSurface",
+                "semantic_role": "cad:CavityWallRole",
+                "name": "Cavity transition wall A",
+                "description": "Small planar transition at one cavity corner.",
+                "salience": "cad:SecondarySalience",
+                "confidence": 0.77,
+                "evidence": [
+                  "PLANE area 0.417831 mm^2.",
+                  "Located along an interior cavity boundary."
+                ]
+              },
+              {
+                "brep_id": "FACE 94",
+                "face_code": "FACE 94",
+                "entity_type": "cad:Face",
+                "geometry_type": "cad:PlanarSurface",
+                "semantic_role": "cad:CavityWallRole",
+                "name": "Cavity transition wall B",
+                "description": "Inclined planar transition within the relief boundary.",
+                "salience": "cad:SecondarySalience",
+                "confidence": 0.77,
+                "evidence": [
+                  "PLANE area 1.219393 mm^2."
+                ]
+              },
+              {
+                "brep_id": "FACE 95",
+                "face_code": "FACE 95",
+                "entity_type": "cad:Face",
+                "geometry_type": "cad:PlanarSurface",
+                "semantic_role": "cad:CavityWallRole",
+                "name": "Cavity floor or side plane",
+                "description": "Broad interior plane forming part of the mass-relief boundary.",
+                "salience": "cad:RepresentativeSalience",
+                "confidence": 0.82,
+                "evidence": [
+                  "PLANE area 3.174695 mm^2.",
+                  "Bounding box lies inside the webbed body."
+                ]
+              },
+              {
+                "brep_id": "FACE 100",
+                "face_code": "FACE 100",
+                "entity_type": "cad:Face",
+                "geometry_type": "cad:PlanarSurface",
+                "semantic_role": "cad:CavityWallRole",
+                "name": "Opposing cavity wall",
+                "description": "Inclined planar wall on the opposing side of the relief.",
+                "salience": "cad:RepresentativeSalience",
+                "confidence": 0.82,
+                "evidence": [
+                  "PLANE area 1.678628 mm^2."
+                ]
+              },
+              {
+                "brep_id": "FACE 107",
+                "face_code": "FACE 107",
+                "entity_type": "cad:Face",
+                "geometry_type": "cad:CylindricalSurface",
+                "semantic_role": "cad:CavityWallRole",
+                "name": "Curved cavity boundary",
+                "description": "Large-radius cylindrical surface forming a curved interior boundary of the relief.",
+                "salience": "cad:PrimarySalience",
+                "confidence": 0.84,
+                "evidence": [
+                  "CYLINDER radius 11.710000 mm.",
+                  "Area 5.841087 mm^2.",
+                  "Bounding box spans x=2.288156 to 10.056479 mm."
+                ]
+              }
+            ],
+            "confidence": 0.86
+          }
+        ],
+        "unclassified_brep_faces": [
+          {
+            "brep_ids": [
+              "FACE 0-FACE 39",
+              "FACE 42-FACE 43",
+              "FACE 45",
+              "FACE 47-FACE 48",
+              "FACE 54",
+              "FACE 56",
+              "FACE 58-FACE 65",
+              "FACE 67-FACE 76",
+              "FACE 82",
+              "FACE 96",
+              "FACE 101-FACE 102",
+              "FACE 104-FACE 106",
+              "FACE 108-FACE 261"
+            ],
+            "salience": "cad:SecondarySalience",
+            "description": "Inclusive FACE ranges assigned to the integral structural body and its transition network. They comprise secondary outer walls, internal support surfaces, local fillets, small spherical and toroidal corner patches, and B-spline transition faces not confidently separable into additional engineering features. Important mounting, web, cavity, and clevis faces are excluded from these ranges.",
+            "confidence": 0.66
+          }
+        ],
+        "relationships": [],
+        "confidence": 0.9
+      },
+      {
+        "id": "R03",
+        "name": "Elevated clevis interface",
+        "ontology_class": "cad:CentralSection",
+        "description": "Two parallel ears separated by an open clevis gap and carrying a common coaxial pin passage.",
+        "location": "Projecting from the central structural body, opposite the mounting side; the two ears lie on opposite sides of the central gap.",
+        "solid_ids": [
+          "SOLID 0"
+        ],
+        "colour": {
+          "R": 53,
+          "G": 170,
+          "B": 104
+        },
+        "section_functions": [
+          {
+            "ontology_class": "cad:ConnectFunction",
+            "name": "Connect pinned linkage",
+            "description": "Provides a forked connection for an external link or member retained by a transverse pin.",
+            "primary": true,
+            "confidence": 0.97
+          },
+          {
+            "ontology_class": "cad:ReceivePinFunction",
+            "name": "Receive clevis pin",
+            "description": "The paired ear bores receive a common pin across the intervening gap.",
+            "primary": false,
+            "confidence": 0.99
+          }
+        ],
+        "section_behaviors": [
+          {
+            "ontology_class": "cad:ReactBearingLoadBehavior",
+            "name": "React pin bearing load",
+            "description": "The two ear bores react distributed bearing contact from a transverse pin.",
+            "confidence": 0.97
+          },
+          {
+            "ontology_class": "cad:CarryShearBehavior",
+            "name": "Carry double-ear shear",
+            "description": "The paired ears carry opposing shear reactions into the supporting webs.",
+            "confidence": 0.93
+          },
+          {
+            "ontology_class": "cad:PermitRotationBehavior",
+            "name": "Permit pinned rotation",
+            "description": "A fitted pin can provide a rotational degree of freedom for the connected member.",
+            "confidence": 0.88
+          }
+        ],
+        "feature_groups": [
+          {
+            "id": "G003",
+            "name": "Paired clevis ears",
+            "ontology_class": "cad:RepeatedFeatureGroup",
+            "feature_class": "cad:LugFeature",
+            "pattern_type": "cad:PairedPattern",
+            "member_count": 2,
+            "member_feature_ids": [
+              "F010",
+              "F011"
+            ],
+            "representative_feature_ids": [
+              "F010"
+            ],
+            "pattern_description": "Two parallel, spaced ears with planar inner and outer side faces.",
+            "confidence": 0.99
+          },
+          {
+            "id": "G004",
+            "name": "Coaxial clevis pin bores",
+            "ontology_class": "cad:RepeatedFeatureGroup",
+            "feature_class": "cad:ThroughHoleFeature",
+            "pattern_type": "cad:PairedPattern",
+            "member_count": 2,
+            "member_feature_ids": [
+              "F012",
+              "F013"
+            ],
+            "representative_feature_ids": [
+              "F012"
+            ],
+            "pattern_description": "Two radius 0.750000 mm cylindrical bores sharing the same CAD X-directed axis at y=3.510000 mm and z=2.943179 mm.",
+            "confidence": 1.0
+          }
+        ],
+        "features": [
+          {
+            "id": "F010",
+            "name": "First clevis ear",
+            "ontology_class": "cad:LugFeature",
+            "parent_feature_id": null,
+            "description": "First plate-like ear of the clevis, bounded by planar faces at approximately CAD x=4.697641 and 5.297640 mm.",
+            "interface_type": "cad:PinInterface",
+            "feature_functions": [
+              {
+                "ontology_class": "cad:SupportFunction",
+                "name": "Support pin end",
+                "description": "Supports one side of the transverse pin connection.",
+                "primary": true,
+                "confidence": 0.98
+              }
+            ],
+            "feature_behaviors": [
+              {
+                "ontology_class": "cad:CarryShearBehavior",
+                "name": "Carry pin shear",
+                "description": "Transfers pin bearing and shear reactions into the webbed body.",
+                "confidence": 0.96
+              }
+            ],
+            "relationships": [
+              {
+                "target_feature_id": "F011",
+                "category": "cad:GeometricFeatureRelationship",
+                "relation": "cad:parallelTo",
+                "description": "The two clevis ears have parallel principal side faces.",
+                "confidence": 0.99
+              },
+              {
+                "target_feature_id": "F012",
+                "category": "cad:GeometricFeatureRelationship",
+                "relation": "cad:surroundsFeature",
+                "description": "The first ear surrounds its pin bore.",
+                "confidence": 0.99
+              }
+            ],
+            "brep_faces": [
+              {
+                "brep_id": "FACE 78",
+                "face_code": "FACE 78",
+                "entity_type": "cad:Face",
+                "geometry_type": "cad:PlanarSurface",
+                "semantic_role": "cad:SideWallRole",
+                "name": "First ear outer side",
+                "description": "Planar outer side of the first clevis ear at CAD x=4.697641 mm.",
+                "salience": "cad:PrimarySalience",
+                "confidence": 0.98,
+                "evidence": [
+                  "PLANE normal parallel to CAD X.",
+                  "Bounding box has constant x=4.697641 mm.",
+                  "Face contains two wires, consistent with the ear outline and pin opening."
+                ]
+              },
+              {
+                "brep_id": "FACE 90",
+                "face_code": "FACE 90",
+                "entity_type": "cad:Face",
+                "geometry_type": "cad:PlanarSurface",
+                "semantic_role": "cad:InterfaceFaceRole",
+                "name": "First ear inner side",
+                "description": "Planar side facing the gap between the clevis ears at CAD x=5.297640 mm.",
+                "salience": "cad:PrimarySalience",
+                "confidence": 0.98,
+                "evidence": [
+                  "PLANE at constant x=5.297640 mm.",
+                  "The face lies adjacent to the central clevis gap."
+                ]
+              }
+            ],
+            "confidence": 0.98
+          },
+          {
+            "id": "F011",
+            "name": "Second clevis ear",
+            "ontology_class": "cad:LugFeature",
+            "parent_feature_id": null,
+            "description": "Second plate-like ear of the clevis, bounded by planar faces at approximately CAD x=6.947640 and 7.547638 mm.",
+            "interface_type": "cad:PinInterface",
+            "feature_functions": [
+              {
+                "ontology_class": "cad:SupportFunction",
+                "name": "Support pin end",
+                "description": "Supports the opposite side of the transverse pin connection.",
+                "primary": true,
+                "confidence": 0.98
+              }
+            ],
+            "feature_behaviors": [
+              {
+                "ontology_class": "cad:CarryShearBehavior",
+                "name": "Carry pin shear",
+                "description": "Transfers pin bearing and shear reactions into the webbed body.",
+                "confidence": 0.96
+              }
+            ],
+            "relationships": [
+              {
+                "target_feature_id": "F013",
+                "category": "cad:GeometricFeatureRelationship",
+                "relation": "cad:surroundsFeature",
+                "description": "The second ear surrounds its pin bore.",
+                "confidence": 0.99
+              }
+            ],
+            "brep_faces": [
+              {
+                "brep_id": "FACE 89",
+                "face_code": "FACE 89",
+                "entity_type": "cad:Face",
+                "geometry_type": "cad:PlanarSurface",
+                "semantic_role": "cad:InterfaceFaceRole",
+                "name": "Second ear inner side",
+                "description": "Planar side facing the gap between the clevis ears at CAD x=6.947640 mm.",
+                "salience": "cad:PrimarySalience",
+                "confidence": 0.98,
+                "evidence": [
+                  "PLANE at constant x=6.947640 mm.",
+                  "The face lies opposite FACE 90 across the clevis gap."
+                ]
+              },
+              {
+                "brep_id": "FACE 79",
+                "face_code": "FACE 79",
+                "entity_type": "cad:Face",
+                "geometry_type": "cad:PlanarSurface",
+                "semantic_role": "cad:SideWallRole",
+                "name": "Second ear outer side",
+                "description": "Planar outer side of the second clevis ear at CAD x=7.547638 mm.",
+                "salience": "cad:PrimarySalience",
+                "confidence": 0.98,
+                "evidence": [
+                  "PLANE normal parallel to CAD X.",
+                  "Bounding box has constant x=7.547638 mm.",
+                  "Face contains two wires, consistent with the ear outline and pin opening."
+                ]
+              }
+            ],
+            "confidence": 0.98
+          },
+          {
+            "id": "F012",
+            "name": "First clevis pin bore",
+            "ontology_class": "cad:ThroughHoleFeature",
+            "parent_feature_id": "F010",
+            "description": "Radius 0.750000 mm through bore across the first ear, directed along CAD X.",
+            "interface_type": "cad:PinInterface",
+            "feature_functions": [
+              {
+                "ontology_class": "cad:ReceivePinFunction",
+                "name": "Receive transverse pin",
+                "description": "Receives one supported portion of the clevis pin.",
+                "primary": true,
+                "confidence": 0.99
+              }
+            ],
+            "feature_behaviors": [
+              {
+                "ontology_class": "cad:ReactBearingLoadBehavior",
+                "name": "React pin bearing",
+                "description": "The bore wall reacts contact pressure from the pin.",
+                "confidence": 0.98
+              },
+              {
+                "ontology_class": "cad:PermitRotationBehavior",
+                "name": "Permit pin rotation",
+                "description": "The cylindrical interface can permit relative rotation when assembled with clearance.",
+                "confidence": 0.87
+              }
+            ],
+            "relationships": [
+              {
+                "target_feature_id": "F013",
+                "category": "cad:GeometricFeatureRelationship",
+                "relation": "cad:coaxialWith",
+                "description": "The two clevis pin bores share the axis through CAD y=3.510000 mm and z=2.943179 mm.",
+                "confidence": 1.0
+              },
+              {
+                "target_feature_id": "F010",
+                "category": "cad:GeometricFeatureRelationship",
+                "relation": "cad:insideFeature",
+                "description": "The bore passes through the first clevis ear.",
+                "confidence": 0.99
+              }
+            ],
+            "brep_faces": [
+              {
+                "brep_id": "FACE 44",
+                "face_code": "FACE 44",
+                "entity_type": "cad:Face",
+                "geometry_type": "cad:CylindricalSurface",
+                "semantic_role": "cad:BoreWallRole",
+                "name": "First pin bore wall",
+                "description": "Cylindrical pin interface of radius 0.750000 mm through the first ear.",
+                "salience": "cad:PrimarySalience",
+                "confidence": 1.0,
+                "evidence": [
+                  "CYLINDER radius 0.750000 mm.",
+                  "Cylinder axis direction (-1.000000,0.000000,0.000000).",
+                  "Center is (4.997640,3.510000,2.943179) mm.",
+                  "Bounding box x=(4.697641,5.297640) mm matches the first ear thickness."
+                ]
+              }
+            ],
+            "confidence": 1.0
+          },
+          {
+            "id": "F013",
+            "name": "Second clevis pin bore",
+            "ontology_class": "cad:ThroughHoleFeature",
+            "parent_feature_id": "F011",
+            "description": "Radius 0.750000 mm through bore across the second ear, directed along CAD X.",
+            "interface_type": "cad:PinInterface",
+            "feature_functions": [
+              {
+                "ontology_class": "cad:ReceivePinFunction",
+                "name": "Receive transverse pin",
+                "description": "Receives the opposite supported portion of the clevis pin.",
+                "primary": true,
+                "confidence": 0.99
+              }
+            ],
+            "feature_behaviors": [
+              {
+                "ontology_class": "cad:ReactBearingLoadBehavior",
+                "name": "React pin bearing",
+                "description": "The bore wall reacts contact pressure from the pin.",
+                "confidence": 0.98
+              },
+              {
+                "ontology_class": "cad:PermitRotationBehavior",
+                "name": "Permit pin rotation",
+                "description": "The cylindrical interface can permit relative rotation when assembled with clearance.",
+                "confidence": 0.87
+              }
+            ],
+            "relationships": [
+              {
+                "target_feature_id": "F011",
+                "category": "cad:GeometricFeatureRelationship",
+                "relation": "cad:insideFeature",
+                "description": "The bore passes through the second clevis ear.",
+                "confidence": 0.99
+              }
+            ],
+            "brep_faces": [
+              {
+                "brep_id": "FACE 46",
+                "face_code": "FACE 46",
+                "entity_type": "cad:Face",
+                "geometry_type": "cad:CylindricalSurface",
+                "semantic_role": "cad:BoreWallRole",
+                "name": "Second pin bore wall",
+                "description": "Cylindrical pin interface of radius 0.750000 mm through the second ear.",
+                "salience": "cad:PrimarySalience",
+                "confidence": 1.0,
+                "evidence": [
+                  "CYLINDER radius 0.750000 mm.",
+                  "Cylinder axis direction (-1.000000,0.000000,0.000000).",
+                  "Center is (7.247639,3.510000,2.943179) mm.",
+                  "Bounding box x=(6.947640,7.547638) mm matches the second ear thickness.",
+                  "The axis and radius exactly match FACE 44."
+                ]
+              }
+            ],
+            "confidence": 1.0
+          }
+        ],
+        "unclassified_brep_faces": [],
+        "relationships": [],
+        "confidence": 0.98
+      }
+    ]
+  }
+}
+
+Natural-language edit request:
+
+Add 0.2 mm chamfer to the hole edges to improve fitting.
+
+Multi-view images of the original CAD model:
+
+View: +Z
+
+[IMAGE 0: /home/adml/Research/Hackathon2026/IDETC26-Hackathon-Autodesk-neuralCAD-Edit/data/edit_192_external/breps/ZK22J6VYRKQ2RTFD_1758875194.249227_+Z.jpg]
+
+View: -Z
+
+[IMAGE 1: /home/adml/Research/Hackathon2026/IDETC26-Hackathon-Autodesk-neuralCAD-Edit/data/edit_192_external/breps/ZK22J6VYRKQ2RTFD_1758875194.249227_-Z.jpg]
+
+View: -X
+
+[IMAGE 2: /home/adml/Research/Hackathon2026/IDETC26-Hackathon-Autodesk-neuralCAD-Edit/data/edit_192_external/breps/ZK22J6VYRKQ2RTFD_1758875194.249227_-X.jpg]
+
+View: +X
+
+[IMAGE 3: /home/adml/Research/Hackathon2026/IDETC26-Hackathon-Autodesk-neuralCAD-Edit/data/edit_192_external/breps/ZK22J6VYRKQ2RTFD_1758875194.249227_+X.jpg]
+
+View: +Y
+
+[IMAGE 4: /home/adml/Research/Hackathon2026/IDETC26-Hackathon-Autodesk-neuralCAD-Edit/data/edit_192_external/breps/ZK22J6VYRKQ2RTFD_1758875194.249227_+Y.jpg]
+
+View: -Y
+
+[IMAGE 5: /home/adml/Research/Hackathon2026/IDETC26-Hackathon-Autodesk-neuralCAD-Edit/data/edit_192_external/breps/ZK22J6VYRKQ2RTFD_1758875194.249227_-Y.jpg]
+
+View: iso1
+
+[IMAGE 6: /home/adml/Research/Hackathon2026/IDETC26-Hackathon-Autodesk-neuralCAD-Edit/data/edit_192_external/breps/ZK22J6VYRKQ2RTFD_1758875194.249227_iso1.jpg]

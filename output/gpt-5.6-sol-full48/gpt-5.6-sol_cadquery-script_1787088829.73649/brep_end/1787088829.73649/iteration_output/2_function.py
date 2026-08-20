@@ -1,0 +1,72 @@
+def my_cad_function(args):
+    import os
+    import cadquery as cq
+
+    input_file = os.path.expanduser(args["input_file"])
+    imported = cq.importers.importStep(input_file)
+    original = imported.val()
+    bbox = original.BoundingBox()
+
+    print(f"Loaded model: solids={len(original.Solids())}, valid={original.isValid()}")
+    print(
+        f"Bounds: X=({bbox.xmin:.2f},{bbox.xmax:.2f}), "
+        f"Y=({bbox.ymin:.2f},{bbox.ymax:.2f}), "
+        f"Z=({bbox.zmin:.2f},{bbox.zmax:.2f})"
+    )
+
+    # Semantic orientation: top=+Y, bottom=-Y, right=-Z, left=+Z.
+    x_center = -88.9
+    outlet_center = cq.Vector(x_center, 156.0, -263.0)
+    inlet_center = cq.Vector(x_center, -145.0, 263.0)
+    outlet_direction = cq.Vector(0, 0, -1)
+    inlet_direction = cq.Vector(0, 0, 1)
+
+    def shifted(origin, direction, distance):
+        return cq.Vector(
+            origin.x + direction.x * distance,
+            origin.y + direction.y * distance,
+            origin.z + direction.z * distance,
+        )
+
+    def make_hose_port(origin, direction):
+        pieces = [
+            cq.Solid.makeCylinder(18.0, 12.0, shifted(origin, direction, -4.0), direction),
+            cq.Solid.makeCone(16.0, 12.5, 8.0, shifted(origin, direction, 5.0), direction),
+            cq.Solid.makeCylinder(12.5, 51.0, shifted(origin, direction, 6.0), direction),
+            cq.Solid.makeCone(16.0, 12.7, 7.0, shifted(origin, direction, 17.0), direction),
+            cq.Solid.makeCone(16.0, 12.7, 7.0, shifted(origin, direction, 30.0), direction),
+            cq.Solid.makeCone(16.0, 12.7, 7.0, shifted(origin, direction, 43.0), direction),
+            cq.Solid.makeCylinder(15.0, 7.0, shifted(origin, direction, 50.0), direction),
+        ]
+
+        body = pieces[0]
+        for piece in pieces[1:]:
+            body = body.fuse(piece)
+
+        bore = cq.Solid.makeCylinder(
+            7.5, 82.0, shifted(origin, direction, -18.0), direction
+        )
+        mouth_leadin = cq.Solid.makeCone(
+            9.5, 7.5, 5.0, shifted(origin, direction, 54.0), direction
+        )
+        return body.cut(bore.fuse(mouth_leadin)), bore
+
+    outlet, outlet_bore = make_hose_port(outlet_center, outlet_direction)
+    inlet, inlet_bore = make_hose_port(inlet_center, inlet_direction)
+
+    modified_base = original
+    try:
+        modified_base = original.cut(outlet_bore.fuse(inlet_bore))
+        print("Header penetration cuts completed.")
+    except Exception as exc:
+        print(f"Header penetration cut warning: {exc}")
+        print("Returning hollow overlapping ports without modifying source topology.")
+
+    result_shapes = list(modified_base.Solids())
+    result_shapes.extend([outlet, inlet])
+    result = cq.Compound.makeCompound(result_shapes)
+
+    print("Created outlet at semantic top-right (+Y/-Z).")
+    print("Created inlet at semantic bottom-left (-Y/+Z).")
+    print(f"Result solids={len(result.Solids())}, valid={result.isValid()}")
+    return cq.Workplane(obj=result)

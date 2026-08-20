@@ -1,0 +1,281 @@
+=== role: system ===
+You are an expert mechanical CAD analyst.
+
+=== role: user ===
+An engineer has requested an edit to a CAD model:
+
+```
+One of the long edges of the blade does not have a radius. Add radius to that long edge R=0,635cm
+```
+
+Generate aim.json: a compact, ontology-grounded description of WHAT the final
+model should contain, achieve, and preserve.
+
+Work from the request text only. Do not select B-rep faces, propose CadQuery
+commands, or describe modeling operations; those belong to later pipeline
+stages.
+
+
+==================================================
+CORE RULES
+==================================================
+
+1. Preserve the engineer's meaning.
+
+- Do not omit dimensions, quantities, relationships, or functional intentions.
+- Never invent a numerical value.
+- Distinguish explicitly stated requirements from reasonable inference.
+
+2. Ground targets from the request.
+
+- Do not invent Section, Feature, Face, or Solid IDs.
+- Leave `section_ids` and `feature_ids` empty unless the request itself gives
+  an exact ID.
+- If a target cannot be resolved reliably, leave its ID arrays empty, lower
+  confidence, and record the uncertainty in `unresolved_requirements`.
+
+3. Ground semantic classes.
+
+- Every non-empty `ontology_class` must be an exact `cad:` class, or a valid
+  parent of such a class.
+- Use the most specific applicable class. If uncertain, use a valid parent
+  class rather than inventing a class.
+
+4. Confidence values are numbers from 0.0 to 1.0.
+
+- Confidence reflects certainty in interpretation or grounding, not geometric
+  precision.
+
+
+==================================================
+REQUIRED ANALYSIS
+==================================================
+
+1. REQUEST
+
+- Copy the complete request into `raw_text` and assign `request_id`.
+- Extract only meaningful phrases into:
+  - `action_words`: requested changes such as add, remove, replace, resize,
+    chamfer, or connect;
+  - `reference_geometry_words`: referenced sections, features, surfaces, or
+    spatial geometry;
+  - `parameter_words`: dimensions, quantities, units, and named parameters;
+  - `functional_intention_words`: intended function, behavior, or performance.
+
+2. OVERALL AIM AND DESIGN INTENTIONS
+
+- Write `primary_aim` as one concise final-state objective.
+- Record each functional design intention separately with a clear name,
+  description, and confidence.
+- Function describes what the geometry should accomplish; behavior describes
+  the physical response through which it works.
+
+3. TARGETS TO CHANGE
+
+- Create one entry for each distinct requested change.
+- `id`: unique aim target ID such as `T01`.
+- `action`: normalized requested change.
+- `target_level`: exactly `section`, `feature`, or `new_geometry`.
+- `reference_geometry`: concise wording identifying the target.
+- `section_ids` and `feature_ids`: leave empty unless the request gives exact IDs.
+- `ontology_class`:
+  - for an existing target, use its valid model/ontology class;
+  - for new or replacement geometry, use the class the final geometry should
+    have.
+- `parameters`: retain each requested property, value, and unit. Use
+  `explicit` or `inferred` for `explicitness`; never infer an unstated
+  number.
+- `required_relationships`: preserve geometric relations such as between,
+  through, around, aligned, concentric, coaxial, parallel, or perpendicular.
+  Use a model ID when resolved; otherwise retain the natural-language
+  reference.
+- `confidence`: certainty in the target interpretation and grounding.
+
+For a new feature, keep uncertain IDs empty and record the missing requirement.
+
+4. TARGETS TO PRESERVE
+
+- Record geometry that the request explicitly identifies or that the local
+  edit clearly requires preserving.
+- Use a concise `preservation_rule`. Leave ID arrays empty unless the request
+  gives exact IDs.
+- Preserve non-targeted geometry under a single compact minimum-change rule
+  when appropriate; do not enumerate every untouched Feature.
+- Do not claim that targeted geometry remains unchanged.
+
+5. PREDICTED FINAL OUTCOME
+
+Describe the state against which the edited model can later be checked.
+
+- `geometry`: state what geometry should exist, be changed, or be absent.
+  Each `target_id` must reference an ID in `targets_to_change`. Repeat exact
+  requested properties and relationships without adding new dimensions.
+- `functions`: state the engineering functions the final result should
+  possess. Each `target_ids` list references relevant change-target IDs.
+- `behaviors`: state the intended physical effects, such as resisting
+  bending, preventing slipping, permitting rotation, or constraining motion.
+- Use valid ontology classes and confidence for every predicted item.
+- Do not describe the CAD procedure used to obtain the outcome.
+
+6. VALIDATION CRITERIA
+
+- Convert the requested final geometry, function, behavior, and preservation
+  rules into concise checkable criteria.
+- `category` must be exactly `geometry`, `function`, `behavior`, or
+  `preservation`.
+- For changed outcomes, `target_ids` reference IDs from
+  `targets_to_change`. For preservation checks, they may be empty.
+- Use `expected_value` and `unit` when the request supplies a measurable
+  requirement; otherwise use `null` and an empty unit.
+- Criteria describe successful final state, not implementation steps.
+
+7. UNRESOLVED REQUIREMENTS
+
+- Record only uncertainties that materially affect target identity, geometry,
+  relationships, function, behavior, or validation.
+- Include plausible candidate interpretations supported by the request.
+- Set `requires_user_clarification` to `true` only when the ambiguity cannot
+  be resolved safely downstream; otherwise use `false`.
+
+
+==================================================
+FINAL CHECK
+==================================================
+
+Before returning aim.json, verify that:
+
+1. Every requested change has a target and predicted final geometry outcome.
+2. All stated values, units, quantities, and relationships are preserved.
+3. Every Section and Feature ID is either empty or taken from the request.
+4. Every ontology class is a cad: class rather than an invented label.
+5. Targets to change and targets to preserve do not conflict.
+6. Geometry, function, and behavior are distinguished.
+7. Validation criteria are outcome-based and checkable.
+8. Ambiguities are recorded rather than guessed.
+9. No Face or Solid IDs, CadQuery commands, or modeling operations appear.
+10. No fields outside the required structure are added.
+11. The result is valid JSON.
+
+
+==================================================
+OUTPUT
+==================================================
+
+Return ONLY valid JSON.
+Do not use Markdown fences.
+
+Use exactly the following structure:
+
+{
+  "request": {
+    "request_id": "",
+    "raw_text": "",
+    "action_words": [],
+    "reference_geometry_words": [],
+    "parameter_words": [],
+    "functional_intention_words": []
+  },
+  "aim": {
+    "primary_aim": "",
+    "functional_design_intentions": [
+      {
+        "name": "",
+        "description": "",
+        "confidence": null
+      }
+    ],
+    "targets_to_change": [
+      {
+        "id": "",
+        "action": "",
+        "target_level": "section|feature|new_geometry",
+        "reference_geometry": "",
+        "section_ids": [],
+        "feature_ids": [],
+        "ontology_class": "",
+        "parameters": [
+          {
+            "name": "",
+            "value": null,
+            "unit": "",
+            "explicitness": ""
+          }
+        ],
+        "required_relationships": [
+          {
+            "relation": "",
+            "reference": ""
+          }
+        ],
+        "confidence": null
+      }
+    ],
+    "targets_to_preserve": [
+      {
+        "reference_geometry": "",
+        "section_ids": [],
+        "feature_ids": [],
+        "preservation_rule": "",
+        "confidence": null
+      }
+    ],
+    "predicted_final_outcome": {
+      "geometry": [
+        {
+          "target_id": "",
+          "ontology_class": "",
+          "description": "",
+          "properties": [
+            {
+              "name": "",
+              "value": null,
+              "unit": ""
+            }
+          ],
+          "relationships": [
+            {
+              "relation": "",
+              "reference": ""
+            }
+          ],
+          "confidence": null
+        }
+      ],
+      "functions": [
+        {
+          "ontology_class": "",
+          "name": "",
+          "target_ids": [],
+          "description": "",
+          "confidence": null
+        }
+      ],
+      "behaviors": [
+        {
+          "ontology_class": "",
+          "name": "",
+          "target_ids": [],
+          "description": "",
+          "confidence": null
+        }
+      ]
+    },
+    "validation_criteria": [
+      {
+        "category": "geometry|function|behavior|preservation",
+        "target_ids": [],
+        "description": "",
+        "expected_value": null,
+        "unit": ""
+      }
+    ],
+    "unresolved_requirements": [
+      {
+        "description": "",
+        "candidate_interpretations": [],
+        "requires_user_clarification": null
+      }
+    ]
+  }
+}
+Return ONLY the JSON object. No extra attachments follow.

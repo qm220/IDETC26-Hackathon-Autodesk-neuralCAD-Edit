@@ -1,0 +1,128 @@
+Thinking text:
+**Confirming wall specifications**
+
+I’m noticing that the support for the inner boundary aligns with the inner wall, so I won't need to take a step there. It seems I should offset the inner wall by 2cm, with a thickness of 0.5cm for the supporting structure. I'm thinking the profile ring width should be around 20, and the extrusion might be about 5. Yes, that sounds right!
+**Reviewing support and dimensions**
+
+I'm considering that better support spans from z=0 to 5, and I think contacting the union is often valid. I believe the OCC fuse touching solids should work correctly. Support should be set at the top surface at z=0 and the bottom at 5, while the fillet on the top outer edge removes that edge effectively. The exact thickness of 5 seems good, and I can identify potential dimensions through direct output. Translations appear to be arbitrary, which is okay!
+
+Generated script:
+def my_cad_function(args):
+    input_file = os.path.expanduser(args["input_file"])
+    model = cq.importers.importStep(input_file)
+    original = model.val() if hasattr(model, "val") else model
+
+    # The broad face opposite the existing large-radius edge is the bottom.
+    # Local coordinates reconstructed from the original rounded frame:
+    #   local X = global X
+    #   local Y = direction along the frame height
+    #   local Z = outward normal from the flat bottom
+    n = cq.Vector(0.0, -0.9659258263, 0.2588190451)
+    v = cq.Vector(0.0, 0.2588190451, 0.9659258263)
+    bottom_center = cq.Vector(-556.6200, -431.3138, 312.7457)
+
+    support_plane = cq.Plane(
+        origin=bottom_center,
+        xDir=cq.Vector(1.0, 0.0, 0.0),
+        normal=n
+    )
+
+    # Existing inner opening: 760 x 560 mm with R50 corners.
+    # Offset its wall outward by 20 mm, producing an 800 x 600 mm R70 profile.
+    # The support is 5 mm thick in the bottom-normal direction.
+    inner_w = 760.0
+    inner_h = 560.0
+    inner_r = 50.0
+    offset = 20.0
+    support_thickness = 5.0
+    transition_radius = 2.0
+
+    outer_w = inner_w + 2.0 * offset
+    outer_h = inner_h + 2.0 * offset
+    outer_r = inner_r + offset
+
+    outer_solid = (
+        cq.Workplane(support_plane)
+        .rect(outer_w, outer_h)
+        .vertices()
+        .fillet2D(outer_r)
+        .extrude(support_thickness)
+        .val()
+    )
+
+    inner_tool = (
+        cq.Workplane(support_plane)
+        .rect(inner_w, inner_h)
+        .vertices()
+        .fillet2D(inner_r)
+        .extrude(support_thickness)
+        .val()
+    )
+
+    support = outer_solid.cut(inner_tool)
+
+    # Round only the upper, outward-facing perimeter of the support. The lower
+    # perimeter is deliberately untouched so the bottom and its edges stay flat.
+    def local_coordinates(point):
+        d = cq.Vector(
+            point.x - bottom_center.x,
+            point.y - bottom_center.y,
+            point.z - bottom_center.z
+        )
+        return d.dot(cq.Vector(1.0, 0.0, 0.0)), d.dot(v), d.dot(n)
+
+    upper_outer_edges = []
+    for edge in support.Edges():
+        vertices = edge.Vertices()
+        if not vertices:
+            continue
+
+        local_vertices = [local_coordinates(vertex.Center()) for vertex in vertices]
+        on_upper_plane = all(abs(coords[2]) < 0.05 for coords in local_vertices)
+        belongs_to_outer_profile = any(
+            max(abs(coords[0]) / (outer_w / 2.0),
+                abs(coords[1]) / (outer_h / 2.0)) > 0.97
+            for coords in local_vertices
+        )
+
+        if on_upper_plane and belongs_to_outer_profile:
+            upper_outer_edges.append(edge)
+
+    if upper_outer_edges:
+        try:
+            support = support.fillet(transition_radius, upper_outer_edges)
+        except Exception as exc:
+            print("Upper support fillet failed; preserving support without it:", exc)
+
+    # Fuse the continuous support to the existing frame. The original small
+    # bottom-side frame fillets also form a smooth R2 transition onto the new ledge.
+    result = original.fuse(support)
+
+    print("ORIGINAL VALID:", original.isValid())
+    print("SUPPORT VALID:", support.isValid())
+    print("RESULT VALID:", result.isValid())
+    print("RESULT SOLIDS:", len(result.Solids()))
+    print("SUPPORT PARAMETERS: offset=20 mm, thickness=5 mm, top radius=2 mm")
+
+    bb = result.BoundingBox()
+    print("RESULT BBOX: x=(%.3f, %.3f) y=(%.3f, %.3f) z=(%.3f, %.3f)" %
+          (bb.xmin, bb.xmax, bb.ymin, bb.ymax, bb.zmin, bb.zmax))
+
+    return cq.Workplane("XY").newObject([result])
+
+Program output:
+stdout: Loading function from: /home/adml/Research/Hackathon2026/IDETC26-Hackathon-Autodesk-neuralCAD-Edit/output/gpt-5.6-ontologies/gpt-5.6-sol-ontologies_cadquery-script_1787175298.5730767/brep_end/1787175298.5730767/temp_script.py
+Error executing LLM-provided function: 'Workplane' object has no attribute 'fillet2D'
+No CadQuery result returned; skipped STEP/STL/image export.
+Script completed.
+
+stderr: Traceback (most recent call last):
+  File "/home/adml/Research/Hackathon2026/IDETC26-Hackathon-Autodesk-neuralCAD-Edit/src/harnesses/cadquery_script.py", line 158, in load_and_execute_function
+    return my_cad_function(args)
+           ^^^^^^^^^^^^^^^^^^^^^
+  File "<string>", line 39, in my_cad_function
+AttributeError: 'Workplane' object has no attribute 'fillet2D'. Did you mean: 'fillet'?
+
+
+Exported this iteration:
+tmp.step, tmp.stl, tmp_+Z.png, tmp_-Z.png, tmp_-X.png, tmp_+X.png, tmp_+Y.png, tmp_-Y.png, tmp_iso1.png, tmp_iso2.png

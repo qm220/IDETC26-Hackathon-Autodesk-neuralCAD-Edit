@@ -1,0 +1,181 @@
+Thinking text:
+
+
+Generated script:
+def my_cad_function(args):
+    import os
+
+    input_file = os.path.expanduser(args["input_file"])
+    model = cq.importers.importStep(input_file)
+    shape = model.val()
+
+    # Inspect and bind the planned FACE indices to the imported STEP geometry.
+    print("Loaded STEP:", input_file)
+    print("Valid:", shape.isValid(), "solids:", len(shape.Solids()), "faces:", len(shape.Faces()))
+    bb = shape.BoundingBox()
+    print("Model bbox: x=(%.6f, %.6f), y=(%.6f, %.6f), z=(%.6f, %.6f)" %
+          (bb.xmin, bb.xmax, bb.ymin, bb.ymax, bb.zmin, bb.zmax))
+
+    faces = shape.Faces()
+    for i, face in enumerate(faces):
+        fb = face.BoundingBox()
+        c = face.Center()
+        try:
+            geom = face.geomType()
+        except Exception:
+            geom = "UNKNOWN"
+        print("FACE %d: %s center=(%.4f,%.4f,%.4f) bbox=[%.4f,%.4f]x[%.4f,%.4f]x[%.4f,%.4f] area=%.4f" %
+              (i, geom, c.x, c.y, c.z, fb.xmin, fb.xmax, fb.ymin, fb.ymax,
+               fb.zmin, fb.zmax, face.Area()))
+
+    # Locate the existing +Y lowered plateau floor (planned FACE 1) from its
+    # actual imported geometry rather than relying solely on its STEP index.
+    floor_face = None
+    floor_score = None
+    for i, face in enumerate(faces):
+        fb = face.BoundingBox()
+        dx = fb.xmax - fb.xmin
+        dy = fb.ymax - fb.ymin
+        dz = fb.zmax - fb.zmin
+        try:
+            is_plane = face.geomType() == "PLANE"
+        except Exception:
+            is_plane = False
+        if is_plane and dy < 1.0e-5 and dz > 80.0 and 12.0 < dx < 17.0:
+            # Prefer the horizontal face one millimetre below the y-max face.
+            score = abs(fb.ymin - (bb.ymax - 1.0))
+            if floor_score is None or score < floor_score:
+                floor_face = face
+                floor_score = score
+
+    if floor_face is None:
+        raise ValueError("Could not identify the existing handle plateau floor")
+
+    pbb = floor_face.BoundingBox()
+    x_min, x_max = pbb.xmin, pbb.xmax
+    z_min, z_max = pbb.zmin, pbb.zmax
+    x_center = 0.5 * (x_min + x_max)
+    z_center = 0.5 * (z_min + z_max)
+    pocket_width = x_max - x_min
+    pocket_length = z_max - z_min
+    top_floor_y = pbb.ymin
+
+    print("Bound existing plateau floor at y=%.6f" % top_floor_y)
+    print("Plateau extents: x=(%.6f, %.6f), z=(%.6f, %.6f), center=(%.6f, %.6f)" %
+          (x_min, x_max, z_min, z_max, x_center, z_center))
+
+    # Reproduce the existing rounded-rectangle pocket on the opposite broad
+    # face. The imported body spans y=0..15; this cutter grows inward in +Y.
+    bottom_y = bb.ymin
+    bottom_plane = cq.Plane(
+        origin=(x_center, bottom_y, z_center),
+        xDir=(1, 0, 0),
+        normal=(0, 1, 0)
+    )
+    bottom_cutter = (
+        cq.Workplane(bottom_plane)
+        .roundedRect(pocket_width, pocket_length, 1.0)
+        .extrude(1.0)
+    )
+    edited = model.cut(bottom_cutter)
+
+    # Emboss TOP on the existing +Y plateau. Local text X follows global Z so
+    # the word runs along the long direction; local text Y follows global X.
+    text_plane = cq.Plane(
+        origin=(x_center, top_floor_y, z_center),
+        xDir=(0, 0, 1),
+        normal=(0, 1, 0)
+    )
+
+    try:
+        text_solid = (
+            cq.Workplane(text_plane)
+            .text("TOP", 10.0, 1.0, font="Arial",
+                  halign="center", valign="center", combine=False)
+        )
+        print("Generated text using Arial")
+    except Exception as exc:
+        # Liberation Sans is metrically compatible with Arial and is commonly
+        # available on Linux CadQuery runners when Microsoft fonts are absent.
+        print("Arial unavailable; using Liberation Sans fallback:", exc)
+        text_solid = (
+            cq.Workplane(text_plane)
+            .text("TOP", 10.0, 1.0, font="Liberation Sans",
+                  halign="center", valign="center", combine=False)
+        )
+
+    tbb = text_solid.val().BoundingBox()
+    print("Text bbox: x=(%.4f,%.4f), y=(%.4f,%.4f), z=(%.4f,%.4f)" %
+          (tbb.xmin, tbb.xmax, tbb.ymin, tbb.ymax, tbb.zmin, tbb.zmax))
+
+    # The 10 mm glyph height is smaller than the approximately 14.4 mm pocket
+    # width, and the word length is well within the approximately 91 mm pocket.
+    margin = 0.05
+    if (tbb.xmin < x_min + margin or tbb.xmax > x_max - margin or
+            tbb.zmin < z_min + margin or tbb.zmax > z_max - margin):
+        raise ValueError("Embossed text does not fit wholly inside the plateau")
+
+    edited = edited.union(text_solid)
+
+    # Rebase the physical thickness midplane from y=7.5 onto the global ZX
+    # datum plane y=0. The two plateau floors then lie at y=+/-6.5 mm and the
+    # untouched broad faces at y=+/-7.5 mm.
+    mid_y = 0.5 * (bb.ymin + bb.ymax)
+    edited = edited.translate((0, -mid_y, 0))
+
+    final_shape = edited.val()
+    print("Final valid:", final_shape.isValid(),
+          "solids:", len(final_shape.Solids()),
+          "volume:", final_shape.Volume())
+    fbb = final_shape.BoundingBox()
+    print("Final y extents=(%.6f, %.6f), symmetry datum y=0" %
+          (fbb.ymin, fbb.ymax))
+    return edited
+
+Program output:
+stdout: Loading function from: /home/adml/Research/Hackathon2026/IDETC26-Hackathon-Autodesk-neuralCAD-Edit/output/gpt-5.6-sol-ontology-full48/gpt-5.6-sol-ontology_cadquery-script_1787126716.7085721/brep_end/1787126716.7085721/temp_script.py
+Loaded STEP: /home/adml/Research/Hackathon2026/IDETC26-Hackathon-Autodesk-neuralCAD-Edit/data/edit_192_external/breps/B7A2N74ZJBF9MZHU_1770167964.8837814.step
+Valid: True solids: 1 faces: 26
+Model bbox: x=(-28.983785, 29.456122), y=(0.000000, 15.000000), z=(-150.000000, 25.913130)
+FACE 0: CYLINDER center=(-7.1277,14.5000,-6.5154) bbox=[-7.4911,-6.4911]x[14.0000,15.0000]x[-7.1520,-6.1520] area=1.5708
+FACE 1: PLANE center=(-0.2730,14.0000,-51.7760) bbox=[-7.4911,6.9452]x[14.0000,14.0000]x[-97.4001,-6.1520] area=1316.4251
+FACE 2: PLANE center=(-0.2730,14.5000,-6.1520) bbox=[-6.4911,5.9452]x[14.0000,15.0000]x[-6.1520,-6.1520] area=12.4363
+FACE 3: CYLINDER center=(6.5818,14.5000,-97.0367) bbox=[5.9452,6.9452]x[14.0000,15.0000]x[-97.4001,-96.4001] area=1.5708
+FACE 4: PLANE center=(6.9452,14.5000,-51.7760) bbox=[6.9452,6.9452]x[14.0000,15.0000]x[-96.4001,-7.1520] area=89.2482
+FACE 5: CYLINDER center=(6.5818,14.5000,-6.5154) bbox=[5.9452,6.9452]x[14.0000,15.0000]x[-7.1520,-6.1520] area=1.5708
+FACE 6: CYLINDER center=(-7.1277,14.5000,-97.0367) bbox=[-7.4911,-6.4911]x[14.0000,15.0000]x[-97.4001,-96.4001] area=1.5708
+FACE 7: PLANE center=(-7.4911,14.5000,-51.7760) bbox=[-7.4911,-7.4911]x[14.0000,15.0000]x[-96.4001,-7.1520] area=89.2482
+FACE 8: PLANE center=(-0.2730,14.5000,-97.4001) bbox=[-6.4911,5.9452]x[14.0000,15.0000]x[-97.4001,-97.4001] area=12.4363
+FACE 9: CYLINDER center=(-11.1589,7.5000,-99.0758) bbox=[-13.1432,-10.0935]x[0.0000,15.0000]x[-101.0733,-96.4694] area=87.7575
+FACE 10: PLANE center=(-10.0935,7.5000,-49.2410) bbox=[-10.0935,-10.0935]x[0.0000,15.0000]x[-96.4694,-2.0125] area=1416.8534
+FACE 11: CYLINDER center=(-10.5045,7.5000,-0.3083) bbox=[-11.3055,-10.0935]x[0.0000,15.0000]x[-2.0125,1.2510] area=53.3355
+FACE 12: CYLINDER center=(0.0177,7.5000,15.9220) bbox=[-14.9224,14.9224]x[0.0000,15.0000]x[1.1702,25.9131] area=1023.1596
+FACE 13: CYLINDER center=(10.4190,7.5000,-0.4004) bbox=[10.0000,11.2354]x[0.0000,15.0000]x[-2.1203,1.1702] area=53.8728
+FACE 14: PLANE center=(10.0000,7.5000,-49.2462) bbox=[10.0000,10.0000]x[0.0000,15.0000]x[-96.3720,-2.1203] area=1413.7757
+FACE 15: CYLINDER center=(11.1059,7.5000,-99.0185) bbox=[10.0000,13.1595]x[0.0000,15.0000]x[-101.0210,-96.3720] area=89.5374
+FACE 16: CYLINDER center=(23.1294,7.5000,-126.2555) bbox=[10.0000,29.4561]x[0.0000,15.0000]x[-150.0000,-101.0210] area=973.5024
+FACE 17: CYLINDER center=(8.1831,7.5000,-111.8169) bbox=[5.0000,10.0000]x[0.0000,15.0000]x[-115.0000,-110.0000] area=117.8097
+FACE 18: PLANE center=(-0.0000,7.5000,-110.0000) bbox=[-5.0000,5.0000]x[0.0000,15.0000]x[-110.0000,-110.0000] area=150.0000
+FACE 19: CYLINDER center=(-8.1831,7.5000,-111.8169) bbox=[-10.0000,-5.0000]x[0.0000,15.0000]x[-115.0000,-110.0000] area=117.8097
+FACE 20: PLANE center=(-10.0000,7.5000,-132.5000) bbox=[-10.0000,-10.0000]x[0.0000,15.0000]x[-150.0000,-115.0000] area=525.0000
+FACE 21: CYLINDER center=(0.0000,7.5000,10.0000) bbox=[-10.0000,10.0000]x[0.0000,15.0000]x[0.0000,20.0000] area=942.4778
+FACE 22: PLANE center=(10.0000,7.5000,-132.5000) bbox=[10.0000,10.0000]x[0.0000,15.0000]x[-150.0000,-115.0000] area=525.0000
+FACE 23: CYLINDER center=(-22.8335,7.5000,-126.2602) bbox=[-28.9838,-10.0000]x[0.0000,15.0000]x[-150.0000,-101.0733] area=961.6324
+FACE 24: PLANE center=(0.2942,15.0000,-85.6755) bbox=[-28.9838,29.4561]x[15.0000,15.0000]x[-150.0000,25.9131] area=2662.3503
+FACE 25: PLANE center=(0.1065,0.0000,-74.4594) bbox=[-28.9838,29.4561]x[0.0000,0.0000]x[-150.0000,25.9131] area=3978.7754
+Bound existing plateau floor at y=14.000000
+Plateau extents: x=(-7.491100, 6.945176), z=(-97.400127, -6.151973), center=(-0.272962, -51.776050)
+Error executing LLM-provided function: 'Workplane' object has no attribute 'roundedRect'
+No CadQuery result returned; skipped STEP/STL/image export.
+Script completed.
+
+stderr: Traceback (most recent call last):
+  File "/home/adml/Research/Hackathon2026/IDETC26-Hackathon-Autodesk-neuralCAD-Edit/src/harnesses/cadquery_script.py", line 158, in load_and_execute_function
+    return my_cad_function(args)
+           ^^^^^^^^^^^^^^^^^^^^^
+  File "<string>", line 73, in my_cad_function
+AttributeError: 'Workplane' object has no attribute 'roundedRect'
+
+
+Exported this iteration:
+none (CadQuery failed or returned no shape)

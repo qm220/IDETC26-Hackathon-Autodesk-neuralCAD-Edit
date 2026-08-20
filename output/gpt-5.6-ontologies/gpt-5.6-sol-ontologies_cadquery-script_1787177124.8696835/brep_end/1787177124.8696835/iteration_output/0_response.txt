@@ -1,0 +1,190 @@
+Thinking text:
+**Evaluating face indices**
+
+I’m considering the face indices in the imported compound; they likely match the planning. I think I should print the selected geometry and normals. The instruction suggests printing faces and coordinates before making any edits, so maybe I need to loop through all of them. Should I include inner wires? The operation seems to indicate that I should focus on the outer boundary wires. I need to ensure the cover fills the shape properly!
+
+Generated script:
+def my_cad_function(args):
+    input_file = os.path.expanduser(args["input_file"])
+    imported = cq.importers.importStep(input_file)
+    model_shape = imported.val() if hasattr(imported, "val") else imported
+
+    faces = model_shape.Faces()
+    print(f"Loaded STEP: {input_file}")
+    print(f"Valid: {model_shape.isValid()}")
+    print(f"Original solids: {len(model_shape.Solids())}")
+    print(f"Original faces: {len(faces)}")
+
+    # Inspect and bind the planning-stage FACE N identifiers to actual STEP faces.
+    for index, face in enumerate(faces):
+        center = face.Center()
+        try:
+            normal = face.normalAt()
+            normal_text = f"({normal.x:.6f}, {normal.y:.6f}, {normal.z:.6f})"
+        except Exception:
+            normal_text = "n/a"
+        try:
+            geom_type = face.geomType()
+        except Exception:
+            geom_type = "unknown"
+        print(
+            f"FACE {index}: type={geom_type}, "
+            f"center=({center.x:.6f}, {center.y:.6f}, {center.z:.6f}), "
+            f"normal={normal_text}, area={face.Area():.6f}"
+        )
+
+    if len(faces) <= 72:
+        raise ValueError(f"Expected at least 73 faces, but loaded model has {len(faces)}")
+
+    # Grounded references from OP01: front FACE 53 and opposed rear FACE 72.
+    front_face = faces[53]
+    rear_face = faces[72]
+    thickness_mm = 0.254 * 10.0
+
+    def make_outward_cover(reference_face, label):
+        if reference_face.geomType() != "PLANE":
+            raise ValueError(f"{label} reference is not planar: {reference_face.geomType()}")
+
+        center = reference_face.Center()
+        normal = reference_face.normalAt().normalized()
+        vector = normal.multiply(thickness_mm)
+        outer_wire = reference_face.outerWire()
+
+        print(
+            f"Creating {label}: flush origin=({center.x:.6f}, {center.y:.6f}, {center.z:.6f}), "
+            f"outward normal=({normal.x:.6f}, {normal.y:.6f}, {normal.z:.6f}), "
+            f"thickness={thickness_mm:.6f} mm"
+        )
+
+        # Extruding the grounded outer boundary outward leaves the inner cover face
+        # exactly coincident with the corresponding original hub outer face.
+        cover = cq.Solid.extrudeLinear(outer_wire, [], vector)
+        if not cover.isValid():
+            raise ValueError(f"Generated {label} is invalid")
+        return cover
+
+    front_cover = make_outward_cover(front_face, "front_cover_FACE_53")
+    rear_cover = make_outward_cover(rear_face, "rear_cover_FACE_72")
+
+    print(f"Front cover volume: {front_cover.Volume():.6f} mm^3")
+    print(f"Rear cover volume: {rear_cover.Volume():.6f} mm^3")
+    print("Created exactly two separate contour-matched cover solids; original geometry is unchanged.")
+
+    result = cq.Assembly(name="crossed_arm_hub_with_covers")
+    result.add(model_shape, name="original_model")
+    result.add(front_cover, name="front_cover")
+    result.add(rear_cover, name="rear_cover")
+    return result
+
+Program output:
+stdout: Loading function from: /home/adml/Research/Hackathon2026/IDETC26-Hackathon-Autodesk-neuralCAD-Edit/output/gpt-5.6-ontologies/gpt-5.6-sol-ontologies_cadquery-script_1787177124.8696835/brep_end/1787177124.8696835/temp_script.py
+Loaded STEP: /home/adml/Research/Hackathon2026/IDETC26-Hackathon-Autodesk-neuralCAD-Edit/data/edit_192_external/breps/F332D3FXML85WLR2_1770204704.7150607.step
+Valid: True
+Original solids: 3
+Original faces: 90
+FACE 0: type=CYLINDER, center=(-21.182443, 3.175000, -14.016564), normal=(0.833954, -0.000000, 0.551833), area=126.676870
+FACE 1: type=CYLINDER, center=(20.788821, 2.810034, 13.756101), normal=(0.833954, -0.000000, 0.551833), area=106.515621
+FACE 2: type=PLANE, center=(-1.049729, 6.350000, -0.694612), normal=(0.000000, 1.000000, 0.000000), area=1697.688934
+FACE 3: type=CYLINDER, center=(93.045063, 6.283296, 61.568539), normal=(-0.551833, -0.000000, 0.833954), area=3145.366870
+FACE 4: type=PLANE, center=(34.657835, 6.969047, 16.666163), normal=(-0.833954, 0.000000, -0.551833), area=5.409286
+FACE 5: type=BSPLINE, center=(39.005800, 9.562836, 14.343541), normal=(-0.313778, 0.500000, -0.807182), area=56.455284
+FACE 6: type=CYLINDER, center=(33.440931, 11.066799, 22.128087), normal=(-0.589695, 0.707107, -0.390205), area=93.212458
+FACE 7: type=BSPLINE, center=(28.451618, 9.562836, 30.293482), normal=(-0.865611, 0.500000, 0.026772), area=56.455284
+FACE 8: type=PLANE, center=(28.889496, 6.969047, 25.383529), normal=(-0.833954, 0.000000, -0.551833), area=5.409286
+FACE 9: type=BSPLINE, center=(-39.005800, 9.562836, -14.343541), normal=(0.313778, 0.500000, 0.807182), area=56.455284
+FACE 10: type=CYLINDER, center=(-33.313121, 10.854028, -22.043515), normal=(0.589695, 0.707107, 0.390205), area=101.341496
+FACE 11: type=BSPLINE, center=(-28.451618, 9.562836, -30.293482), normal=(0.865611, 0.500000, -0.026772), area=56.455284
+FACE 12: type=PLANE, center=(-31.773665, 6.971968, -21.024846), normal=(0.833954, -0.000000, 0.551833), area=18.662537
+FACE 13: type=PLANE, center=(-159.049947, 6.206130, -104.849763), normal=(-0.833954, 0.000000, -0.551833), area=296.620152
+FACE 14: type=PLANE, center=(-1.800313, -0.000000, 2.720712), normal=(-0.000000, -1.000000, -0.000000), area=7063.133503
+FACE 15: type=CYLINDER, center=(-0.000000, 3.175000, 0.000000), normal=(-0.833954, 0.000000, -0.551833), area=258.420814
+FACE 16: type=CYLINDER, center=(-103.174188, 10.392536, -55.809294), normal=(-0.390205, 0.707107, 0.589695), area=1469.451695
+FACE 17: type=PLANE, center=(-97.439241, 12.700000, -64.476196), normal=(0.000000, 1.000000, 0.000000), area=1870.964007
+FACE 18: type=CYLINDER, center=(91.704295, 10.392536, 73.143097), normal=(-0.390205, 0.707107, 0.589695), area=1469.451695
+FACE 19: type=PLANE, center=(97.439241, 12.700000, 64.476196), normal=(0.000000, 1.000000, 0.000000), area=1870.964007
+FACE 20: type=CYLINDER, center=(5.735017, 5.833472, -8.667008), normal=(0.551833, 0.000000, -0.833954), area=6738.993152
+FACE 21: type=PLANE, center=(-7.008282, 3.175000, 10.591222), normal=(-0.551833, 0.000000, 0.833954), area=2419.350000
+FACE 22: type=PLANE, center=(158.665002, 6.188934, 105.431508), normal=(0.833954, -0.000000, 0.551833), area=264.950935
+FACE 23: type=CYLINDER, center=(-0.000000, 6.416704, -111.570913), normal=(1.000000, -0.000000, 0.000000), area=3145.366875
+FACE 24: type=CYLINDER, center=(0.000000, 9.889965, -24.928006), normal=(1.000000, 0.000000, -0.000000), area=106.515636
+FACE 25: type=PLANE, center=(5.226524, 5.730953, -38.099999), normal=(-0.000000, -0.000000, 1.000000), area=5.409286
+FACE 26: type=BSPLINE, center=(9.562836, 3.137164, -40.444304), normal=(0.500000, -0.500000, 0.707107), area=56.455284
+FACE 27: type=CYLINDER, center=(0.000000, 1.633201, -40.099228), normal=(-0.000000, -0.707107, 0.707107), area=93.212458
+FACE 28: type=BSPLINE, center=(-9.562836, 3.137164, -40.444304), normal=(-0.500000, -0.500000, 0.707107), area=56.455284
+FACE 29: type=PLANE, center=(-5.226524, 5.730953, -38.099999), normal=(-0.000000, -0.000000, 1.000000), area=5.409286
+FACE 30: type=BSPLINE, center=(-9.562836, 3.137164, 40.444304), normal=(-0.500000, -0.500000, -0.707107), area=56.455284
+FACE 31: type=CYLINDER, center=(-0.000000, 1.633201, 40.099228), normal=(0.000000, -0.707107, -0.707107), area=93.212458
+FACE 32: type=BSPLINE, center=(9.562836, 3.137164, 40.444304), normal=(0.500000, -0.500000, -0.707107), area=56.455284
+FACE 33: type=CYLINDER, center=(10.392664, 6.866528, 0.000000), normal=(1.000000, -0.000000, 0.000000), area=6738.993087
+FACE 34: type=PLANE, center=(-5.226524, 5.730953, 38.099999), normal=(0.000000, 0.000000, -1.000000), area=5.409286
+FACE 35: type=PLANE, center=(5.226524, 5.730953, 38.099999), normal=(0.000000, 0.000000, -1.000000), area=5.409286
+FACE 36: type=CYLINDER, center=(-0.000000, 6.416704, 111.570913), normal=(1.000000, 0.000000, 0.000000), area=3145.366883
+FACE 37: type=CYLINDER, center=(-0.000000, 9.889965, 24.928005), normal=(1.000000, 0.000000, -0.000000), area=106.515636
+FACE 38: type=PLANE, center=(0.000000, 6.350000, -0.000000), normal=(0.000000, -1.000000, 0.000000), area=1632.878554
+FACE 39: type=PLANE, center=(-0.000000, 0.000000, 116.840000), normal=(0.000000, -1.000000, 0.000000), area=1870.964007
+FACE 40: type=PLANE, center=(-0.000000, 6.350000, 190.500000), normal=(-0.000000, -0.000000, 1.000000), area=256.297652
+FACE 41: type=CYLINDER, center=(-10.392664, 6.866528, -0.000000), normal=(-1.000000, 0.000000, -0.000000), area=6738.993050
+FACE 42: type=PLANE, center=(0.000000, 12.700000, -98.818968), normal=(-0.000000, 1.000000, -0.000000), area=2322.000028
+FACE 43: type=PLANE, center=(-0.000000, 12.700000, 98.818968), normal=(-0.000000, 1.000000, -0.000000), area=2322.000028
+FACE 44: type=PLANE, center=(0.000000, 6.350000, -190.500000), normal=(0.000000, 0.000000, -1.000000), area=256.297652
+FACE 45: type=CYLINDER, center=(0.000041, 9.524980, 0.000000), normal=(-1.000000, 0.000000, -0.000000), area=258.419183
+FACE 46: type=PLANE, center=(0.000000, 0.000000, -116.840000), normal=(0.000000, -1.000000, 0.000000), area=1870.964007
+FACE 47: type=CYLINDER, center=(-20.091043, 22.860000, -20.091043), normal=(0.707107, 0.000000, 0.707107), area=121.609795
+FACE 48: type=PLANE, center=(-22.860001, 22.860000, -0.000000), normal=(1.000000, 0.000000, -0.000000), area=309.676815
+FACE 49: type=CYLINDER, center=(-20.091043, 22.860000, 20.091043), normal=(0.707107, -0.000000, -0.707107), area=121.609795
+FACE 50: type=PLANE, center=(0.000000, 22.860000, 22.860001), normal=(0.000000, -0.000000, -1.000000), area=309.676815
+FACE 51: type=CYLINDER, center=(22.631042, 21.590000, -22.631042), normal=(0.707107, -0.000000, -0.707107), area=152.012244
+FACE 52: type=PLANE, center=(0.000000, 21.590000, -25.400000), normal=(0.000000, -0.000000, -1.000000), area=451.611990
+FACE 53: type=PLANE, center=(0.000000, 27.940000, -0.000000), normal=(-0.000000, 1.000000, -0.000000), area=490.321389
+FACE 54: type=CYLINDER, center=(20.091043, 22.860000, 20.091043), normal=(-0.707107, -0.000000, -0.707107), area=121.609795
+FACE 55: type=PLANE, center=(22.860001, 22.860000, -0.000000), normal=(-1.000000, 0.000000, 0.000000), area=309.676815
+FACE 56: type=CYLINDER, center=(22.631042, 21.590000, 22.631042), normal=(0.707107, 0.000000, 0.707107), area=152.012244
+FACE 57: type=PLANE, center=(0.000000, 21.590000, 25.400000), normal=(-0.000000, 0.000000, 1.000000), area=451.611990
+FACE 58: type=PLANE, center=(0.000000, 15.240000, -0.000000), normal=(0.000000, -1.000000, 0.000000), area=2245.774058
+FACE 59: type=CYLINDER, center=(-22.631042, 21.590000, 22.631042), normal=(-0.707107, 0.000000, 0.707107), area=152.012244
+FACE 60: type=PLANE, center=(-25.400000, 21.590000, -0.000000), normal=(-1.000000, 0.000000, 0.000000), area=451.611990
+FACE 61: type=CYLINDER, center=(-22.631042, 21.590000, -22.631042), normal=(-0.707107, -0.000000, -0.707107), area=152.012244
+FACE 62: type=CYLINDER, center=(20.091043, 22.860000, -20.091043), normal=(-0.707107, 0.000000, 0.707107), area=121.609795
+FACE 63: type=PLANE, center=(0.000000, 17.780000, 0.000000), normal=(0.000000, 1.000000, -0.000000), area=2040.475626
+FACE 64: type=PLANE, center=(-0.000000, 22.860000, -22.860001), normal=(0.000000, 0.000000, 1.000000), area=309.676815
+FACE 65: type=PLANE, center=(25.400000, 21.590000, -0.000000), normal=(1.000000, 0.000000, 0.000000), area=451.611990
+FACE 66: type=CYLINDER, center=(-20.091043, -10.160000, -20.091043), normal=(0.707107, -0.000000, 0.707107), area=121.609795
+FACE 67: type=PLANE, center=(-22.860001, -10.160000, -0.000000), normal=(1.000000, -0.000000, -0.000000), area=309.676815
+FACE 68: type=CYLINDER, center=(-20.091043, -10.160000, 20.091043), normal=(0.707107, 0.000000, -0.707107), area=121.609795
+FACE 69: type=PLANE, center=(0.000000, -10.160000, 22.860001), normal=(-0.000000, 0.000000, -1.000000), area=309.676815
+FACE 70: type=CYLINDER, center=(22.631042, -8.890000, -22.631042), normal=(0.707107, 0.000000, -0.707107), area=152.012244
+FACE 71: type=PLANE, center=(0.000000, -8.890000, -25.400000), normal=(-0.000000, 0.000000, -1.000000), area=451.611990
+FACE 72: type=PLANE, center=(0.000000, -15.240000, -0.000000), normal=(0.000000, -1.000000, -0.000000), area=490.321389
+FACE 73: type=CYLINDER, center=(20.091043, -10.160000, 20.091043), normal=(-0.707107, 0.000000, -0.707107), area=121.609795
+FACE 74: type=PLANE, center=(22.860001, -10.160000, -0.000000), normal=(-1.000000, 0.000000, -0.000000), area=309.676815
+FACE 75: type=CYLINDER, center=(22.631042, -8.890000, 22.631042), normal=(0.707107, -0.000000, 0.707107), area=152.012244
+FACE 76: type=PLANE, center=(0.000000, -8.890000, 25.400000), normal=(-0.000000, -0.000000, 1.000000), area=451.611990
+FACE 77: type=PLANE, center=(0.000000, -2.540000, -0.000000), normal=(-0.000000, 1.000000, 0.000000), area=2245.774058
+FACE 78: type=CYLINDER, center=(-22.631042, -8.890000, 22.631042), normal=(-0.707107, -0.000000, 0.707107), area=152.012244
+FACE 79: type=PLANE, center=(-25.400000, -8.890000, -0.000000), normal=(-1.000000, -0.000000, -0.000000), area=451.611990
+FACE 80: type=CYLINDER, center=(-22.631042, -8.890000, -22.631042), normal=(-0.707107, 0.000000, -0.707107), area=152.012244
+FACE 81: type=CYLINDER, center=(20.091043, -10.160000, -20.091043), normal=(-0.707107, -0.000000, 0.707107), area=121.609795
+FACE 82: type=PLANE, center=(0.000000, -5.080000, 0.000000), normal=(0.000000, -1.000000, -0.000000), area=2040.475626
+FACE 83: type=PLANE, center=(-0.000000, -10.160000, -22.860001), normal=(-0.000000, -0.000000, 1.000000), area=309.676815
+FACE 84: type=PLANE, center=(25.400000, -8.890000, -0.000000), normal=(1.000000, -0.000000, -0.000000), area=451.611990
+FACE 85: type=PLANE, center=(0.000000, 0.000000, -0.000000), normal=(0.000000, 1.000000, 0.000000), area=158.346087
+FACE 86: type=CYLINDER, center=(-0.000000, -1.270000, 0.000000), normal=(1.000000, 0.000000, 0.000000), area=152.012244
+FACE 87: type=PLANE, center=(0.000000, 12.700000, 0.000000), normal=(-0.000000, -1.000000, -0.000000), area=158.346087
+FACE 88: type=CYLINDER, center=(-0.000000, 13.970000, 0.000000), normal=(1.000000, -0.000000, 0.000000), area=152.012244
+FACE 89: type=CYLINDER, center=(0.000000, 6.350000, 0.000000), normal=(1.000000, -0.000000, 0.000000), area=506.707479
+Creating front_cover_FACE_53: flush origin=(0.000000, 27.940000, -0.000000), outward normal=(-0.000000, 1.000000, -0.000000), thickness=2.540000 mm
+Creating rear_cover_FACE_72: flush origin=(0.000000, -15.240000, -0.000000), outward normal=(0.000000, -1.000000, -0.000000), thickness=2.540000 mm
+Front cover volume: 6428.224418 mm^3
+Rear cover volume: 6428.224418 mm^3
+Created exactly two separate contour-matched cover solids; original geometry is unchanged.
+Exported assembly to: /home/adml/Research/Hackathon2026/IDETC26-Hackathon-Autodesk-neuralCAD-Edit/output/gpt-5.6-ontologies/gpt-5.6-sol-ontologies_cadquery-script_1787177124.8696835/brep_end/1787177124.8696835/tmp.step
+Exported STL to: /home/adml/Research/Hackathon2026/IDETC26-Hackathon-Autodesk-neuralCAD-Edit/output/gpt-5.6-ontologies/gpt-5.6-sol-ontologies_cadquery-script_1787177124.8696835/brep_end/1787177124.8696835/tmp.stl
+Exported PNG image to: /home/adml/Research/Hackathon2026/IDETC26-Hackathon-Autodesk-neuralCAD-Edit/output/gpt-5.6-ontologies/gpt-5.6-sol-ontologies_cadquery-script_1787177124.8696835/brep_end/1787177124.8696835/tmp.png
+Script completed.
+
+stderr: /home/adml/Research/Hackathon2026/IDETC26-Hackathon-Autodesk-neuralCAD-Edit/.venv/lib/python3.12/site-packages/cadquery/utils.py:82: FutureWarning: save will be removed in the next release.
+  warn(f"{f.__name__} will be removed in the next release.", FutureWarning)
+
+
+Exported this iteration:
+tmp.step, tmp.stl, tmp.png, tmp_+Z.png, tmp_-Z.png, tmp_-X.png, tmp_+X.png, tmp_+Y.png, tmp_-Y.png, tmp_iso1.png, tmp_iso2.png

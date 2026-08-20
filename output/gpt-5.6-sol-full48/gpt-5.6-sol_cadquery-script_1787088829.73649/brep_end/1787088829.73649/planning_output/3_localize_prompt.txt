@@ -1,0 +1,1404 @@
+Now use all the given information:
+1. model.json
+2. operation.json
+3. Multiview images labelled with CAD look directions (+X, -X, +Y, -Y, +Z, -Z, and iso1 / iso2 when present)
+
+Decide which sections of the original model should be modified, removed, interacted with, or whether new sections should be created. Use as much information from the multiview images, model.json, and operation.json as possible.
+
+Make this decision using the following evidence, in this order:
+
+1. If the action target clearly identifies geometry, locate the corresponding section(s) and face(s) in model.json.
+2. If the request indicates a side using "front", "back", "top", "bottom", "left", or "right", use part.semantic_orientation from model.json. Map that semantic word to the stored cad_axis (for example top → +Y) and then to the matching labelled view and faces.
+   - If that semantic direction is unresolved (cad_axis is null) or has low confidence (below 0.6), treat the directional word as ambiguous. Do not guess an axis. Use other evidence instead.
+3. If no clear geometry is identified, use referenced_feature_words and relational_constraint to identify candidate sections and features.
+4. Also consider the intention of the edit. Based on each section's function intent and physical behavior, decide which section most needs the action. Then record the corresponding section id and face_code values from model.json.
+
+face_code values in model.json are visual labels from shaded renders. Brep_id is the CadQuery Faces() index from the STEP analysis report (for example FACE 0). Prefer listing face_code in target face code; you may also include the matching Brep_id in steps when it helps the later CadQuery implementation.
+
+Plan the modeling procedure needed to perform each action. Describe it in professional CAD modelling language, from choosing the plane and drawing sketches through extrusion, cuts, fillets, and chamfers. Be thorough and detailed.
+
+Edit operation.json accordingly. Keep the previous request_wording and actions, and add localization plus steps.
+
+OUTPUT FORMAT (JSON, operation.json, no markdown fences, use this schema):
+{
+  "request": "",
+  "request_wording": {
+    "action_words": ["..."],
+    "referenced_feature_words": ["..."],
+    "intention_words": ["..."],
+    "grammatical_words": ["..."]
+  },
+  "actions": [
+    {
+      "operation": "...",
+      "parameters": {
+        "parameter_name": "..."
+      },
+      "target": "...",
+      "relational_constraint": "...",
+      "unresolved_reference": "...",
+      "target section code": ["..."],
+      "target face code": ["..."],
+      "steps": [
+        "...",
+        "..."
+      ]
+    }
+  ],
+  "intention": ["..."]
+}
+
+The model.json, operation.json, and labeled multi-view images follow.
+
+
+model.json:
+
+{
+  "part": {
+    "name": "Dual-fan radiator and heat-exchanger assembly",
+    "description": "A rectangular finned liquid-to-air heat exchanger with a perimeter frame, two side-by-side axial cooling fans and guards on the front side, two fluid hose fittings, and three auxiliary mounting or service bosses.",
+    "source_views": [
+      "+Z",
+      "-Z",
+      "-X",
+      "+X",
+      "+Y",
+      "-Y",
+      "iso1"
+    ],
+    "semantic_orientation": {
+      "front": {
+        "cad_axis": "+X",
+        "confidence": 0.97
+      },
+      "back": {
+        "cad_axis": "-X",
+        "confidence": 0.97
+      },
+      "left": {
+        "cad_axis": "+Z",
+        "confidence": 0.88
+      },
+      "right": {
+        "cad_axis": "-Z",
+        "confidence": 0.88
+      },
+      "top": {
+        "cad_axis": "+Y",
+        "confidence": 0.96
+      },
+      "bottom": {
+        "cad_axis": "-Y",
+        "confidence": 0.96
+      }
+    },
+    "symmetry_note": "The heat-exchanger body and fan arrangement are approximately symmetric about CAD Z=0, with fan axes parallel to X and fan centers near Z=+133.35 and Z=-133.35. Fluid fittings and several service bosses break the otherwise strong bilateral symmetry."
+  },
+  "Section": [
+    {
+      "id": "S01",
+      "name": "Radiator core and perimeter frame",
+      "features included": [
+        "rectangular finned heat-exchanger core",
+        "upper and lower structural rails",
+        "left and right end tanks or side plates",
+        "rounded and chamfered outer corners",
+        "fan mounting support plane",
+        "fluid header region",
+        "frame mounting interfaces"
+      ],
+      "function intent": "Provides the liquid-to-air heat-transfer body, contains or supports the fluid passages, and carries the two fan assemblies and external mounting loads.",
+      "physical behavior": "The fin field presents high surface area to airflow while the thicker rails and end structures resist bending, distribute fan reactions, protect the core, and transfer mounting loads around the comparatively delicate fins.",
+      "geometry": "A broad, thin rectangular body normal to X, bounded by deep upper and lower rails and vertical side structures. The central field is a dense finned core; the perimeter includes planar strips, rounded corner bands, and narrow edge blends.",
+      "location": "Central rectangular body spanning most of Y and Z; behind the fans toward -X, with top at +Y and bottom at -Y.",
+      "colour": {
+        "R": 52,
+        "G": 152,
+        "B": 219
+      },
+      "major_faces": [
+        {
+          "face_code": "0000",
+          "name": "Front core support face",
+          "Brep_id": "FACE 0",
+          "description": "Large planar front-side support region normal to X with openings for the two fan zones and service details."
+        },
+        {
+          "face_code": "0001",
+          "name": "Rear core plane",
+          "Brep_id": "FACE 5",
+          "description": "Large rectangular planar face on one side of the heat-exchanger slab."
+        },
+        {
+          "face_code": "0002",
+          "name": "Opposite rear plane",
+          "Brep_id": "FACE 12",
+          "description": "Second large rectangular plane defining the opposite X-side skin of the frame/core body."
+        },
+        {
+          "face_code": "0003",
+          "name": "Bottom rail outer face",
+          "Brep_id": "FACE 22",
+          "description": "Long planar outer face of the lower rail at negative Y."
+        },
+        {
+          "face_code": "0004",
+          "name": "Top rail outer face",
+          "Brep_id": "FACE 46",
+          "description": "Long planar outer face of the upper rail at positive Y."
+        },
+        {
+          "face_code": "0005",
+          "name": "Front upper frame strip",
+          "Brep_id": "FACE 60",
+          "description": "Broad planar strip on the front side of the upper perimeter structure."
+        },
+        {
+          "face_code": "0006",
+          "name": "Front lower frame strip",
+          "Brep_id": "FACE 61",
+          "description": "Broad planar strip on the front side of the lower perimeter structure."
+        },
+        {
+          "face_code": "0007",
+          "name": "Rear upper frame strip",
+          "Brep_id": "FACE 62",
+          "description": "Broad planar strip on the opposite X side of the upper perimeter structure."
+        },
+        {
+          "face_code": "0008",
+          "name": "Negative-Z core barrel surface",
+          "Brep_id": "FACE 334",
+          "description": "Large cylindrical or wrapped core-side surface associated with the negative-Z half of the heat exchanger."
+        },
+        {
+          "face_code": "0009",
+          "name": "Positive-Z core barrel surface",
+          "Brep_id": "FACE 652",
+          "description": "Mirrored large cylindrical or wrapped core-side surface associated with the positive-Z half."
+        },
+        {
+          "face_code": "0010",
+          "name": "Positive-Z header transition",
+          "Brep_id": "FACE 656",
+          "description": "Large curved transition surface joining the positive-Z core region to the surrounding frame or header."
+        }
+      ],
+      "minor_faces_Brep_id": [
+        "FACE 1",
+        "FACE 2",
+        "FACE 3",
+        "FACE 4",
+        "FACE 6",
+        "FACE 7",
+        "FACE 8",
+        "FACE 9",
+        "FACE 10",
+        "FACE 11",
+        "FACE 13",
+        "FACE 14",
+        "FACE 15",
+        "FACE 16",
+        "FACE 17",
+        "FACE 18",
+        "FACE 19",
+        "FACE 20",
+        "FACE 21",
+        "FACE 23",
+        "FACE 24",
+        "FACE 25",
+        "FACE 26",
+        "FACE 27",
+        "FACE 28",
+        "FACE 29",
+        "FACE 30",
+        "FACE 31",
+        "FACE 32",
+        "FACE 33",
+        "FACE 34",
+        "FACE 35",
+        "FACE 36",
+        "FACE 37",
+        "FACE 38",
+        "FACE 39",
+        "FACE 40",
+        "FACE 41",
+        "FACE 42",
+        "FACE 43",
+        "FACE 44",
+        "FACE 45",
+        "FACE 47",
+        "FACE 48",
+        "FACE 49",
+        "FACE 50",
+        "FACE 51",
+        "FACE 52",
+        "FACE 53",
+        "FACE 54",
+        "FACE 55",
+        "FACE 56",
+        "FACE 57",
+        "FACE 58",
+        "FACE 59",
+        "FACE 63",
+        "FACE 64",
+        "FACE 65",
+        "FACE 66",
+        "FACE 67",
+        "FACE 68",
+        "FACE 69",
+        "FACE 70",
+        "FACE 71",
+        "FACE 72"
+      ],
+      "relationships": [
+        {
+          "source id": "S01",
+          "target id": "S02",
+          "function relationship": "mounts_to; receives_airflow; distributes_stress",
+          "structural relationship": "supports; adjacent_to; offset_from"
+        },
+        {
+          "source id": "S01",
+          "target id": "S03",
+          "function relationship": "mounts_to; receives_airflow; distributes_stress",
+          "structural relationship": "supports; adjacent_to; offset_from"
+        },
+        {
+          "source id": "S01",
+          "target id": "S05",
+          "function relationship": "provides_fluid_interface; mounts_to",
+          "structural relationship": "attached_to; blends_into"
+        }
+      ]
+    },
+    {
+      "id": "S02",
+      "name": "Right axial fan and guard",
+      "features included": [
+        "negative-Z fan shroud",
+        "concentric wire guard rings",
+        "radial guard spokes",
+        "central motor housing",
+        "hub rings and stepped boss",
+        "fan-to-radiator mounting interface"
+      ],
+      "function intent": "Forces ambient air through the negative-Z half of the radiator while preventing accidental contact with the rotating blades.",
+      "physical behavior": "The motor applies torque to the rotor; the guard and shroud remain stationary, carry motor and aerodynamic reactions into the radiator frame, and constrain access to the swept blade volume while leaving large airflow openings.",
+      "geometry": "A circular fan assembly centered near Z=-133.35 with an X-directed axis. It contains concentric annular guard members, radial spokes, a central stepped cylindrical hub, toroidal rim transitions, and a shallow surrounding shroud.",
+      "location": "Front side (+X) of the radiator, on the semantic right or CAD -Z half.",
+      "colour": {
+        "R": 231,
+        "G": 76,
+        "B": 60
+      },
+      "major_faces": [
+        {
+          "face_code": "0011",
+          "name": "Right fan swept-side shell",
+          "Brep_id": "FACE 77",
+          "description": "Large perforated BSpline surface forming the visible fan-side shell or guard field."
+        },
+        {
+          "face_code": "0012",
+          "name": "Right fan inner support shell",
+          "Brep_id": "FACE 139",
+          "description": "Large BSpline patch carrying the repeated concentric and radial fan geometry."
+        },
+        {
+          "face_code": "0013",
+          "name": "Right central hub cylinder",
+          "Brep_id": "FACE 161",
+          "description": "Main cylindrical wall of the right fan's central hub or motor interface."
+        },
+        {
+          "face_code": "0014",
+          "name": "Right hub mounting plane",
+          "Brep_id": "FACE 324",
+          "description": "Planar annular hub face surrounding the central motor region."
+        },
+        {
+          "face_code": "0015",
+          "name": "Right guard rim torus",
+          "Brep_id": "FACE 327",
+          "description": "Rounded toroidal transition at the guard or hub perimeter."
+        },
+        {
+          "face_code": "0016",
+          "name": "Right front hub torus",
+          "Brep_id": "FACE 339",
+          "description": "Prominent toroidal front transition around the motor hub."
+        },
+        {
+          "face_code": "0017",
+          "name": "Right hub end face",
+          "Brep_id": "FACE 389",
+          "description": "Outermost planar end face of the right fan hub assembly."
+        }
+      ],
+      "minor_faces_Brep_id": [
+        "FACE 73",
+        "FACE 74",
+        "FACE 75",
+        "FACE 76",
+        "FACE 78",
+        "FACE 79",
+        "FACE 80",
+        "FACE 81",
+        "FACE 82",
+        "FACE 83",
+        "FACE 84",
+        "FACE 85",
+        "FACE 86",
+        "FACE 87",
+        "FACE 88",
+        "FACE 89",
+        "FACE 90",
+        "FACE 91",
+        "FACE 92",
+        "FACE 93",
+        "FACE 94",
+        "FACE 95",
+        "FACE 96",
+        "FACE 97",
+        "FACE 98",
+        "FACE 99",
+        "FACE 100",
+        "FACE 101",
+        "FACE 102",
+        "FACE 103",
+        "FACE 104",
+        "FACE 105",
+        "FACE 106",
+        "FACE 107",
+        "FACE 108",
+        "FACE 109",
+        "FACE 110",
+        "FACE 111",
+        "FACE 112",
+        "FACE 113",
+        "FACE 114",
+        "FACE 115",
+        "FACE 116",
+        "FACE 117",
+        "FACE 118",
+        "FACE 119",
+        "FACE 120",
+        "FACE 121",
+        "FACE 122",
+        "FACE 123",
+        "FACE 124",
+        "FACE 125",
+        "FACE 126",
+        "FACE 127",
+        "FACE 128",
+        "FACE 129",
+        "FACE 130",
+        "FACE 131",
+        "FACE 132",
+        "FACE 133",
+        "FACE 134",
+        "FACE 135",
+        "FACE 136",
+        "FACE 137",
+        "FACE 138",
+        "FACE 140",
+        "FACE 141",
+        "FACE 142",
+        "FACE 143",
+        "FACE 144",
+        "FACE 145",
+        "FACE 146",
+        "FACE 147",
+        "FACE 148",
+        "FACE 149",
+        "FACE 150",
+        "FACE 151",
+        "FACE 152",
+        "FACE 153",
+        "FACE 154",
+        "FACE 155",
+        "FACE 156",
+        "FACE 157",
+        "FACE 158",
+        "FACE 159",
+        "FACE 160",
+        "FACE 162",
+        "FACE 163",
+        "FACE 164",
+        "FACE 165",
+        "FACE 166",
+        "FACE 167",
+        "FACE 168",
+        "FACE 169",
+        "FACE 170",
+        "FACE 171",
+        "FACE 172",
+        "FACE 173",
+        "FACE 174",
+        "FACE 175",
+        "FACE 176",
+        "FACE 177",
+        "FACE 178",
+        "FACE 179",
+        "FACE 180",
+        "FACE 181",
+        "FACE 182",
+        "FACE 183",
+        "FACE 184",
+        "FACE 185",
+        "FACE 186",
+        "FACE 187",
+        "FACE 188",
+        "FACE 189",
+        "FACE 190",
+        "FACE 191",
+        "FACE 192",
+        "FACE 193",
+        "FACE 194",
+        "FACE 195",
+        "FACE 196",
+        "FACE 197",
+        "FACE 198",
+        "FACE 199",
+        "FACE 200",
+        "FACE 201",
+        "FACE 202",
+        "FACE 203",
+        "FACE 204",
+        "FACE 205",
+        "FACE 206",
+        "FACE 207",
+        "FACE 208",
+        "FACE 209",
+        "FACE 210",
+        "FACE 211",
+        "FACE 212",
+        "FACE 213",
+        "FACE 214",
+        "FACE 215",
+        "FACE 216",
+        "FACE 217",
+        "FACE 218",
+        "FACE 219",
+        "FACE 220",
+        "FACE 221",
+        "FACE 222",
+        "FACE 223",
+        "FACE 224",
+        "FACE 225",
+        "FACE 226",
+        "FACE 227",
+        "FACE 228",
+        "FACE 229",
+        "FACE 230",
+        "FACE 231",
+        "FACE 232",
+        "FACE 233",
+        "FACE 234",
+        "FACE 235",
+        "FACE 236",
+        "FACE 237",
+        "FACE 238",
+        "FACE 239",
+        "FACE 240",
+        "FACE 241",
+        "FACE 242",
+        "FACE 243",
+        "FACE 244",
+        "FACE 245",
+        "FACE 246",
+        "FACE 247",
+        "FACE 248",
+        "FACE 249",
+        "FACE 250",
+        "FACE 251",
+        "FACE 252",
+        "FACE 253",
+        "FACE 254",
+        "FACE 255",
+        "FACE 256",
+        "FACE 257",
+        "FACE 258",
+        "FACE 259",
+        "FACE 260",
+        "FACE 261",
+        "FACE 262",
+        "FACE 263",
+        "FACE 264",
+        "FACE 265",
+        "FACE 266",
+        "FACE 267",
+        "FACE 268",
+        "FACE 269",
+        "FACE 270",
+        "FACE 271",
+        "FACE 272",
+        "FACE 273",
+        "FACE 274",
+        "FACE 275",
+        "FACE 276",
+        "FACE 277",
+        "FACE 278",
+        "FACE 279",
+        "FACE 280",
+        "FACE 281",
+        "FACE 282",
+        "FACE 283",
+        "FACE 284",
+        "FACE 285",
+        "FACE 286",
+        "FACE 287",
+        "FACE 288",
+        "FACE 289",
+        "FACE 290",
+        "FACE 291",
+        "FACE 292",
+        "FACE 293",
+        "FACE 294",
+        "FACE 295",
+        "FACE 296",
+        "FACE 297",
+        "FACE 298",
+        "FACE 299",
+        "FACE 300",
+        "FACE 301",
+        "FACE 302",
+        "FACE 303",
+        "FACE 304",
+        "FACE 305",
+        "FACE 306",
+        "FACE 307",
+        "FACE 308",
+        "FACE 309",
+        "FACE 310",
+        "FACE 311",
+        "FACE 312",
+        "FACE 313",
+        "FACE 314",
+        "FACE 315",
+        "FACE 316",
+        "FACE 317",
+        "FACE 318",
+        "FACE 319",
+        "FACE 320",
+        "FACE 321",
+        "FACE 322",
+        "FACE 323",
+        "FACE 325",
+        "FACE 326",
+        "FACE 328",
+        "FACE 329",
+        "FACE 330",
+        "FACE 331",
+        "FACE 332",
+        "FACE 333",
+        "FACE 335",
+        "FACE 336",
+        "FACE 337",
+        "FACE 338",
+        "FACE 340",
+        "FACE 341",
+        "FACE 342",
+        "FACE 343",
+        "FACE 344",
+        "FACE 345",
+        "FACE 346",
+        "FACE 347",
+        "FACE 348",
+        "FACE 349",
+        "FACE 350",
+        "FACE 351",
+        "FACE 352",
+        "FACE 353",
+        "FACE 354",
+        "FACE 355",
+        "FACE 356",
+        "FACE 357",
+        "FACE 358",
+        "FACE 359",
+        "FACE 360",
+        "FACE 361",
+        "FACE 362",
+        "FACE 363",
+        "FACE 364",
+        "FACE 365",
+        "FACE 366",
+        "FACE 367",
+        "FACE 368",
+        "FACE 369",
+        "FACE 370",
+        "FACE 371",
+        "FACE 372",
+        "FACE 373",
+        "FACE 374",
+        "FACE 375",
+        "FACE 376",
+        "FACE 377",
+        "FACE 378",
+        "FACE 379",
+        "FACE 380",
+        "FACE 381",
+        "FACE 382",
+        "FACE 383",
+        "FACE 384",
+        "FACE 385",
+        "FACE 386",
+        "FACE 387",
+        "FACE 388",
+        "FACE 390"
+      ],
+      "relationships": [
+        {
+          "source id": "S02",
+          "target id": "S01",
+          "function relationship": "moves_air_through; mounts_to; transmits_load",
+          "structural relationship": "attached_to; coaxial_with_local_opening; supported_by"
+        },
+        {
+          "source id": "S02",
+          "target id": "S04",
+          "function relationship": "drives_rotation; constrains_dof; provides_clearance",
+          "structural relationship": "coaxial_with; surrounds; adjacent_to"
+        }
+      ]
+    },
+    {
+      "id": "S03",
+      "name": "Left axial fan and guard",
+      "features included": [
+        "positive-Z fan shroud",
+        "concentric wire guard rings",
+        "radial guard spokes",
+        "central motor housing",
+        "hub rings and stepped boss",
+        "fan-to-radiator mounting interface"
+      ],
+      "function intent": "Forces ambient air through the positive-Z half of the radiator while shielding the rotating blades.",
+      "physical behavior": "The stationary guard and shroud resist contact and aerodynamic loads, while the coaxial hub supports the rotating blade set and transfers motor reaction into the radiator frame.",
+      "geometry": "A circular assembly centered near Z=+133.35 and coaxial with X. Its geometry mirrors the right fan and includes annular guard rings, radial spokes, a stepped cylindrical hub, toroidal transitions, and a shallow shroud.",
+      "location": "Front side (+X) of the radiator, on the semantic left or CAD +Z half.",
+      "colour": {
+        "R": 46,
+        "G": 204,
+        "B": 113
+      },
+      "major_faces": [
+        {
+          "face_code": "0018",
+          "name": "Left fan swept-side shell",
+          "Brep_id": "FACE 395",
+          "description": "Large perforated BSpline surface forming the left fan's visible shell or guard field."
+        },
+        {
+          "face_code": "0019",
+          "name": "Left fan inner support shell",
+          "Brep_id": "FACE 457",
+          "description": "Large BSpline patch carrying the left fan's repeated concentric and radial geometry."
+        },
+        {
+          "face_code": "0020",
+          "name": "Left central hub cylinder",
+          "Brep_id": "FACE 479",
+          "description": "Main cylindrical wall of the left fan central hub or motor interface."
+        },
+        {
+          "face_code": "0021",
+          "name": "Left hub mounting plane",
+          "Brep_id": "FACE 642",
+          "description": "Planar annular hub face surrounding the central motor region."
+        },
+        {
+          "face_code": "0022",
+          "name": "Left guard rim torus",
+          "Brep_id": "FACE 645",
+          "description": "Rounded toroidal transition at the left guard or hub perimeter."
+        },
+        {
+          "face_code": "0023",
+          "name": "Left front hub torus",
+          "Brep_id": "FACE 658",
+          "description": "Prominent toroidal front transition around the left motor hub."
+        },
+        {
+          "face_code": "0024",
+          "name": "Left hub end face",
+          "Brep_id": "FACE 708",
+          "description": "Outermost planar end face of the left fan hub assembly."
+        }
+      ],
+      "minor_faces_Brep_id": [
+        "FACE 391",
+        "FACE 392",
+        "FACE 393",
+        "FACE 394",
+        "FACE 396",
+        "FACE 397",
+        "FACE 398",
+        "FACE 399",
+        "FACE 400",
+        "FACE 401",
+        "FACE 402",
+        "FACE 403",
+        "FACE 404",
+        "FACE 405",
+        "FACE 406",
+        "FACE 407",
+        "FACE 408",
+        "FACE 409",
+        "FACE 410",
+        "FACE 411",
+        "FACE 412",
+        "FACE 413",
+        "FACE 414",
+        "FACE 415",
+        "FACE 416",
+        "FACE 417",
+        "FACE 418",
+        "FACE 419",
+        "FACE 420",
+        "FACE 421",
+        "FACE 422",
+        "FACE 423",
+        "FACE 424",
+        "FACE 425",
+        "FACE 426",
+        "FACE 427",
+        "FACE 428",
+        "FACE 429",
+        "FACE 430",
+        "FACE 431",
+        "FACE 432",
+        "FACE 433",
+        "FACE 434",
+        "FACE 435",
+        "FACE 436",
+        "FACE 437",
+        "FACE 438",
+        "FACE 439",
+        "FACE 440",
+        "FACE 441",
+        "FACE 442",
+        "FACE 443",
+        "FACE 444",
+        "FACE 445",
+        "FACE 446",
+        "FACE 447",
+        "FACE 448",
+        "FACE 449",
+        "FACE 450",
+        "FACE 451",
+        "FACE 452",
+        "FACE 453",
+        "FACE 454",
+        "FACE 455",
+        "FACE 456",
+        "FACE 458",
+        "FACE 459",
+        "FACE 460",
+        "FACE 461",
+        "FACE 462",
+        "FACE 463",
+        "FACE 464",
+        "FACE 465",
+        "FACE 466",
+        "FACE 467",
+        "FACE 468",
+        "FACE 469",
+        "FACE 470",
+        "FACE 471",
+        "FACE 472",
+        "FACE 473",
+        "FACE 474",
+        "FACE 475",
+        "FACE 476",
+        "FACE 477",
+        "FACE 478",
+        "FACE 480",
+        "FACE 481",
+        "FACE 482",
+        "FACE 483",
+        "FACE 484",
+        "FACE 485",
+        "FACE 486",
+        "FACE 487",
+        "FACE 488",
+        "FACE 489",
+        "FACE 490",
+        "FACE 491",
+        "FACE 492",
+        "FACE 493",
+        "FACE 494",
+        "FACE 495",
+        "FACE 496",
+        "FACE 497",
+        "FACE 498",
+        "FACE 499",
+        "FACE 500",
+        "FACE 501",
+        "FACE 502",
+        "FACE 503",
+        "FACE 504",
+        "FACE 505",
+        "FACE 506",
+        "FACE 507",
+        "FACE 508",
+        "FACE 509",
+        "FACE 510",
+        "FACE 511",
+        "FACE 512",
+        "FACE 513",
+        "FACE 514",
+        "FACE 515",
+        "FACE 516",
+        "FACE 517",
+        "FACE 518",
+        "FACE 519",
+        "FACE 520",
+        "FACE 521",
+        "FACE 522",
+        "FACE 523",
+        "FACE 524",
+        "FACE 525",
+        "FACE 526",
+        "FACE 527",
+        "FACE 528",
+        "FACE 529",
+        "FACE 530",
+        "FACE 531",
+        "FACE 532",
+        "FACE 533",
+        "FACE 534",
+        "FACE 535",
+        "FACE 536",
+        "FACE 537",
+        "FACE 538",
+        "FACE 539",
+        "FACE 540",
+        "FACE 541",
+        "FACE 542",
+        "FACE 543",
+        "FACE 544",
+        "FACE 545",
+        "FACE 546",
+        "FACE 547",
+        "FACE 548",
+        "FACE 549",
+        "FACE 550",
+        "FACE 551",
+        "FACE 552",
+        "FACE 553",
+        "FACE 554",
+        "FACE 555",
+        "FACE 556",
+        "FACE 557",
+        "FACE 558",
+        "FACE 559",
+        "FACE 560",
+        "FACE 561",
+        "FACE 562",
+        "FACE 563",
+        "FACE 564",
+        "FACE 565",
+        "FACE 566",
+        "FACE 567",
+        "FACE 568",
+        "FACE 569",
+        "FACE 570",
+        "FACE 571",
+        "FACE 572",
+        "FACE 573",
+        "FACE 574",
+        "FACE 575",
+        "FACE 576",
+        "FACE 577",
+        "FACE 578",
+        "FACE 579",
+        "FACE 580",
+        "FACE 581",
+        "FACE 582",
+        "FACE 583",
+        "FACE 584",
+        "FACE 585",
+        "FACE 586",
+        "FACE 587",
+        "FACE 588",
+        "FACE 589",
+        "FACE 590",
+        "FACE 591",
+        "FACE 592",
+        "FACE 593",
+        "FACE 594",
+        "FACE 595",
+        "FACE 596",
+        "FACE 597",
+        "FACE 598",
+        "FACE 599",
+        "FACE 600",
+        "FACE 601",
+        "FACE 602",
+        "FACE 603",
+        "FACE 604",
+        "FACE 605",
+        "FACE 606",
+        "FACE 607",
+        "FACE 608",
+        "FACE 609",
+        "FACE 610",
+        "FACE 611",
+        "FACE 612",
+        "FACE 613",
+        "FACE 614",
+        "FACE 615",
+        "FACE 616",
+        "FACE 617",
+        "FACE 618",
+        "FACE 619",
+        "FACE 620",
+        "FACE 621",
+        "FACE 622",
+        "FACE 623",
+        "FACE 624",
+        "FACE 625",
+        "FACE 626",
+        "FACE 627",
+        "FACE 628",
+        "FACE 629",
+        "FACE 630",
+        "FACE 631",
+        "FACE 632",
+        "FACE 633",
+        "FACE 634",
+        "FACE 635",
+        "FACE 636",
+        "FACE 637",
+        "FACE 638",
+        "FACE 639",
+        "FACE 640",
+        "FACE 641",
+        "FACE 643",
+        "FACE 644",
+        "FACE 646",
+        "FACE 647",
+        "FACE 648",
+        "FACE 649",
+        "FACE 650",
+        "FACE 651",
+        "FACE 653",
+        "FACE 654",
+        "FACE 655",
+        "FACE 657",
+        "FACE 659",
+        "FACE 660",
+        "FACE 661",
+        "FACE 662",
+        "FACE 663",
+        "FACE 664",
+        "FACE 665",
+        "FACE 666",
+        "FACE 667",
+        "FACE 668",
+        "FACE 669",
+        "FACE 670",
+        "FACE 671",
+        "FACE 672",
+        "FACE 673",
+        "FACE 674",
+        "FACE 675",
+        "FACE 676",
+        "FACE 677",
+        "FACE 678",
+        "FACE 679",
+        "FACE 680",
+        "FACE 681",
+        "FACE 682",
+        "FACE 683",
+        "FACE 684",
+        "FACE 685",
+        "FACE 686",
+        "FACE 687",
+        "FACE 688",
+        "FACE 689",
+        "FACE 690",
+        "FACE 691",
+        "FACE 692",
+        "FACE 693",
+        "FACE 694",
+        "FACE 695",
+        "FACE 696",
+        "FACE 697",
+        "FACE 698",
+        "FACE 699",
+        "FACE 700",
+        "FACE 701",
+        "FACE 702",
+        "FACE 703",
+        "FACE 704",
+        "FACE 705",
+        "FACE 706",
+        "FACE 707",
+        "FACE 709"
+      ],
+      "relationships": [
+        {
+          "source id": "S03",
+          "target id": "S01",
+          "function relationship": "moves_air_through; mounts_to; transmits_load",
+          "structural relationship": "attached_to; coaxial_with_local_opening; supported_by"
+        },
+        {
+          "source id": "S03",
+          "target id": "S04",
+          "function relationship": "drives_rotation; constrains_dof; provides_clearance",
+          "structural relationship": "coaxial_with; surrounds; adjacent_to"
+        },
+        {
+          "source id": "S03",
+          "target id": "S02",
+          "function relationship": "shares_airflow_duty; balances_cooling",
+          "structural relationship": "coplanar_with; offset_from; approximately_mirrored_about_Z0"
+        }
+      ]
+    },
+    {
+      "id": "S04",
+      "name": "Fan blade rotors",
+      "features included": [
+        "fourteen separate curved blade solids",
+        "seven blades per fan",
+        "airfoil-like broad blade faces",
+        "curved leading and trailing edges",
+        "root regions adjoining the hubs"
+      ],
+      "function intent": "Converts motor torque into an X-directed pressure rise and airflow through both halves of the radiator core.",
+      "physical behavior": "Each curved blade experiences centrifugal, bending, and aerodynamic loading. The swept blade set rotates about X, accelerates air axially, and requires radial and axial clearance from the stationary guards and radiator.",
+      "geometry": "Two seven-blade rotors. Each blade is represented as a separate six-face BSpline-dominated solid extending radially from a central hub with twist and curvature through its span.",
+      "location": "Contained inside the two front fan guards, centered near Z=-133.35 and Z=+133.35.",
+      "colour": {
+        "R": 241,
+        "G": 196,
+        "B": 15
+      },
+      "major_faces": [
+        {
+          "face_code": "0025",
+          "name": "Left rotor blade 1 pressure face",
+          "Brep_id": "FACE 710",
+          "description": "Broad curved working surface of the first positive-Z fan blade."
+        },
+        {
+          "face_code": "0026",
+          "name": "Left rotor blade 2 pressure face",
+          "Brep_id": "FACE 716",
+          "description": "Broad curved working surface of the second positive-Z fan blade."
+        },
+        {
+          "face_code": "0027",
+          "name": "Left rotor blade 3 pressure face",
+          "Brep_id": "FACE 722",
+          "description": "Broad curved working surface of the third positive-Z fan blade."
+        },
+        {
+          "face_code": "0028",
+          "name": "Left rotor blade 4 pressure face",
+          "Brep_id": "FACE 728",
+          "description": "Broad curved working surface of the fourth positive-Z fan blade."
+        },
+        {
+          "face_code": "0029",
+          "name": "Left rotor blade 5 pressure face",
+          "Brep_id": "FACE 734",
+          "description": "Broad curved working surface of the fifth positive-Z fan blade."
+        },
+        {
+          "face_code": "0030",
+          "name": "Left rotor blade 6 pressure face",
+          "Brep_id": "FACE 740",
+          "description": "Broad curved working surface of the sixth positive-Z fan blade."
+        },
+        {
+          "face_code": "0031",
+          "name": "Left rotor blade 7 pressure face",
+          "Brep_id": "FACE 746",
+          "description": "Broad curved working surface of the seventh positive-Z fan blade."
+        },
+        {
+          "face_code": "0032",
+          "name": "Right rotor blade 1 pressure face",
+          "Brep_id": "FACE 752",
+          "description": "Broad curved working surface of the first negative-Z fan blade."
+        },
+        {
+          "face_code": "0033",
+          "name": "Right rotor blade 2 pressure face",
+          "Brep_id": "FACE 758",
+          "description": "Broad curved working surface of the second negative-Z fan blade."
+        },
+        {
+          "face_code": "0034",
+          "name": "Right rotor blade 3 pressure face",
+          "Brep_id": "FACE 764",
+          "description": "Broad curved working surface of the third negative-Z fan blade."
+        },
+        {
+          "face_code": "0035",
+          "name": "Right rotor blade 4 pressure face",
+          "Brep_id": "FACE 770",
+          "description": "Broad curved working surface of the fourth negative-Z fan blade."
+        },
+        {
+          "face_code": "0036",
+          "name": "Right rotor blade 5 pressure face",
+          "Brep_id": "FACE 776",
+          "description": "Broad curved working surface of the fifth negative-Z fan blade."
+        },
+        {
+          "face_code": "0037",
+          "name": "Right rotor blade 6 pressure face",
+          "Brep_id": "FACE 782",
+          "description": "Broad curved working surface of the sixth negative-Z fan blade."
+        },
+        {
+          "face_code": "0038",
+          "name": "Right rotor blade 7 pressure face",
+          "Brep_id": "FACE 788",
+          "description": "Broad curved working surface of the seventh negative-Z fan blade."
+        }
+      ],
+      "minor_faces_Brep_id": [
+        "FACE 711",
+        "FACE 712",
+        "FACE 713",
+        "FACE 714",
+        "FACE 715",
+        "FACE 717",
+        "FACE 718",
+        "FACE 719",
+        "FACE 720",
+        "FACE 721",
+        "FACE 723",
+        "FACE 724",
+        "FACE 725",
+        "FACE 726",
+        "FACE 727",
+        "FACE 729",
+        "FACE 730",
+        "FACE 731",
+        "FACE 732",
+        "FACE 733",
+        "FACE 735",
+        "FACE 736",
+        "FACE 737",
+        "FACE 738",
+        "FACE 739",
+        "FACE 741",
+        "FACE 742",
+        "FACE 743",
+        "FACE 744",
+        "FACE 745",
+        "FACE 747",
+        "FACE 748",
+        "FACE 749",
+        "FACE 750",
+        "FACE 751",
+        "FACE 753",
+        "FACE 754",
+        "FACE 755",
+        "FACE 756",
+        "FACE 757",
+        "FACE 759",
+        "FACE 760",
+        "FACE 761",
+        "FACE 762",
+        "FACE 763",
+        "FACE 765",
+        "FACE 766",
+        "FACE 767",
+        "FACE 768",
+        "FACE 769",
+        "FACE 771",
+        "FACE 772",
+        "FACE 773",
+        "FACE 774",
+        "FACE 775",
+        "FACE 777",
+        "FACE 778",
+        "FACE 779",
+        "FACE 780",
+        "FACE 781",
+        "FACE 783",
+        "FACE 784",
+        "FACE 785",
+        "FACE 786",
+        "FACE 787",
+        "FACE 789",
+        "FACE 790",
+        "FACE 791",
+        "FACE 792",
+        "FACE 793"
+      ],
+      "relationships": [
+        {
+          "source id": "S04",
+          "target id": "S02",
+          "function relationship": "rotates_within; guides_airflow; constrained_by_hub",
+          "structural relationship": "contained_in; coaxial_with; offset_from"
+        },
+        {
+          "source id": "S04",
+          "target id": "S03",
+          "function relationship": "rotates_within; guides_airflow; constrained_by_hub",
+          "structural relationship": "contained_in; coaxial_with; offset_from"
+        },
+        {
+          "source id": "S04",
+          "target id": "S01",
+          "function relationship": "drives_air_through; provides_forced_convection",
+          "structural relationship": "offset_from; faces_toward"
+        }
+      ]
+    },
+    {
+      "id": "S05",
+      "name": "Fluid fittings and service bosses",
+      "features included": [
+        "two brass-colored hose fittings",
+        "upper service or mounting boss",
+        "two diagonal corner mounting or service bosses",
+        "rounded external caps"
+      ],
+      "function intent": "Connects the heat exchanger to external fluid lines and provides auxiliary attachment, filling, bleeding, isolation, or installation interfaces.",
+      "physical behavior": "The hose fittings transmit fluid pressure, hose insertion loads, and clamp loads into the header. The larger bosses resist local installation forces and provide graspable or mountable external interfaces.",
+      "geometry": "Five disconnected, predominantly revolved or smoothly lofted solids: two narrow curved hose-barb fittings near the positive-Z lower side and three larger rounded bosses at separated perimeter locations.",
+      "location": "Two fittings project beyond the semantic left/CAD +Z end near -Y; service bosses occur near the upper-left, lower-right, and top-center perimeter regions.",
+      "colour": {
+        "R": 155,
+        "G": 89,
+        "B": 182
+      },
+      "major_faces": [
+        {
+          "face_code": "0039",
+          "name": "Upper hose fitting body",
+          "Brep_id": "FACE 794",
+          "description": "Single smooth BSpline shell representing one curved fluid hose fitting."
+        },
+        {
+          "face_code": "0040",
+          "name": "Lower hose fitting body",
+          "Brep_id": "FACE 795",
+          "description": "Second smooth BSpline shell representing the adjacent fluid hose fitting."
+        },
+        {
+          "face_code": "0041",
+          "name": "Positive-Y positive-Z service boss",
+          "Brep_id": "FACE 796",
+          "description": "Rounded one-face boss near the upper positive-Z corner."
+        },
+        {
+          "face_code": "0042",
+          "name": "Negative-Y negative-Z service boss",
+          "Brep_id": "FACE 797",
+          "description": "Rounded one-face boss near the diagonally opposite lower corner."
+        },
+        {
+          "face_code": "0043",
+          "name": "Top-center service boss",
+          "Brep_id": "FACE 798",
+          "description": "Rounded one-face boss projecting from the top rail near Z=0."
+        }
+      ],
+      "minor_faces_Brep_id": [],
+      "relationships": [
+        {
+          "source id": "S05",
+          "target id": "S01",
+          "function relationship": "mounts_to; seals_against; transmits_fluid_and_installation_load",
+          "structural relationship": "attached_to; offset_from; blends_into"
+        }
+      ]
+    }
+  ]
+}
+
+operation.json:
+
+{
+  "request": "Hi , Please create an outlet port on the top right and an inlet port on the bottom left .",
+  "request_wording": {
+    "action_words": [
+      "create",
+      "port",
+      "port"
+    ],
+    "referenced_feature_words": [
+      "on",
+      "top",
+      "right",
+      "on",
+      "bottom",
+      "left"
+    ],
+    "intention_words": [
+      "outlet",
+      "inlet"
+    ],
+    "grammatical_words": [
+      "Hi",
+      "Please",
+      "an",
+      "the",
+      "and",
+      "an",
+      "the"
+    ]
+  },
+  "actions": [
+    {
+      "operation": "Create a port",
+      "parameters": {},
+      "target": "Top-right location of the existing model",
+      "relational_constraint": "The port must be located on the top-right region.",
+      "unresolved_reference": "Identify the face or surface corresponding to the top-right region under the model's applicable orientation. The port geometry and dimensions are not specified."
+    },
+    {
+      "operation": "Create a port",
+      "parameters": {},
+      "target": "Bottom-left location of the existing model",
+      "relational_constraint": "The port must be located on the bottom-left region.",
+      "unresolved_reference": "Identify the face or surface corresponding to the bottom-left region under the model's applicable orientation. The port geometry and dimensions are not specified."
+    }
+  ],
+  "intention": [
+    "Provide an outlet function at the top-right location.",
+    "Provide an inlet function at the bottom-left location."
+  ]
+}
+
+View: +Z
+
+[IMAGE 0: /home/adml/Research/Hackathon2026/IDETC26-Hackathon-Autodesk-neuralCAD-Edit/data/edit_192_external/breps/SUJ2G2UMJQR7PMBX_1759203649.19873_+Z.jpg]
+
+View: -Z
+
+[IMAGE 1: /home/adml/Research/Hackathon2026/IDETC26-Hackathon-Autodesk-neuralCAD-Edit/data/edit_192_external/breps/SUJ2G2UMJQR7PMBX_1759203649.19873_-Z.jpg]
+
+View: -X
+
+[IMAGE 2: /home/adml/Research/Hackathon2026/IDETC26-Hackathon-Autodesk-neuralCAD-Edit/data/edit_192_external/breps/SUJ2G2UMJQR7PMBX_1759203649.19873_-X.jpg]
+
+View: +X
+
+[IMAGE 3: /home/adml/Research/Hackathon2026/IDETC26-Hackathon-Autodesk-neuralCAD-Edit/data/edit_192_external/breps/SUJ2G2UMJQR7PMBX_1759203649.19873_+X.jpg]
+
+View: +Y
+
+[IMAGE 4: /home/adml/Research/Hackathon2026/IDETC26-Hackathon-Autodesk-neuralCAD-Edit/data/edit_192_external/breps/SUJ2G2UMJQR7PMBX_1759203649.19873_+Y.jpg]
+
+View: -Y
+
+[IMAGE 5: /home/adml/Research/Hackathon2026/IDETC26-Hackathon-Autodesk-neuralCAD-Edit/data/edit_192_external/breps/SUJ2G2UMJQR7PMBX_1759203649.19873_-Y.jpg]
+
+View: iso1
+
+[IMAGE 6: /home/adml/Research/Hackathon2026/IDETC26-Hackathon-Autodesk-neuralCAD-Edit/data/edit_192_external/breps/SUJ2G2UMJQR7PMBX_1759203649.19873_iso1.jpg]

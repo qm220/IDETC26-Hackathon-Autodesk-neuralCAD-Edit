@@ -1,0 +1,70 @@
+def my_cad_function(args):
+    import os
+    import cadquery as cq
+
+    input_file = os.path.expanduser(args["input_file"])
+    model = cq.importers.importStep(input_file)
+    source = model.val()
+    solids = list(source.Solids())
+
+    if len(solids) != 9:
+        raise ValueError("Expected 9 solids in the exploded component set, found %d" % len(solids))
+
+    # SOLID 1 is the finned Cyclops Plus heatsink. Its rear interface is the
+    # broad +Y face at y=0. The imported three-point pattern is centered at:
+    #   (x,z) = (35.5,20), (44.5,20), and (40,10).
+    # Replace the lower central point with two lower corner points, yielding
+    # a rectangular four-point pattern while preserving the upper pair.
+    heatsink = solids[1]
+
+    rear_y = 0.0
+    hole_depth = 6.0
+    minor_radius = 1.265
+    entry_radius = 1.70
+    entry_depth = 0.44
+
+    # Heal the obsolete lower-center threaded mounting point. The plug spans
+    # slightly beyond the existing blind-hole depth and rear surface so the
+    # union fully removes its threaded and countersunk geometry.
+    old_x, old_z = 40.0, 10.0
+    plug = cq.Solid.makeCylinder(
+        1.82,
+        6.25,
+        cq.Vector(old_x, -6.10, old_z),
+        cq.Vector(0, 1, 0)
+    )
+    edited = heatsink.fuse(plug)
+
+    # Cut the two replacement lower mounting points aligned with the existing
+    # upper pair. Each is a usable blind mounting bore with an entry chamfer,
+    # matching the size and rear-face treatment of the retained points.
+    for x in (35.5, 44.5):
+        bore = cq.Solid.makeCylinder(
+            minor_radius,
+            hole_depth + 0.10,
+            cq.Vector(x, rear_y + 0.05, 10.0),
+            cq.Vector(0, -1, 0)
+        )
+        entry = cq.Solid.makeCone(
+            entry_radius,
+            minor_radius,
+            entry_depth,
+            cq.Vector(x, rear_y + 0.02, 10.0),
+            cq.Vector(0, -1, 0)
+        )
+        edited = edited.cut(bore.fuse(entry))
+
+    if not edited.isValid():
+        raise ValueError("Edited Cyclops Plus heatsink is not a valid solid")
+
+    solids[1] = edited
+    result = cq.Compound.makeCompound(solids)
+
+    print("EDITED SOLID: 1 (Cyclops Plus finned heatsink)")
+    print("REMOVED REAR MOUNTING POINT:", (old_x, rear_y, old_z))
+    print("FINAL REAR FOUR-POINT PATTERN:",
+          [(35.5, rear_y, 10.0), (44.5, rear_y, 10.0),
+           (35.5, rear_y, 20.0), (44.5, rear_y, 20.0)])
+    print("RESULT VALID:", result.isValid(), "SOLIDS:", len(result.Solids()))
+
+    return cq.Workplane("XY").newObject([result])

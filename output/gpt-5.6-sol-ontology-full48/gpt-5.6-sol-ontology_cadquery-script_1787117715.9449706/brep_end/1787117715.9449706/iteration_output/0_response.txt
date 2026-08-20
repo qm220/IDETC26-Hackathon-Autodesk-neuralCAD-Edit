@@ -1,0 +1,155 @@
+Thinking text:
+
+
+Generated script:
+def my_cad_function(args):
+    input_file = os.path.expanduser(args["input_file"])
+    imported = cq.importers.importStep(input_file)
+
+    solids = imported.solids().vals()
+    if len(solids) != 1:
+        raise ValueError("Expected exactly one input solid, found %d" % len(solids))
+    solid = solids[0]
+
+    print("INPUT VALID:", solid.isValid())
+    print("INPUT SOLIDS:", len(solids))
+    print("INPUT FACES:", len(solid.Faces()))
+    print("INPUT EDGES:", len(solid.Edges()))
+    print("INPUT VOLUME: %.9f" % solid.Volume())
+
+    for i, face in enumerate(solid.Faces()):
+        bb = face.BoundingBox()
+        c = face.Center()
+        try:
+            geom_type = face.geomType()
+        except Exception:
+            geom_type = "UNKNOWN"
+        print(
+            "FACE %d type=%s center=(%.6f, %.6f, %.6f) "
+            "bbox=(%.6f, %.6f, %.6f)-(%.6f, %.6f, %.6f) area=%.9f"
+            % (i, geom_type, c.x, c.y, c.z,
+               bb.xmin, bb.ymin, bb.zmin, bb.xmax, bb.ymax, bb.zmax,
+               face.Area())
+        )
+
+    original_edges = []
+    for i, edge in enumerate(solid.Edges()):
+        length = edge.Length()
+        c = edge.Center()
+        bb = edge.BoundingBox()
+        try:
+            geom_type = edge.geomType()
+        except Exception:
+            geom_type = "UNKNOWN"
+        print(
+            "EDGE %d type=%s length=%.9f center=(%.6f, %.6f, %.6f) "
+            "bbox=(%.6f, %.6f, %.6f)-(%.6f, %.6f, %.6f)"
+            % (i, geom_type, length, c.x, c.y, c.z,
+               bb.xmin, bb.ymin, bb.zmin, bb.xmax, bb.ymax, bb.zmax)
+        )
+        if length > 1.0e-7:
+            original_edges.append(edge)
+
+    print("NON-DEGENERATE ORIGINAL EDGES SELECTED:", len(original_edges))
+    if len(original_edges) != len(solid.Edges()):
+        print("DEGENERATE EDGES OMITTED:", len(solid.Edges()) - len(original_edges))
+
+    radius = 0.2
+    try:
+        # Apply one global constant-radius rolling-ball fillet to the complete
+        # collection captured from the original, unmodified B-rep.
+        filleted_solid = solid.fillet(radius, original_edges)
+        if filleted_solid is None:
+            raise RuntimeError("The OCC fillet operation returned no shape")
+
+        result_solids = filleted_solid.Solids()
+        print("FILLET SUCCEEDED")
+        print("RESULT VALID:", filleted_solid.isValid())
+        print("RESULT SOLIDS:", len(result_solids))
+        print("RESULT FACES:", len(filleted_solid.Faces()))
+        print("RESULT EDGES:", len(filleted_solid.Edges()))
+        print("RESULT VOLUME: %.9f" % filleted_solid.Volume())
+
+        if not filleted_solid.isValid():
+            raise RuntimeError("Global all-edge fillet produced an invalid shape")
+        if len(result_solids) != 1:
+            raise RuntimeError("Global all-edge fillet did not preserve one closed solid")
+
+        return cq.Workplane(obj=filleted_solid)
+    except Exception as exc:
+        print("GLOBAL ALL-EDGE R=0.2 MM FILLET FAILED:", repr(exc))
+        print("The requested radius equals the nominal 0.2 mm side-wall thickness; no radius reduction or edge exclusion was applied.")
+        # Return the valid source body so its geometry and printed edge data can
+        # be inspected during this diagnostic first iteration.
+        return cq.Workplane(obj=solid)
+
+Program output:
+stdout: Loading function from: /home/adml/Research/Hackathon2026/IDETC26-Hackathon-Autodesk-neuralCAD-Edit/output/gpt-5.6-sol-ontology-full48/gpt-5.6-sol-ontology_cadquery-script_1787117715.9449706/brep_end/1787117715.9449706/temp_script.py
+INPUT VALID: True
+INPUT SOLIDS: 1
+INPUT FACES: 15
+INPUT EDGES: 36
+INPUT VOLUME: 5.470427083
+FACE 0 type=CYLINDER center=(0.000000, 0.000000, 0.052952) bbox=(-0.800000, -2.461707, -0.200000)-(0.800000, 2.461707, 0.550000) area=8.356221156
+FACE 1 type=PLANE center=(0.000000, -2.630853, 0.550000) bbox=(-0.800000, -2.800000, 0.550000)-(0.800000, -2.461707, 0.550000) area=0.541269240
+FACE 2 type=PLANE center=(-0.000000, 2.630853, 0.550000) bbox=(-0.800000, 2.461707, 0.550000)-(0.800000, 2.800000, 0.550000) area=0.541269240
+FACE 3 type=PLANE center=(0.800000, 0.000000, -0.282609) bbox=(0.800000, -2.800000, -0.750000)-(0.800000, 2.800000, 0.550000) area=4.773181271
+FACE 4 type=PLANE center=(-0.800000, 0.000000, -0.282609) bbox=(-0.800000, -2.800000, -0.750000)-(-0.800000, 2.800000, 0.550000) area=4.773181271
+FACE 5 type=PLANE center=(-0.000000, 2.800000, -0.100000) bbox=(-0.800000, 2.800000, -0.750000)-(0.800000, 2.800000, 0.550000) area=2.080000000
+FACE 6 type=PLANE center=(0.000000, -2.800000, -0.100000) bbox=(-0.800000, -2.800000, -0.750000)-(0.800000, -2.800000, 0.550000) area=2.080000000
+FACE 7 type=CYLINDER center=(0.000000, -0.000000, 0.253099) bbox=(-1.000000, -2.400000, 0.000000)-(1.000000, 2.400000, 0.750000) area=10.213277762
+FACE 8 type=PLANE center=(0.000000, -2.700000, 0.750000) bbox=(-1.000000, -3.000000, 0.750000)-(1.000000, -2.400000, 0.750000) area=1.200000000
+FACE 9 type=PLANE center=(0.000000, 2.700000, 0.750000) bbox=(-1.000000, 2.400000, 0.750000)-(1.000000, 3.000000, 0.750000) area=1.200000000
+FACE 10 type=PLANE center=(1.000000, -0.000000, -0.167066) bbox=(1.000000, -3.000000, -0.750000)-(1.000000, 3.000000, 0.750000) area=6.553758559
+FACE 11 type=PLANE center=(0.000000, -0.000000, -0.750000) bbox=(-1.000000, -3.000000, -0.750000)-(1.000000, 3.000000, -0.750000) area=3.040000000
+FACE 12 type=PLANE center=(-1.000000, 0.000000, -0.167066) bbox=(-1.000000, -3.000000, -0.750000)-(-1.000000, 3.000000, 0.750000) area=6.553758559
+FACE 13 type=PLANE center=(-0.000000, 3.000000, 0.000000) bbox=(-1.000000, 3.000000, -0.750000)-(1.000000, 3.000000, 0.750000) area=3.000000000
+FACE 14 type=PLANE center=(0.000000, -3.000000, 0.000000) bbox=(-1.000000, -3.000000, -0.750000)-(1.000000, -3.000000, 0.750000) area=3.000000000
+EDGE 0 type=CIRCLE length=5.222638222 center=(-0.800000, -0.000000, 0.052952) bbox=(-0.800000, -2.461707, -0.200000)-(-0.800000, 2.461707, 0.550000)
+EDGE 1 type=LINE length=1.600000000 center=(-0.000000, 2.461707, 0.550000) bbox=(-0.800000, 2.461707, 0.550000)-(0.800000, 2.461707, 0.550000)
+EDGE 2 type=CIRCLE length=5.222638222 center=(0.800000, 0.000000, 0.052952) bbox=(0.800000, -2.461707, -0.200000)-(0.800000, 2.461707, 0.550000)
+EDGE 3 type=LINE length=1.600000000 center=(0.000000, -2.461707, 0.550000) bbox=(-0.800000, -2.461707, 0.550000)-(0.800000, -2.461707, 0.550000)
+EDGE 4 type=LINE length=0.338293275 center=(0.800000, -2.630853, 0.550000) bbox=(0.800000, -2.800000, 0.550000)-(0.800000, -2.461707, 0.550000)
+EDGE 5 type=LINE length=1.600000000 center=(0.000000, -2.800000, 0.550000) bbox=(-0.800000, -2.800000, 0.550000)-(0.800000, -2.800000, 0.550000)
+EDGE 6 type=LINE length=0.338293275 center=(-0.800000, -2.630853, 0.550000) bbox=(-0.800000, -2.800000, 0.550000)-(-0.800000, -2.461707, 0.550000)
+EDGE 7 type=LINE length=0.338293275 center=(-0.800000, 2.630853, 0.550000) bbox=(-0.800000, 2.461707, 0.550000)-(-0.800000, 2.800000, 0.550000)
+EDGE 8 type=LINE length=1.600000000 center=(-0.000000, 2.800000, 0.550000) bbox=(-0.800000, 2.800000, 0.550000)-(0.800000, 2.800000, 0.550000)
+EDGE 9 type=LINE length=0.338293275 center=(0.800000, 2.630853, 0.550000) bbox=(0.800000, 2.461707, 0.550000)-(0.800000, 2.800000, 0.550000)
+EDGE 10 type=LINE length=1.300000000 center=(0.800000, 2.800000, -0.100000) bbox=(0.800000, 2.800000, -0.750000)-(0.800000, 2.800000, 0.550000)
+EDGE 11 type=LINE length=5.600000000 center=(0.800000, 0.000000, -0.750000) bbox=(0.800000, -2.800000, -0.750000)-(0.800000, 2.800000, -0.750000)
+EDGE 12 type=LINE length=1.300000000 center=(0.800000, -2.800000, -0.100000) bbox=(0.800000, -2.800000, -0.750000)-(0.800000, -2.800000, 0.550000)
+EDGE 13 type=LINE length=1.300000000 center=(-0.800000, -2.800000, -0.100000) bbox=(-0.800000, -2.800000, -0.750000)-(-0.800000, -2.800000, 0.550000)
+EDGE 14 type=LINE length=5.600000000 center=(-0.800000, -0.000000, -0.750000) bbox=(-0.800000, -2.800000, -0.750000)-(-0.800000, 2.800000, -0.750000)
+EDGE 15 type=LINE length=1.300000000 center=(-0.800000, 2.800000, -0.100000) bbox=(-0.800000, 2.800000, -0.750000)-(-0.800000, 2.800000, 0.550000)
+EDGE 16 type=LINE length=1.600000000 center=(-0.000000, 2.800000, -0.750000) bbox=(-0.800000, 2.800000, -0.750000)-(0.800000, 2.800000, -0.750000)
+EDGE 17 type=LINE length=1.600000000 center=(0.000000, -2.800000, -0.750000) bbox=(-0.800000, -2.800000, -0.750000)-(0.800000, -2.800000, -0.750000)
+EDGE 18 type=LINE length=2.000000000 center=(0.000000, 2.400000, 0.750000) bbox=(-1.000000, 2.400000, 0.750000)-(1.000000, 2.400000, 0.750000)
+EDGE 19 type=CIRCLE length=5.106638881 center=(1.000000, 0.000000, 0.253099) bbox=(1.000000, -2.400000, 0.000000)-(1.000000, 2.400000, 0.750000)
+EDGE 20 type=LINE length=2.000000000 center=(0.000000, -2.400000, 0.750000) bbox=(-1.000000, -2.400000, 0.750000)-(1.000000, -2.400000, 0.750000)
+EDGE 21 type=CIRCLE length=5.106638881 center=(-1.000000, 0.000000, 0.253099) bbox=(-1.000000, -2.400000, 0.000000)-(-1.000000, 2.400000, 0.750000)
+EDGE 22 type=LINE length=0.600000000 center=(-1.000000, -2.700000, 0.750000) bbox=(-1.000000, -3.000000, 0.750000)-(-1.000000, -2.400000, 0.750000)
+EDGE 23 type=LINE length=2.000000000 center=(0.000000, -3.000000, 0.750000) bbox=(-1.000000, -3.000000, 0.750000)-(1.000000, -3.000000, 0.750000)
+EDGE 24 type=LINE length=0.600000000 center=(1.000000, -2.700000, 0.750000) bbox=(1.000000, -3.000000, 0.750000)-(1.000000, -2.400000, 0.750000)
+EDGE 25 type=LINE length=0.600000000 center=(1.000000, 2.700000, 0.750000) bbox=(1.000000, 2.400000, 0.750000)-(1.000000, 3.000000, 0.750000)
+EDGE 26 type=LINE length=2.000000000 center=(0.000000, 3.000000, 0.750000) bbox=(-1.000000, 3.000000, 0.750000)-(1.000000, 3.000000, 0.750000)
+EDGE 27 type=LINE length=0.600000000 center=(-1.000000, 2.700000, 0.750000) bbox=(-1.000000, 2.400000, 0.750000)-(-1.000000, 3.000000, 0.750000)
+EDGE 28 type=LINE length=1.500000000 center=(1.000000, -3.000000, -0.000000) bbox=(1.000000, -3.000000, -0.750000)-(1.000000, -3.000000, 0.750000)
+EDGE 29 type=LINE length=6.000000000 center=(1.000000, 0.000000, -0.750000) bbox=(1.000000, -3.000000, -0.750000)-(1.000000, 3.000000, -0.750000)
+EDGE 30 type=LINE length=1.500000000 center=(1.000000, 3.000000, -0.000000) bbox=(1.000000, 3.000000, -0.750000)-(1.000000, 3.000000, 0.750000)
+EDGE 31 type=LINE length=2.000000000 center=(0.000000, -3.000000, -0.750000) bbox=(-1.000000, -3.000000, -0.750000)-(1.000000, -3.000000, -0.750000)
+EDGE 32 type=LINE length=6.000000000 center=(-1.000000, -0.000000, -0.750000) bbox=(-1.000000, -3.000000, -0.750000)-(-1.000000, 3.000000, -0.750000)
+EDGE 33 type=LINE length=2.000000000 center=(0.000000, 3.000000, -0.750000) bbox=(-1.000000, 3.000000, -0.750000)-(1.000000, 3.000000, -0.750000)
+EDGE 34 type=LINE length=1.500000000 center=(-1.000000, 3.000000, -0.000000) bbox=(-1.000000, 3.000000, -0.750000)-(-1.000000, 3.000000, 0.750000)
+EDGE 35 type=LINE length=1.500000000 center=(-1.000000, -3.000000, 0.000000) bbox=(-1.000000, -3.000000, -0.750000)-(-1.000000, -3.000000, 0.750000)
+NON-DEGENERATE ORIGINAL EDGES SELECTED: 36
+GLOBAL ALL-EDGE R=0.2 MM FILLET FAILED: StdFail_NotDone('BRep_API: command not done')
+The requested radius equals the nominal 0.2 mm side-wall thickness; no radius reduction or edge exclusion was applied.
+Exported shape to: /home/adml/Research/Hackathon2026/IDETC26-Hackathon-Autodesk-neuralCAD-Edit/output/gpt-5.6-sol-ontology-full48/gpt-5.6-sol-ontology_cadquery-script_1787117715.9449706/brep_end/1787117715.9449706/tmp.step
+Exported STL to: /home/adml/Research/Hackathon2026/IDETC26-Hackathon-Autodesk-neuralCAD-Edit/output/gpt-5.6-sol-ontology-full48/gpt-5.6-sol-ontology_cadquery-script_1787117715.9449706/brep_end/1787117715.9449706/tmp.stl
+Exported PNG image to: /home/adml/Research/Hackathon2026/IDETC26-Hackathon-Autodesk-neuralCAD-Edit/output/gpt-5.6-sol-ontology-full48/gpt-5.6-sol-ontology_cadquery-script_1787117715.9449706/brep_end/1787117715.9449706/tmp.png
+Script completed.
+
+stderr: 
+
+Exported this iteration:
+tmp.step, tmp.stl, tmp.png, tmp_+Z.png, tmp_-Z.png, tmp_-X.png, tmp_+X.png, tmp_+Y.png, tmp_-Y.png, tmp_iso1.png, tmp_iso2.png

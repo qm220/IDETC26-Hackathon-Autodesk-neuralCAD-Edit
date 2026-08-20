@@ -1,0 +1,235 @@
+def my_cad_function(args):
+    import os
+    import math
+    import cadquery as cq
+
+    input_file = os.path.expanduser(args["input_file"])
+    imported = cq.importers.importStep(input_file)
+    root = imported.val()
+    original_solids = list(root.Solids())
+
+    if not original_solids:
+        raise ValueError("The input STEP file contains no solids")
+
+    # The largest solid is the integrated radiator, tanks, shrouds and guards.
+    # All discrete fan blades and existing fittings are preserved unchanged.
+    body_index = max(
+        range(len(original_solids)),
+        key=lambda i: original_solids[i].Volume()
+    )
+    original_body = original_solids[body_index]
+    body = original_body
+
+    bb = original_body.BoundingBox()
+    cy = 0.5 * (bb.ymin + bb.ymax)
+    cz = 0.5 * (bb.zmin + bb.zmax)
+    hy = max(0.5 * (bb.ymax - bb.ymin), 1.0)
+    hz = max(0.5 * (bb.zmax - bb.zmin), 1.0)
+
+    def circular_radii(face):
+        radii = []
+        for edge in face.Edges():
+            try:
+                if edge.geomType() == "CIRCLE":
+                    r = float(edge.radius())
+                    if r > 0.1:
+                        radii.append(r)
+            except Exception:
+                pass
+        return sorted(radii)
+
+    def corner_face_candidates(shape, y_sign, z_sign):
+        candidates = []
+        for face in shape.Faces():
+            try:
+                if face.geomType() != "PLANE":
+                    continue
+
+                center = face.Center()
+                normal = face.normalAt().normalized()
+                if abs(normal.x) < 0.72:
+                    continue
+
+                ny = (center.y - cy) / hy
+                nz = (center.z - cz) / hz
+                if y_sign * ny < 0.25 or z_sign * nz < 0.25:
+                    continue
+
+                fbb = face.BoundingBox()
+                dy = max(fbb.ylen, 0.01)
+                dz = max(fbb.zlen, 0.01)
+                area = face.Area()
+                radii = circular_radii(face)
+
+                # Requested positions are interpreted in the canonical +X
+                # front view: +Y is right and +Z is top. Favor compact,
+                # approximately circular X-normal faces near those corners.
+                location_error = math.hypot(
+                    ny - 0.82 * y_sign,
+                    nz - 0.82 * z_sign
+                )
+                roundness_penalty = abs(math.log(dy / dz))
+                size_penalty = 0.0
+                if area < 20.0:
+                    size_penalty += (20.0 - area) / 20.0
+                if area > 3500.0:
+                    size_penalty += (area - 3500.0) / 1000.0
+                circular_bonus = min(len(radii), 2) * 0.45
+                front_penalty = 0.0 if normal.x > 0.0 else 0.8
+
+                score = (
+                    4.0 * location_error
+                    + 0.8 * roundness_penalty
+                    + size_penalty
+                    + front_penalty
+                    - circular_bonus
+                )
+                candidates.append({
+                    "score": score,
+                    "face": face,
+                    "center": center,
+                    "normal": normal,
+                    "area": area,
+                    "dy": dy,
+                    "dz": dz,
+                    "radii": radii,
+                    "ny": ny,
+                    "nz": nz,
+                })
+            except Exception:
+                continue
+
+        candidates.sort(key=lambda item: item["score"])
+        return candidates
+
+    targets = [
+        ("outlet", 1.0, 1.0),
+        ("inlet", -1.0, -1.0),
+    ]
+
+    port_specs = []
+    for role, y_sign, z_sign in targets:
+        candidates = corner_face_candidates(original_body, y_sign, z_sign)
+        if not candidates:
+            raise ValueError(
+                "Could not locate a suitable X-normal corner interface for %s" % role
+            )
+
+        chosen = candidates[0]
+        center = chosen["center"]
+        radii = chosen["radii"]
+
+        if radii:
+            outer_radius = max(radii)
+            if len(radii) >= 2:
+                bore_radius = min(radii)
+            else:
+                bore_radius = 0.55 * outer_radius
+        else:
+            outer_radius = 0.5 * min(chosen["dy"], chosen["dz"])
+            bore_radius = 0.55 * outer_radius
+
+        # Keep inferred dimensions within a practical range while retaining
+        # the proportions of the existing corner interface geometry.
+        outer_radius = max(7.0, min(outer_radius, 18.0))
+        bore_radius = max(4.0, min(bore_radius, outer_radius - 2.5))
+
+        port_specs.append({
+            "role": role,
+            "center": center,
+            "outer_radius": outer_radius,
+            "bore_radius": bore_radius,
+            "candidate": chosen,
+        })
+
+    new_port_solids = []
+    edit_log = []
+    axis_out = cq.Vector(1, 0, 0)
+    axis_in = cq.Vector(-1, 0, 0)
+
+    for spec in port_specs:
+        role = spec["role"]
+        center = spec["center"]
+        ro = spec["outer_radius"]
+        ri = spec["bore_radius"]
+
+        # Add a recognizable hollow hose-port interface: a broad attachment
+        # flange, cylindrical neck and retaining lip. It overlaps the selected
+        # local interface slightly but remains a separate assembly solid to
+        # avoid changing any remote integrated fan or guard topology.
+        base_start = cq.Vector(center.x - 1.5, center.y, center.z)
+        neck_start = cq.Vector(center.x + 1.5, center.y, center.z)
+        lip_start = cq.Vector(center.x + 17.0, center.y, center.z)
+
+        base = cq.Solid.makeCylinder(ro * 1.22, 5.0, base_start, axis_out)
+        neck = cq.Solid.makeCylinder(ro, 18.0, neck_start, axis_out)
+        lip = cq.Solid.makeCylinder(ro * 1.14, 6.0, lip_start, axis_out)
+        outer_port = base.fuse(neck).fuse(lip)
+
+        fitting_bore = cq.Solid.makeCylinder(
+            ri,
+            29.0,
+            cq.Vector(center.x - 3.0, center.y, center.z),
+            axis_out
+        )
+        port = outer_port.cut(fitting_bore)
+        if not port.isValid() or not list(port.Solids()):
+            raise ValueError("Failed to construct valid hollow %s fitting" % role)
+        new_port_solids.extend(list(port.Solids()))
+
+        # Open the selected corner interface into the local tank/body wall.
+        # The cutter is deliberately short and corner-local, preventing the
+        # assembly-wide piercing that caused invalid geometry previously.
+        body_bore = cq.Solid.makeCylinder(
+            ri,
+            24.0,
+            cq.Vector(center.x + 3.0, center.y, center.z),
+            axis_in
+        )
+        removed = 0.0
+        cut_applied = False
+        try:
+            candidate_body = body.cut(body_bore)
+            removed = body.Volume() - candidate_body.Volume()
+            if candidate_body.isValid() and list(candidate_body.Solids()):
+                # A zero/small removal means that the selected interface was
+                # already open; in that case preserving the original body is
+                # preferable and the hollow fitting uses the existing opening.
+                if removed > 0.05:
+                    body = candidate_body
+                    cut_applied = True
+        except Exception:
+            cut_applied = False
+
+        c = spec["candidate"]
+        edit_log.append((
+            role, center.x, center.y, center.z, c["ny"], c["nz"],
+            c["area"], ro, ri, removed, cut_applied
+        ))
+
+    result_shapes = []
+    for index, solid in enumerate(original_solids):
+        if index == body_index:
+            result_shapes.extend(list(body.Solids()))
+        else:
+            result_shapes.append(solid)
+    result_shapes.extend(new_port_solids)
+
+    result_shape = cq.Compound.makeCompound(result_shapes)
+
+    print("INPUT: solids=%d body_index=%d bbox=(%.2f, %.2f, %.2f)" % (
+        len(original_solids), body_index, bb.xlen, bb.ylen, bb.zlen
+    ))
+    for entry in edit_log:
+        print(
+            "%s: center=(%.3f, %.3f, %.3f) normalized_yz=(%.3f, %.3f) "
+            "face_area=%.3f outer_r=%.3f bore_r=%.3f removed=%.3f cut=%s" % entry
+        )
+    print("RESULT: valid=%s solids=%d faces=%d added_port_solids=%d" % (
+        result_shape.isValid(),
+        len(result_shape.Solids()),
+        len(result_shape.Faces()),
+        len(new_port_solids)
+    ))
+
+    return cq.Workplane(obj=result_shape)

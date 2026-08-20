@@ -1,0 +1,106 @@
+Thinking text:
+
+
+Generated script:
+def my_cad_function(args):
+    input_file = os.path.expanduser(args["input_file"])
+    imported = cq.importers.importStep(input_file)
+    model = imported.val() if hasattr(imported, "val") else imported
+
+    solids = list(model.Solids())
+    faces = list(model.Faces())
+    print("Loaded STEP:", input_file)
+    print("Valid:", model.isValid(), "solids:", len(solids), "faces:", len(faces))
+
+    # Bind the grounded STEP indices to the actual imported geometry.
+    for face_index in (58, 424):
+        if face_index < len(faces):
+            face = faces[face_index]
+            center = face.Center()
+            bb = face.BoundingBox()
+            try:
+                geom_type = face.geomType()
+            except Exception:
+                geom_type = "unknown"
+            print(
+                "FACE %d: type=%s area=%.6f center=(%.4f, %.4f, %.4f) "
+                "bbox=(%.4f, %.4f, %.4f)-(%.4f, %.4f, %.4f)"
+                % (
+                    face_index, geom_type, face.Area(),
+                    center.x, center.y, center.z,
+                    bb.xmin, bb.ymin, bb.zmin,
+                    bb.xmax, bb.ymax, bb.zmax,
+                )
+            )
+
+    # Inspect the control-region solids to verify the imported solid ordering.
+    for solid_index in range(37, min(48, len(solids))):
+        solid = solids[solid_index]
+        bb = solid.BoundingBox()
+        center = solid.Center()
+        print(
+            "SOLID %d: volume=%.6f center=(%.4f, %.4f, %.4f) "
+            "size=(%.4f, %.4f, %.4f) bbox=(%.4f, %.4f, %.4f)-(%.4f, %.4f, %.4f)"
+            % (
+                solid_index, solid.Volume(), center.x, center.y, center.z,
+                bb.xlen, bb.ylen, bb.zlen,
+                bb.xmin, bb.ymin, bb.zmin,
+                bb.xmax, bb.ymax, bb.zmax,
+            )
+        )
+
+    if len(solids) <= 39:
+        raise ValueError("Expected F013 source geometry at SOLID 39, but the STEP contains fewer solids")
+
+    # F013 is the complete existing horizontal button body. Copying the solid
+    # preserves its rounded ends, depth, mounting offset, and all blends.
+    source_button = solids[39]
+    source_bb = source_button.BoundingBox()
+
+    # Use one shared center-to-center pitch for the symmetric three-button row.
+    # The source is a shallow horizontal feature; 25 mm gives visible, nearly
+    # uniform spacing while retaining clearance within the control-panel area.
+    pitch = 25.0
+    upper_button = source_button.moved(cq.Location(cq.Vector(0, 0, pitch)))
+    lower_button = source_button.moved(cq.Location(cq.Vector(0, 0, -pitch)))
+
+    print(
+        "Copied SOLID 39 at translations (0,0,+%.3f) and (0,0,-%.3f); "
+        "source bbox size=(%.4f, %.4f, %.4f)"
+        % (pitch, pitch, source_bb.xlen, source_bb.ylen, source_bb.zlen)
+    )
+
+    # Preserve every original assembly body and append the two new disconnected
+    # button bodies, matching the assembly structure of the existing button.
+    result = cq.Compound.makeCompound([model, upper_button, lower_button])
+    print("Result valid:", result.isValid(), "result solids:", len(result.Solids()))
+    return result
+
+Program output:
+stdout: Loading function from: /home/adml/Research/Hackathon2026/IDETC26-Hackathon-Autodesk-neuralCAD-Edit/output/gpt-5.6-sol-ontology-full48/gpt-5.6-sol-ontology_cadquery-script_1787123459.920629/brep_end/1787123459.920629/temp_script.py
+Loaded STEP: /home/adml/Research/Hackathon2026/IDETC26-Hackathon-Autodesk-neuralCAD-Edit/data/edit_192_external/breps/B7A2N74ZJBF9MZHU_1770174381.837417.step
+Valid: True solids: 56 faces: 532
+FACE 58: type=BSPLINE area=75580.946565 center=(-150.0000, 408.4347, 138.5481) bbox=(-287.8889, 402.1624, 3.3333)-(-12.1111, 409.0000, 276.6667)
+FACE 424: type=BSPLINE area=251.797865 center=(-237.0065, 340.0000, 320.7739) bbox=(-256.5598, 336.6667, 320.3763)-(-217.4402, 343.3333, 320.8958)
+SOLID 37: volume=63095.357143 center=(-149.9002, 324.9796, 316.0011) size=(73.3333, 73.3333, 19.1975) bbox=(-186.5669, 288.3130, 306.8038)-(-113.2336, 361.6463, 326.0013)
+SOLID 38: volume=5156.146133 center=(-150.1799, 323.3978, 322.7163) size=(12.3576, 61.9085, 9.0842) bbox=(-156.3576, 292.5820, 317.7491)-(-144.0000, 354.4905, 326.8333)
+SOLID 39: volume=1623.538479 center=(-237.0087, 340.0000, 318.5000) size=(42.9583, 10.0000, 4.7917) bbox=(-258.4792, 335.0000, 316.1042)-(-215.5208, 345.0000, 320.8958)
+SOLID 40: volume=81.077317 center=(-160.9956, 354.7930, 320.0001) size=(74.9360, 42.7520, 1.0000) bbox=(-191.5077, 323.7384, 319.5004)-(-116.5718, 366.4904, 320.5004)
+SOLID 41: volume=60.924857 center=(-196.5475, 326.6142, 319.6878) size=(6.4167, 6.4167, 2.2994) bbox=(-199.7558, 323.4058, 318.5381)-(-193.3392, 329.8225, 320.8375)
+SOLID 42: volume=60.924857 center=(-186.5475, 357.6142, 319.6878) size=(6.4167, 6.4167, 2.2994) bbox=(-189.7558, 354.4058, 318.5381)-(-183.3392, 360.8225, 320.8375)
+SOLID 43: volume=60.924857 center=(-149.5475, 371.6142, 319.6878) size=(6.4167, 6.4167, 2.2994) bbox=(-152.7558, 368.4058, 318.5381)-(-146.3392, 374.8225, 320.8375)
+SOLID 44: volume=60.924857 center=(-113.5475, 357.6142, 319.6878) size=(6.4167, 6.4167, 2.2994) bbox=(-116.7558, 354.4058, 318.5381)-(-110.3392, 360.8225, 320.8375)
+SOLID 45: volume=1523.455871 center=(-80.0900, 330.4007, 319.3071) size=(10.3094, 35.8602, 5.0115) bbox=(-85.2447, 312.4706, 316.8013)-(-74.9353, 348.3308, 321.8129)
+SOLID 46: volume=1523.455871 center=(-55.0900, 330.4007, 319.3071) size=(10.3094, 35.8602, 5.0115) bbox=(-60.2447, 312.4706, 316.8013)-(-49.9353, 348.3308, 321.8129)
+SOLID 47: volume=234187.246445 center=(-149.8768, 242.7645, 268.0815) size=(100.8333, 36.9143, 100.8333) bbox=(-200.2935, 222.2832, 217.6649)-(-99.4601, 259.1975, 318.4982)
+Copied SOLID 39 at translations (0,0,+25.000) and (0,0,-25.000); source bbox size=(42.9583, 10.0000, 4.7917)
+Result valid: True result solids: 58
+Exported shape to: /home/adml/Research/Hackathon2026/IDETC26-Hackathon-Autodesk-neuralCAD-Edit/output/gpt-5.6-sol-ontology-full48/gpt-5.6-sol-ontology_cadquery-script_1787123459.920629/brep_end/1787123459.920629/tmp.step
+Exported STL to: /home/adml/Research/Hackathon2026/IDETC26-Hackathon-Autodesk-neuralCAD-Edit/output/gpt-5.6-sol-ontology-full48/gpt-5.6-sol-ontology_cadquery-script_1787123459.920629/brep_end/1787123459.920629/tmp.stl
+Exported PNG image to: /home/adml/Research/Hackathon2026/IDETC26-Hackathon-Autodesk-neuralCAD-Edit/output/gpt-5.6-sol-ontology-full48/gpt-5.6-sol-ontology_cadquery-script_1787123459.920629/brep_end/1787123459.920629/tmp.png
+Script completed.
+
+stderr: 
+
+Exported this iteration:
+tmp.step, tmp.stl, tmp.png, tmp_+Z.png, tmp_-Z.png, tmp_-X.png, tmp_+X.png, tmp_+Y.png, tmp_-Y.png, tmp_iso1.png, tmp_iso2.png

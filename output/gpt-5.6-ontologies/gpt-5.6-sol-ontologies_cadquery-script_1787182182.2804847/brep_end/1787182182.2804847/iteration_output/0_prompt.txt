@@ -1,0 +1,1165 @@
+The planning stage produced model.json (hierarchical part → sections → features
+→ B-rep faces), aim.json (desired final state from the edit request), and
+operation.json (grounded edit operations, parameters, constraints, targets,
+and modeling plans). Use those artifacts when writing my_cad_function.
+
+Section ids look like R01. Feature ids look like F001. FACE N values are
+CadQuery Faces() indices from the STEP analysis. Bind them to actual STEP
+geometry by inspecting the loaded model (print faces and coordinates) before
+editing. If an operation needs boundary topology such as a chamfer or fillet
+edge, derive it in CadQuery from the grounded face(s).
+
+Implement each operation's modeling_plan steps. Load the start model from
+args["input_file"].
+
+model.json from the planning stage:
+
+{
+  "part": {
+    "id": "P01",
+    "name": "Socketed lever arm",
+    "ontology_class": "cad:Part",
+    "source_views": [
+      "+Z",
+      "-Z",
+      "-X",
+      "+X",
+      "+Y",
+      "-Y",
+      "iso1"
+    ],
+    "solid_ids": [
+      "SOLID 0"
+    ],
+    "semantic_orientation": {
+      "status": "partial",
+      "confidence": 0.62,
+      "view_sides": {
+        "+X": "right",
+        "-X": "left",
+        "+Y": "front",
+        "-Y": "back",
+        "+Z": "top",
+        "-Z": "bottom"
+      }
+    },
+    "part_functions": [
+      {
+        "ontology_class": "cad:TransferLoadFunction",
+        "name": "Transfer actuation load through the arm",
+        "primary": true,
+        "confidence": 0.84
+      },
+      {
+        "ontology_class": "cad:ReceivePinFunction",
+        "name": "Receive a mating pin or shaft",
+        "primary": false,
+        "confidence": 0.82
+      }
+    ],
+    "sections": [
+      {
+        "id": "R01",
+        "name": "Lever arm section",
+        "ontology_class": "cad:MainBodySection",
+        "solid_ids": [
+          "SOLID 0"
+        ],
+        "section_functions": [
+          {
+            "ontology_class": "cad:TransferLoadFunction",
+            "name": "Transfer load along the lever arm",
+            "primary": true,
+            "confidence": 0.9
+          },
+          {
+            "ontology_class": "cad:SupportFunction",
+            "name": "Support the socket region",
+            "primary": false,
+            "confidence": 0.83
+          }
+        ],
+        "features": [
+          {
+            "id": "F001",
+            "name": "Structural lever arm",
+            "ontology_class": "cad:SupportFeature",
+            "feature_functions": [
+              {
+                "ontology_class": "cad:TransferLoadFunction",
+                "name": "Carry load between the free end and socket",
+                "primary": true,
+                "confidence": 0.9
+              }
+            ],
+            "brep_faces": [
+              {
+                "cadquery_face_id": "FACE 0",
+                "geometry_type": "cad:CylindricalSurface",
+                "semantic_role": "cad:OuterWallRole",
+                "feature_assignment_confidence": 0.98
+              },
+              {
+                "cadquery_face_id": "FACE 1",
+                "geometry_type": "cad:PlanarSurface",
+                "semantic_role": "cad:SupportFaceRole",
+                "feature_assignment_confidence": 0.99
+              },
+              {
+                "cadquery_face_id": "FACE 2",
+                "geometry_type": "cad:PlanarSurface",
+                "semantic_role": "cad:SideWallRole",
+                "feature_assignment_confidence": 0.95
+              },
+              {
+                "cadquery_face_id": "FACE 5",
+                "geometry_type": "cad:PlanarSurface",
+                "semantic_role": "cad:SideWallRole",
+                "feature_assignment_confidence": 0.99
+              },
+              {
+                "cadquery_face_id": "FACE 6",
+                "geometry_type": "cad:PlanarSurface",
+                "semantic_role": "cad:SupportFaceRole",
+                "feature_assignment_confidence": 0.99
+              },
+              {
+                "cadquery_face_id": "FACE 7",
+                "geometry_type": "cad:PlanarSurface",
+                "semantic_role": "cad:OuterWallRole",
+                "feature_assignment_confidence": 0.99
+              },
+              {
+                "cadquery_face_id": "FACE 8",
+                "geometry_type": "cad:PlanarSurface",
+                "semantic_role": "cad:SideWallRole",
+                "feature_assignment_confidence": 0.99
+              }
+            ],
+            "confidence": 0.96
+          }
+        ]
+      },
+      {
+        "id": "R02",
+        "name": "Socket end section",
+        "ontology_class": "cad:EndSection",
+        "solid_ids": [
+          "SOLID 0"
+        ],
+        "section_functions": [
+          {
+            "ontology_class": "cad:ReceivePinFunction",
+            "name": "Receive and support a mating pin or shaft",
+            "primary": true,
+            "confidence": 0.88
+          },
+          {
+            "ontology_class": "cad:ConnectFunction",
+            "name": "Connect the lever arm to a mating component",
+            "primary": false,
+            "confidence": 0.84
+          }
+        ],
+        "features": [
+          {
+            "id": "F002",
+            "name": "Cylindrical socket hub",
+            "ontology_class": "cad:HubFeature",
+            "feature_functions": [
+              {
+                "ontology_class": "cad:SupportFunction",
+                "name": "Support the pin-receiving bore",
+                "primary": true,
+                "confidence": 0.91
+              },
+              {
+                "ontology_class": "cad:TransferLoadFunction",
+                "name": "Transfer load between the bore and arm",
+                "primary": false,
+                "confidence": 0.86
+              }
+            ],
+            "brep_faces": [
+              {
+                "cadquery_face_id": "FACE 10",
+                "geometry_type": "cad:CylindricalSurface",
+                "semantic_role": "cad:OuterWallRole",
+                "feature_assignment_confidence": 0.99
+              },
+              {
+                "cadquery_face_id": "FACE 11",
+                "geometry_type": "cad:PlanarSurface",
+                "semantic_role": "cad:InterfaceFaceRole",
+                "feature_assignment_confidence": 0.97
+              }
+            ],
+            "confidence": 0.97
+          },
+          {
+            "id": "F003",
+            "name": "Blind pin bore",
+            "ontology_class": "cad:BlindHoleFeature",
+            "feature_functions": [
+              {
+                "ontology_class": "cad:ReceivePinFunction",
+                "name": "Receive a mating cylindrical pin or shaft",
+                "primary": true,
+                "confidence": 0.92
+              },
+              {
+                "ontology_class": "cad:LocateFunction",
+                "name": "Radially locate the mating pin or shaft",
+                "primary": false,
+                "confidence": 0.87
+              }
+            ],
+            "brep_faces": [
+              {
+                "cadquery_face_id": "FACE 3",
+                "geometry_type": "cad:CylindricalSurface",
+                "semantic_role": "cad:BoreWallRole",
+                "feature_assignment_confidence": 1.0
+              },
+              {
+                "cadquery_face_id": "FACE 4",
+                "geometry_type": "cad:PlanarSurface",
+                "semantic_role": "cad:SeatingFaceRole",
+                "feature_assignment_confidence": 0.98
+              }
+            ],
+            "confidence": 0.99
+          },
+          {
+            "id": "F004",
+            "name": "Hub-to-arm blend",
+            "ontology_class": "cad:FilletFeature",
+            "feature_functions": [
+              {
+                "ontology_class": "cad:DistributeStressFunction",
+                "name": "Distribute stress at the hub-to-arm junction",
+                "primary": true,
+                "confidence": 0.91
+              }
+            ],
+            "brep_faces": [
+              {
+                "cadquery_face_id": "FACE 9",
+                "geometry_type": "cad:BSplineSurface",
+                "semantic_role": "cad:FilletSurfaceRole",
+                "feature_assignment_confidence": 0.94
+              }
+            ],
+            "confidence": 0.92
+          }
+        ]
+      }
+    ]
+  }
+}
+
+aim.json from the planning stage:
+
+{
+  "request": {
+    "request_id": "REQ-001",
+    "raw_text": "Design cylindrical bearing on the flat end of the part (the one without fillet). Create another 7 instances of this design and rotate them around the bearing axis.",
+    "action_words": [
+      "Design",
+      "Create another 7 instances",
+      "rotate them"
+    ],
+    "reference_geometry_words": [
+      "cylindrical bearing",
+      "flat end of the part",
+      "the one without fillet",
+      "bearing axis"
+    ],
+    "parameter_words": [
+      "another 7 instances"
+    ],
+    "functional_intention_words": [
+      "bearing"
+    ]
+  },
+  "aim": {
+    "primary_aim": "Provide eight instances of a cylindrical bearing design on the part's non-filleted flat end, arranged rotationally around the bearing axis.",
+    "functional_design_intentions": [
+      {
+        "name": "Bearing function",
+        "description": "The cylindrical geometry is intended to serve as bearing geometry associated with the flat, non-filleted end of the part.",
+        "confidence": 0.72
+      },
+      {
+        "name": "Repeated circumferential arrangement",
+        "description": "The original bearing design and seven additional instances are intended to form a rotational arrangement around the bearing axis.",
+        "confidence": 0.9
+      }
+    ],
+    "targets_to_change": [
+      {
+        "id": "T01",
+        "action": "add",
+        "target_level": "new_geometry",
+        "reference_geometry": "cylindrical bearing design on the flat end of the part that has no fillet",
+        "section_ids": [],
+        "feature_ids": [],
+        "ontology_class": "cad:Feature",
+        "parameters": [],
+        "required_relationships": [
+          {
+            "relation": "on",
+            "reference": "the flat end of the part without fillet"
+          },
+          {
+            "relation": "aligned_with",
+            "reference": "the bearing axis"
+          }
+        ],
+        "confidence": 0.76
+      },
+      {
+        "id": "T02",
+        "action": "replicate_and_rotate",
+        "target_level": "new_geometry",
+        "reference_geometry": "seven additional instances of the cylindrical bearing design",
+        "section_ids": [],
+        "feature_ids": [],
+        "ontology_class": "cad:Feature",
+        "parameters": [
+          {
+            "name": "additional_instance_count",
+            "value": 7,
+            "unit": "",
+            "explicitness": "explicit"
+          },
+          {
+            "name": "total_instance_count",
+            "value": 8,
+            "unit": "",
+            "explicitness": "inferred"
+          }
+        ],
+        "required_relationships": [
+          {
+            "relation": "instances_of",
+            "reference": "the cylindrical bearing design described by T01"
+          },
+          {
+            "relation": "around",
+            "reference": "the bearing axis"
+          },
+          {
+            "relation": "on",
+            "reference": "the flat end of the part without fillet"
+          }
+        ],
+        "confidence": 0.86
+      }
+    ],
+    "targets_to_preserve": [
+      {
+        "reference_geometry": "existing part geometry outside the requested bearing additions",
+        "section_ids": [],
+        "feature_ids": [],
+        "preservation_rule": "Preserve all non-targeted part geometry with minimum change, including the distinction between the non-filleted flat end and existing filleted geometry.",
+        "confidence": 0.91
+      }
+    ],
+    "predicted_final_outcome": {
+      "geometry": [
+        {
+          "target_id": "T01",
+          "ontology_class": "cad:Feature",
+          "description": "A cylindrical bearing design exists on the flat end of the part identified as the end without fillet.",
+          "properties": [
+            {
+              "name": "shape",
+              "value": "cylindrical",
+              "unit": ""
+            }
+          ],
+          "relationships": [
+            {
+              "relation": "on",
+              "reference": "the flat end of the part without fillet"
+            },
+            {
+              "relation": "aligned_with",
+              "reference": "the bearing axis"
+            }
+          ],
+          "confidence": 0.76
+        },
+        {
+          "target_id": "T02",
+          "ontology_class": "cad:Feature",
+          "description": "Seven additional instances of the cylindrical bearing design exist, producing eight total instances rotated around the bearing axis.",
+          "properties": [
+            {
+              "name": "additional_instance_count",
+              "value": 7,
+              "unit": ""
+            },
+            {
+              "name": "total_instance_count",
+              "value": 8,
+              "unit": ""
+            }
+          ],
+          "relationships": [
+            {
+              "relation": "instances_of",
+              "reference": "the cylindrical bearing design described by T01"
+            },
+            {
+              "relation": "around",
+              "reference": "the bearing axis"
+            },
+            {
+              "relation": "on",
+              "reference": "the flat end of the part without fillet"
+            }
+          ],
+          "confidence": 0.86
+        }
+      ],
+      "functions": [
+        {
+          "ontology_class": "cad:Function",
+          "name": "Provide bearing geometry",
+          "target_ids": [
+            "T01",
+            "T02"
+          ],
+          "description": "The cylindrical instances collectively provide the requested bearing design at the non-filleted flat end.",
+          "confidence": 0.7
+        }
+      ],
+      "behaviors": [
+        {
+          "ontology_class": "cad:Behavior",
+          "name": "Permit or support rotation",
+          "target_ids": [
+            "T01",
+            "T02"
+          ],
+          "description": "As bearing geometry, the instances are inferred to support or permit relative rotational motion associated with a bearing axis.",
+          "confidence": 0.55
+        }
+      ]
+    },
+    "validation_criteria": [
+      {
+        "category": "geometry",
+        "target_ids": [
+          "T01"
+        ],
+        "description": "A cylindrical bearing design exists on the part's flat end that is identified by the absence of a fillet.",
+        "expected_value": null,
+        "unit": ""
+      },
+      {
+        "category": "geometry",
+        "target_ids": [
+          "T02"
+        ],
+        "description": "Exactly seven additional instances of the bearing design exist.",
+        "expected_value": 7,
+        "unit": ""
+      },
+      {
+        "category": "geometry",
+        "target_ids": [
+          "T01",
+          "T02"
+        ],
+        "description": "The final model contains eight total instances of the cylindrical bearing design.",
+        "expected_value": 8,
+        "unit": ""
+      },
+      {
+        "category": "geometry",
+        "target_ids": [
+          "T02"
+        ],
+        "description": "The additional instances are rotationally arranged around the bearing axis.",
+        "expected_value": null,
+        "unit": ""
+      },
+      {
+        "category": "function",
+        "target_ids": [
+          "T01",
+          "T02"
+        ],
+        "description": "The added cylindrical geometry fulfills the requested bearing role at the non-filleted flat end.",
+        "expected_value": null,
+        "unit": ""
+      },
+      {
+        "category": "behavior",
+        "target_ids": [
+          "T01",
+          "T02"
+        ],
+        "description": "The bearing geometry is suitable for the inferred purpose of supporting or permitting rotation associated with a bearing axis.",
+        "expected_value": null,
+        "unit": ""
+      },
+      {
+        "category": "preservation",
+        "target_ids": [],
+        "description": "Non-targeted part geometry remains unchanged, and the existing filleted geometry is preserved.",
+        "expected_value": null,
+        "unit": ""
+      }
+    ],
+    "unresolved_requirements": [
+      {
+        "description": "The cylindrical bearing's dimensions and detailed form are not specified.",
+        "candidate_interpretations": [
+          "A cylindrical bearing element with dimensions determined from surrounding model context",
+          "A cylindrical bearing seat or housing",
+          "A cylindrical boss intended to represent or support a bearing"
+        ],
+        "requires_user_clarification": true
+      },
+      {
+        "description": "The radial location and angular spacing of the eight instances around the bearing axis are not specified.",
+        "candidate_interpretations": [
+          "Eight equally spaced instances around the bearing axis",
+          "Eight instances with spacing determined by existing model geometry",
+          "Seven additional instances at nonuniform angular positions"
+        ],
+        "requires_user_clarification": true
+      },
+      {
+        "description": "The meaning of rotating the instances around the bearing axis does not fully distinguish positional revolution from orientation-only rotation.",
+        "candidate_interpretations": [
+          "The instances occupy different circumferential positions around the axis",
+          "The instances retain their positions but have individually rotated orientations",
+          "Both position and orientation change around the axis"
+        ],
+        "requires_user_clarification": true
+      },
+      {
+        "description": "No model identifier is provided for the flat end without fillet or for the bearing axis.",
+        "candidate_interpretations": [
+          "Resolve the unique planar end lacking a fillet and derive the relevant bearing axis from the intended cylindrical geometry",
+          "Resolve the references from existing model semantics or geometry"
+        ],
+        "requires_user_clarification": false
+      }
+    ]
+  }
+}
+
+operation.json from the planning stage:
+
+{
+  "request_id": "REQ-001",
+  "operation_ontology": {
+    "id": "cqop:CadQueryOperationOntology",
+    "version": "1.2.0"
+  },
+  "aim_summary": {
+    "goal": "Add a cylindrical bearing design to the non-filleted flat end and create eight total instances rotationally arranged around the bearing axis.",
+    "change_targets": [
+      "T01",
+      "T02"
+    ],
+    "preserve_targets": [
+      "R01/F001 Structural lever arm",
+      "R02/F002 Cylindrical socket hub",
+      "R02/F003 Blind pin bore",
+      "R02/F004 Hub-to-arm blend"
+    ],
+    "expected_outcome": "Eight cylindrical bearing instances exist on the non-filleted flat end in a rotational arrangement supporting the requested bearing role while existing part geometry remains unchanged."
+  },
+  "operations_plan": [
+    {
+      "operation_id": "OP01",
+      "summary": "Create the seed cylindrical bearing sleeve on the planar non-filleted end face.",
+      "confidence": 0.72,
+      "depends_on_operation_ids": [],
+      "steps": [
+        {
+          "step_id": "S01",
+          "step_index": 1,
+          "ontology_operation": "CreateTubetoFace",
+          "description": "Add an annular cylindrical bearing seed normal to FACE 7 on the structural lever arm.",
+          "required_parameters": {
+            "target_body": {
+              "value": "SOLID 0",
+              "unit": "",
+              "source_type": "model_json_entity",
+              "cadquery_type": "cq.Workplane",
+              "model_reference": {
+                "part_id": "P01",
+                "section_ids": [
+                  "R01",
+                  "R02"
+                ],
+                "feature_ids": [],
+                "face_ids": [],
+                "solid_ids": [
+                  "SOLID 0"
+                ]
+              },
+              "source_step_id": "",
+              "confidence": 1.0
+            },
+            "target_face": {
+              "value": "FACE 7",
+              "unit": "",
+              "source_type": "model_json_entity",
+              "cadquery_type": "cq.Face",
+              "model_reference": {
+                "part_id": "P01",
+                "section_ids": [
+                  "R01"
+                ],
+                "feature_ids": [
+                  "F001"
+                ],
+                "face_ids": [
+                  "FACE 7"
+                ],
+                "solid_ids": [
+                  "SOLID 0"
+                ]
+              },
+              "source_step_id": "",
+              "confidence": 0.68
+            },
+            "locations": {
+              "value": null,
+              "unit": "",
+              "source_type": "unresolved",
+              "cadquery_type": "list[tuple[float, float]]",
+              "model_reference": {
+                "part_id": "P01",
+                "section_ids": [
+                  "R01"
+                ],
+                "feature_ids": [
+                  "F001"
+                ],
+                "face_ids": [
+                  "FACE 7"
+                ],
+                "solid_ids": [
+                  "SOLID 0"
+                ]
+              },
+              "source_step_id": "",
+              "confidence": 0.2
+            },
+            "outer_diameter": {
+              "value": null,
+              "unit": "",
+              "source_type": "unresolved",
+              "cadquery_type": "float",
+              "model_reference": {
+                "part_id": "",
+                "section_ids": [],
+                "feature_ids": [],
+                "face_ids": [],
+                "solid_ids": []
+              },
+              "source_step_id": "",
+              "confidence": 0.0
+            },
+            "inner_diameter": {
+              "value": null,
+              "unit": "",
+              "source_type": "unresolved",
+              "cadquery_type": "float",
+              "model_reference": {
+                "part_id": "",
+                "section_ids": [],
+                "feature_ids": [],
+                "face_ids": [],
+                "solid_ids": []
+              },
+              "source_step_id": "",
+              "confidence": 0.0
+            },
+            "length": {
+              "value": null,
+              "unit": "",
+              "source_type": "unresolved",
+              "cadquery_type": "float",
+              "model_reference": {
+                "part_id": "",
+                "section_ids": [],
+                "feature_ids": [],
+                "face_ids": [],
+                "solid_ids": []
+              },
+              "source_step_id": "",
+              "confidence": 0.0
+            }
+          },
+          "ontology_conformant": false,
+          "depends_on_step_ids": [],
+          "output": {
+            "name": "bearing_seed_result",
+            "cadquery_type": "cq.Workplane"
+          },
+          "confidence": 0.42
+        }
+      ],
+      "expected_result": {
+        "geometry": "One annular cylindrical bearing seed is added normal to the planar non-filleted end face.",
+        "function": "Provide the seed geometry for the requested bearing design.",
+        "behavior": "Support or permit relative rotational motion associated with the bearing axis."
+      },
+      "validation_criteria": [
+        {
+          "category": "geometry",
+          "description": "A cylindrical annular bearing design exists on FACE 7, the planar non-filleted end face."
+        },
+        {
+          "category": "function",
+          "description": "The added cylindrical geometry fulfills the requested bearing role at the non-filleted flat end."
+        },
+        {
+          "category": "preservation",
+          "description": "F001 geometry outside the bearing attachment and all geometry of F002, F003, and F004 remain unchanged."
+        }
+      ]
+    },
+    {
+      "operation_id": "OP02",
+      "summary": "Create a polar pattern containing eight total occurrences of the bearing seed.",
+      "confidence": 0.78,
+      "depends_on_operation_ids": [
+        "OP01"
+      ],
+      "steps": [
+        {
+          "step_id": "S02",
+          "step_index": 1,
+          "ontology_operation": "CreatePolarPatterntoFeature",
+          "description": "Repeat the bearing seed to produce eight total occurrences rotated around the bearing axis.",
+          "required_parameters": {
+            "seed_feature": {
+              "value": "bearing_seed_result",
+              "unit": "",
+              "source_type": "previous_step_output",
+              "cadquery_type": "cq.Workplane",
+              "model_reference": {
+                "part_id": "",
+                "section_ids": [],
+                "feature_ids": [],
+                "face_ids": [],
+                "solid_ids": []
+              },
+              "source_step_id": "S01",
+              "confidence": 0.72
+            },
+            "axis_start": {
+              "value": null,
+              "unit": "",
+              "source_type": "unresolved",
+              "cadquery_type": "cq.Vector",
+              "model_reference": {
+                "part_id": "P01",
+                "section_ids": [
+                  "R01"
+                ],
+                "feature_ids": [
+                  "F001"
+                ],
+                "face_ids": [
+                  "FACE 7"
+                ],
+                "solid_ids": [
+                  "SOLID 0"
+                ]
+              },
+              "source_step_id": "",
+              "confidence": 0.18
+            },
+            "axis_end": {
+              "value": null,
+              "unit": "",
+              "source_type": "unresolved",
+              "cadquery_type": "cq.Vector",
+              "model_reference": {
+                "part_id": "P01",
+                "section_ids": [
+                  "R01"
+                ],
+                "feature_ids": [
+                  "F001"
+                ],
+                "face_ids": [
+                  "FACE 7"
+                ],
+                "solid_ids": [
+                  "SOLID 0"
+                ]
+              },
+              "source_step_id": "",
+              "confidence": 0.18
+            },
+            "count": {
+              "value": 8,
+              "unit": "",
+              "source_type": "request_value",
+              "cadquery_type": "int",
+              "model_reference": {
+                "part_id": "",
+                "section_ids": [],
+                "feature_ids": [],
+                "face_ids": [],
+                "solid_ids": []
+              },
+              "source_step_id": "",
+              "confidence": 0.86
+            },
+            "angular_spacing": {
+              "value": null,
+              "unit": "",
+              "source_type": "unresolved",
+              "cadquery_type": "float",
+              "model_reference": {
+                "part_id": "",
+                "section_ids": [],
+                "feature_ids": [],
+                "face_ids": [],
+                "solid_ids": []
+              },
+              "source_step_id": "",
+              "confidence": 0.0
+            }
+          },
+          "ontology_conformant": false,
+          "depends_on_step_ids": [
+            "S01"
+          ],
+          "output": {
+            "name": "bearing_polar_pattern",
+            "cadquery_type": "cq.Workplane"
+          },
+          "confidence": 0.43
+        }
+      ],
+      "expected_result": {
+        "geometry": "Seven additional instances accompany the seed, producing eight total cylindrical bearing instances rotationally arranged around the bearing axis on the non-filleted flat end.",
+        "function": "The eight instances collectively provide the requested bearing geometry.",
+        "behavior": "The bearing arrangement is suitable for supporting or permitting rotation associated with its axis."
+      },
+      "validation_criteria": [
+        {
+          "category": "geometry",
+          "description": "Exactly seven additional instances of the bearing seed exist, producing eight total instances."
+        },
+        {
+          "category": "geometry",
+          "description": "All additional instances are rotationally arranged around one resolved bearing axis and remain associated with the non-filleted flat end."
+        },
+        {
+          "category": "function",
+          "description": "The patterned cylindrical geometry fulfills the requested bearing role."
+        },
+        {
+          "category": "behavior",
+          "description": "The final bearing geometry is suitable for the inferred purpose of supporting or permitting rotation about the bearing axis."
+        },
+        {
+          "category": "preservation",
+          "description": "Non-targeted geometry of F001, F002, F003, and the existing fillet F004 remains unchanged."
+        }
+      ]
+    }
+  ]
+}
+
+
+        Given the instructions and task information in operation.json, generate a CadQuery Python function that execute the modeling tasks you designed. First use CadQuery to extract information you need regarding the model, such as surfaces you want to use as reference faces. Then write CadQuery code with correct dimensions and coordinates to perform the edit.
+
+        The script that runs the function is provided for reference, as well as an example function, but you should only create your version of the function my_cad_function. Do not include any of the rest of the script.
+
+        Once you have generated the function, it will be executed in CadQuery. You will then be provided with a rendering of the CAD model created by your function, and any prints, debug or error messages. You will then have the opportunity to refine your function based on this feedback, and it will be re-executed. Continue this process until the task is complete, or you reach the maximum number of iterations.
+
+        If the task involves editing an existing model, the path to that model's .step file is passed to your function as args["input_file"], and is also listed as brep_start_path_step in the task information. Load it from args["input_file"] rather than hard-coding a path. For these cases, you might need to print out debug information once the model is loaded in your first iteration.
+
+        Return a json object with two fields. Do not include any other text outside of the json object in your response:
+        'complete': true if the task has been completed. IMPORTANT: This should only be judged by looking at the output from the last iteration, not whether a function has been returned this iteration. If there is no valid output that corresponds to the instruction, the task is not complete. The first iteration can never be complete. If this is true, then the current function will NOT be executed, and the function from the last iteration will be used.
+        'my_cad_function': CadQuery python function as a string. Use the same definition and arguments as the example.
+        Script example:
+
+        
+
+#!/usr/bin/env python3
+
+import cadquery as cq
+from cadquery import exporters
+import os
+import sys
+
+###
+# Function definitions
+###
+
+def _shape_from_result(result):
+    if hasattr(result, "val"):
+        return result.val()
+    if isinstance(result, cq.Assembly):
+        return result.toCompound()
+    return result
+
+
+def export_as_step(result, output_dir):
+    """Export CadQuery result as STEP file"""
+    try:
+        output_path = os.path.join(output_dir, "tmp.step")
+        if isinstance(result, cq.Assembly):
+            result.save(output_path)
+            print(f"Exported assembly to: {output_path}")
+            return
+        exporters.export(_shape_from_result(result), output_path, exportType="STEP")
+        print(f"Exported shape to: {output_path}")
+    except Exception as e:
+        print(f"Error exporting STEP file: {e}")
+        import traceback
+        traceback.print_exc()
+
+
+def export_as_stl(result, output_dir):
+    """Export CadQuery result as STL file"""
+    try:
+        output_path = os.path.join(output_dir, "tmp.stl")
+        exporters.export(_shape_from_result(result), output_path, exportType="STL")
+        print(f"Exported STL to: {output_path}")
+    except Exception as e:
+        print(f"Error exporting STL file: {e}")
+        import traceback
+        traceback.print_exc()
+
+
+def export_as_image(result, output_dir):
+    """Export CadQuery result as an image (SVG or PNG if VTK available)"""
+    try:
+        # Get the shape from result
+        if hasattr(result, 'val'):
+            shape = result.val()
+        elif isinstance(result, cq.Assembly):
+            # For assemblies, try to get combined shape
+            shape = result.toCompound()
+        else:
+            shape = result
+        
+        # Try PNG export using VTK (requires cadquery with ocp/vtk support)
+        png_path = os.path.join(output_dir, "tmp.png")
+        try:
+            from cadquery.vis import show
+            # Use show() with screenshot parameter instead of vis.screenshot()
+            show(
+                shape,
+                screenshot=png_path,
+                width=1920,
+                height=1080,
+                interact=False  # Don't open interactive GUI
+            )
+            print(f"Exported PNG image to: {png_path}")
+            return
+        except Exception as e:
+            print(f"Error exporting PNG image: {e}")
+            pass
+        
+        # Try using ocp_vscode or jupyter_cadquery for rendering
+        try:
+            from ocp_tessellate.convert import to_svg
+            svg_path = os.path.join(output_dir, "tmp.svg")
+            svg_content = to_svg(shape)
+            with open(svg_path, 'w') as f:
+                f.write(svg_content)
+            print(f"Exported SVG image to: {svg_path}")
+            return
+        except ImportError:
+            pass
+        
+        # Fallback: export SVG using CadQuery's built-in SVG exporter
+        svg_path = os.path.join(output_dir, "tmp.svg")
+        exporters.export(shape, svg_path, exportType="SVG")
+        print(f"Exported SVG image to: {svg_path}")
+        
+    except Exception as e:
+        print(f"Error exporting image: {e}")
+        import traceback
+        traceback.print_exc()
+
+
+def parse_cadquery_args(argv, required_args=None):
+    """
+    Parses command line arguments passed to CadQuery scripts.
+    Args will be passed as --passkey value(s)
+    Only required args are processed
+    """
+    if required_args is None:
+        required_args = ['--output_dir', '--input_file', '--function_file']
+    
+    args = {}
+    i = 0
+    while i < len(argv):
+        arg = argv[i]
+        if arg in required_args:
+            if i + 1 < len(argv):
+                args[arg.lstrip('-')] = argv[i + 1]
+                i += 1  # skip next since it's a value
+            else:
+                print(f"Warning: No value provided for argument {arg}")
+        i += 1
+    return args
+
+
+def load_and_execute_function(function_string, args):
+    """
+    Load a my_cad_function function from a string and execute it.
+    
+    Args:
+        function_string (str): The complete function definition as a string
+        args (dict): Arguments to pass to the function
+    
+    Returns:
+        CadQuery Workplane, Shape, or Assembly, or None
+    """
+    try:
+        # Create a safe execution environment with necessary imports
+        exec_globals = {
+            'cq': cq,
+            'cadquery': cq,
+            'Workplane': cq.Workplane,
+            'Assembly': cq.Assembly,
+            'exporters': exporters,
+            'os': os,
+            'sys': sys,
+            '__builtins__': __builtins__
+        }
+        
+        # Execute the function definition
+        exec(function_string, exec_globals)
+        
+        # Get the function from the execution environment
+        if 'my_cad_function' not in exec_globals:
+            raise ValueError("Function 'my_cad_function' not found in provided code")
+        
+        my_cad_function = exec_globals['my_cad_function']
+        
+        # Execute the function with arguments
+        return my_cad_function(args)
+        
+    except Exception as e:
+        print(f"Error executing LLM-provided function: {e}")
+        import traceback
+        traceback.print_exc()
+        return None
+
+
+###
+# Example my_cad_function that creates three boxes.
+###
+# def my_cad_function(args):
+#     boxes = []
+#     for translation in [(100, 0, 0), (0, 100, 0), (0, 0, 100)]:
+#         box = cq.Workplane("XY").box(10, 20, 30).translate(translation)
+#         boxes.append(box)
+#     # Combine all boxes into a compound
+#     result = boxes[0]
+#     for box in boxes[1:]:
+#         result = result.union(box)
+#     print(f"Created compound with multiple boxes at different locations.")
+#     return result
+
+###
+# Example my_cad_function that loads a STEP file and prints information.
+###
+# def my_cad_function(args):
+#     if "input_file" in args:
+#         input_file = os.path.expanduser(args["input_file"])
+#         shape = cq.importers.importStep(input_file)
+#         # Get the underlying OCC shape for analysis
+#         if hasattr(shape, 'val'):
+#             occ_shape = shape.val()
+#         else:
+#             occ_shape = shape
+#         print(f"Is Valid: {occ_shape.isValid()}")
+#         print(f"Volume: {occ_shape.Volume():.6f} mm^3")
+#         print(f"Number of faces: {len(occ_shape.Faces())}")
+#         bbox = occ_shape.BoundingBox()
+#         center = bbox.center
+#         print(f"Bbox Center: ({center.x:.4f}, {center.y:.4f}, {center.z:.4f})")
+#         return shape
+#     return None
+
+
+###
+# Main script execution
+###
+
+if __name__ == "__main__":
+    # Process command line arguments
+    argv = sys.argv
+    args = parse_cadquery_args(argv)
+    output_dir = args.get("output_dir", "~/Desktop")
+    output_dir = os.path.expanduser(output_dir)
+    if not os.path.exists(output_dir):
+        os.makedirs(output_dir)
+
+    # Do not delete tmp.step / tmp.stl from a previous successful iteration.
+    # A later failed or timed-out run must leave the last good solid in place
+    # so ingest/eval still have geometry. Preview files can be replaced.
+    for stale_name in ("tmp.png", "tmp.svg"):
+        stale_path = os.path.join(output_dir, stale_name)
+        if os.path.exists(stale_path):
+            os.remove(stale_path)
+
+    # Load function from file or use default
+    result = None
+    if "function_file" in args:
+        function_file = os.path.expanduser(args["function_file"])
+        if os.path.exists(function_file):
+            try:
+                with open(function_file, 'r') as f:
+                    function_string = f.read()
+                print(f"Loading function from: {function_file}")
+                result = load_and_execute_function(function_string, args)
+            except Exception as e:
+                print(f"Error loading function from file: {e}")
+        else:
+            print(f"Function file not found: {function_file}")
+    else:
+        print("No function file provided")
+
+    # Export results if a result was returned
+    if result is not None:
+        export_as_step(result, output_dir)
+        export_as_stl(result, output_dir)
+        export_as_image(result, output_dir)
+    else:
+        print("No CadQuery result returned; skipped STEP/STL/image export.")
+    
+    print("Script completed.")
+
+Instruction:
+
+Edit the existing model according to the provided instructions.
+
+Task information:
+
+request_text:
+
+Design cylindrical bearing on the flat end of the part (the one without fillet). Create another 7 instances of this design and rotate them around the bearing axis.
+
+brep_start_path_step:
+
+/home/adml/Research/Hackathon2026/IDETC26-Hackathon-Autodesk-neuralCAD-Edit/data/edit_192_external/breps/3YH2WFSRM22W7DKT_1769175266.4731915.step
+
+Last output rendering: None (this is the first iteration)
+
+Iterations remaining: 10

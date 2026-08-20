@@ -1,0 +1,2385 @@
+The planning stage produced model.json (hierarchical part → sections → features
+→ B-rep faces), aim.json (desired final state from the edit request), and
+operation.json (grounded edit operations, parameters, constraints, targets,
+and modeling plans). Use those artifacts when writing my_cad_function.
+
+Section ids look like R01. Feature ids look like F001. FACE N values are
+CadQuery Faces() indices from the STEP analysis. Bind them to actual STEP
+geometry by inspecting the loaded model (print faces and coordinates) before
+editing. If an operation needs boundary topology such as a chamfer or fillet
+edge, derive it in CadQuery from the grounded face(s).
+
+Implement each operation's modeling_plan steps. Load the start model from
+args["input_file"].
+
+model.json from the planning stage:
+
+{
+  "part": {
+    "id": "P001",
+    "name": "Dual-fan automotive radiator assembly",
+    "description": "A rectangular liquid-to-air heat exchanger with a perimeter frame, finned radiator core, two axial electric fan assemblies with protective guards, coolant hose fittings, and service or mounting plugs. CadQuery reports 20 solids: SOLID 0 is the large connected radiator/frame/fan-guard body, SOLID 1 through SOLID 14 are seven repeated blades for each of two fans, SOLID 15 and SOLID 16 are paired hose fittings, SOLID 17 and SOLID 18 are paired corner plugs or mounts, and SOLID 19 is a top filler/service cap. The STEP is reported as invalid, and several accessory solids are represented by single closed BSpline faces.",
+    "source_views": [
+      "+Z",
+      "-Z",
+      "-X",
+      "+X",
+      "+Y",
+      "-Y",
+      "iso1"
+    ],
+    "solid_ids": [
+      "SOLID 0",
+      "SOLID 1",
+      "SOLID 2",
+      "SOLID 3",
+      "SOLID 4",
+      "SOLID 5",
+      "SOLID 6",
+      "SOLID 7",
+      "SOLID 8",
+      "SOLID 9",
+      "SOLID 10",
+      "SOLID 11",
+      "SOLID 12",
+      "SOLID 13",
+      "SOLID 14",
+      "SOLID 15",
+      "SOLID 16",
+      "SOLID 17",
+      "SOLID 18",
+      "SOLID 19"
+    ],
+    "symmetry_note": "The assembly is approximately bilateral about CAD z=0. Two fan centers occur near z=-133.35 mm and z=+133.35 mm. Each fan has a seven-member circular blade pattern. The accessory fittings break exact bilateral symmetry.",
+    "semantic_orientation": {
+      "status": "inferred",
+      "description": "The guarded dual-fan side is interpreted as the front, the exposed heat-exchanger face as the back, the long header containing the filler/service cap as the top, and the opposite long header as the bottom. CAD view labels are mapped independently from this semantic interpretation.",
+      "confidence": 0.88,
+      "view_sides": {
+        "+X": "front",
+        "-X": "back",
+        "+Y": "top",
+        "-Y": "bottom",
+        "+Z": "left",
+        "-Z": "right"
+      }
+    },
+    "sections": [
+      {
+        "id": "R01",
+        "name": "Radiator frame and heat-exchanger core",
+        "ontology_class": "cad:MainBodySection",
+        "description": "The large rectangular structural and thermal body comprising the perimeter shell, top and bottom headers, side members, and broad heat-exchanger core surfaces.",
+        "location": "Central rectangular body behind and surrounding both fan assemblies.",
+        "solid_ids": [
+          "SOLID 0"
+        ],
+        "colour": {
+          "R": 76,
+          "G": 153,
+          "B": 214
+        },
+        "section_functions": [
+          {
+            "ontology_class": "cad:ContainFunction",
+            "name": "Contain coolant and heat-exchanger structure",
+            "description": "Contains and supports the radiator core and its working-fluid passages.",
+            "primary": true,
+            "confidence": 0.9
+          },
+          {
+            "ontology_class": "cad:SupportFunction",
+            "name": "Support fan assemblies",
+            "description": "Provides the structural base to which the two guarded fan assemblies are attached.",
+            "primary": false,
+            "confidence": 0.94
+          },
+          {
+            "ontology_class": "cad:MountFunction",
+            "name": "Mount radiator assembly",
+            "description": "Provides the perimeter structure used to install the assembly in a vehicle or machine.",
+            "primary": false,
+            "confidence": 0.82
+          }
+        ],
+        "section_behaviors": [
+          {
+            "ontology_class": "cad:SpreadLoadBehavior",
+            "name": "Spread structural and pressure loads",
+            "description": "The perimeter members distribute fan reaction, mounting, and internal fluid-pressure loads.",
+            "confidence": 0.86
+          },
+          {
+            "ontology_class": "cad:ResistBendingBehavior",
+            "name": "Resist panel bending",
+            "description": "The rectangular frame restrains bending of the broad radiator core.",
+            "confidence": 0.88
+          }
+        ],
+        "feature_groups": [],
+        "features": [
+          {
+            "id": "F001",
+            "name": "Perimeter radiator shell and headers",
+            "ontology_class": "cad:HousingFeature",
+            "parent_feature_id": null,
+            "description": "Rectangular outer housing formed by long headers and side members around the heat-exchanger core.",
+            "interface_type": null,
+            "feature_functions": [
+              {
+                "ontology_class": "cad:ContainFunction",
+                "name": "Contain radiator core",
+                "description": "Encloses and structurally bounds the heat-exchanger core.",
+                "primary": true,
+                "confidence": 0.9
+              },
+              {
+                "ontology_class": "cad:ProtectFunction",
+                "name": "Protect core edges",
+                "description": "Protects vulnerable fin and tube edges around the perimeter.",
+                "primary": false,
+                "confidence": 0.88
+              }
+            ],
+            "feature_behaviors": [
+              {
+                "ontology_class": "cad:ResistBendingBehavior",
+                "name": "Resist frame bending",
+                "description": "The closed rectangular perimeter increases bending stiffness.",
+                "confidence": 0.9
+              },
+              {
+                "ontology_class": "cad:SpreadLoadBehavior",
+                "name": "Distribute mounting loads",
+                "description": "Spreads external mounting and fan loads around the radiator perimeter.",
+                "confidence": 0.86
+              }
+            ],
+            "relationships": [
+              {
+                "target_feature_id": "F002",
+                "category": "cad:StructuralFeatureRelationship",
+                "relation": "cad:surroundsFeature",
+                "description": "The perimeter shell surrounds the heat-exchanger core.",
+                "confidence": 0.96
+              },
+              {
+                "target_feature_id": "F003",
+                "category": "cad:StructuralFeatureRelationship",
+                "relation": "cad:containsFeature",
+                "description": "The shell incorporates the peripheral mounting and attachment rails.",
+                "confidence": 0.86
+              }
+            ],
+            "brep_faces": [
+              {
+                "brep_id": "FACE 22",
+                "face_code": "FACE 22",
+                "entity_type": "cad:Face",
+                "geometry_type": "cad:PlanarSurface",
+                "semantic_role": "cad:OuterWallRole",
+                "name": "Lower header outer wall",
+                "description": "Long planar exterior wall at CAD y=-171.45 mm spanning most of the radiator width.",
+                "salience": "cad:PrimarySalience",
+                "confidence": 0.94,
+                "evidence": [
+                  "PLANE surface",
+                  "area 18387.060000 mm^2",
+                  "bbox spans z=-241.3 to 241.3 mm",
+                  "visual correspondence to a long perimeter header"
+                ]
+              },
+              {
+                "brep_id": "FACE 46",
+                "face_code": "FACE 46",
+                "entity_type": "cad:Face",
+                "geometry_type": "cad:PlanarSurface",
+                "semantic_role": "cad:OuterWallRole",
+                "name": "Upper header outer wall",
+                "description": "Long planar exterior wall at CAD y=174.851756 mm.",
+                "salience": "cad:PrimarySalience",
+                "confidence": 0.94,
+                "evidence": [
+                  "PLANE surface",
+                  "area 17584.057710 mm^2",
+                  "bbox spans z=-230.761912 to 230.761912 mm",
+                  "visual correspondence to the cap-bearing upper header"
+                ]
+              },
+              {
+                "brep_id": "FACE 24",
+                "face_code": "FACE 24",
+                "entity_type": "cad:Face",
+                "geometry_type": "cad:PlanarSurface",
+                "semantic_role": "cad:SideWallRole",
+                "name": "Positive-z side member face",
+                "description": "Planar side-member surface at CAD z=266.7 mm.",
+                "salience": "cad:RepresentativeSalience",
+                "confidence": 0.91,
+                "evidence": [
+                  "PLANE surface",
+                  "area 11458.750406 mm^2",
+                  "constant z=266.7 mm"
+                ]
+              },
+              {
+                "brep_id": "FACE 42",
+                "face_code": "FACE 42",
+                "entity_type": "cad:Face",
+                "geometry_type": "cad:PlanarSurface",
+                "semantic_role": "cad:SideWallRole",
+                "name": "Negative-z side member face",
+                "description": "Planar side-member surface at CAD z=-266.7 mm, mirrored from FACE 24.",
+                "salience": "cad:RepresentativeSalience",
+                "confidence": 0.91,
+                "evidence": [
+                  "PLANE surface",
+                  "area 11458.750406 mm^2",
+                  "constant z=-266.7 mm",
+                  "mirror correspondence with FACE 24"
+                ]
+              }
+            ],
+            "confidence": 0.93
+          },
+          {
+            "id": "F002",
+            "name": "Broad radiator core panels",
+            "ontology_class": "cad:WallFeature",
+            "parent_feature_id": null,
+            "description": "Broad front and rear surfaces associated with the rectangular heat-exchanger core. Fine visual fins are not individually resolved as separate semantic features in the supplied B-rep report.",
+            "interface_type": null,
+            "feature_functions": [
+              {
+                "ontology_class": "cad:TransferLoadFunction",
+                "name": "Transfer thermal and pressure loads",
+                "description": "Forms the broad heat-exchanger region that transfers heat to airflow while reacting coolant pressure structurally.",
+                "primary": true,
+                "confidence": 0.82
+              },
+              {
+                "ontology_class": "cad:SupportFunction",
+                "name": "Support fin field",
+                "description": "Provides the broad support region for the visually observed finned core.",
+                "primary": false,
+                "confidence": 0.83
+              }
+            ],
+            "feature_behaviors": [
+              {
+                "ontology_class": "cad:SpreadLoadBehavior",
+                "name": "Spread pressure load",
+                "description": "Broad surfaces distribute internal and external loading over the rectangular core.",
+                "confidence": 0.8
+              }
+            ],
+            "relationships": [
+              {
+                "target_feature_id": "F001",
+                "category": "cad:GeometricFeatureRelationship",
+                "relation": "cad:insideFeature",
+                "description": "The core panels lie inside the surrounding perimeter shell.",
+                "confidence": 0.95
+              },
+              {
+                "target_feature_id": "F004",
+                "category": "cad:StructuralFeatureRelationship",
+                "relation": "cad:supportsFeature",
+                "description": "The core body supports the left fan guard and shroud.",
+                "confidence": 0.9
+              },
+              {
+                "target_feature_id": "F007",
+                "category": "cad:StructuralFeatureRelationship",
+                "relation": "cad:supportsFeature",
+                "description": "The core body supports the right fan guard and shroud.",
+                "confidence": 0.9
+              }
+            ],
+            "brep_faces": [
+              {
+                "brep_id": "FACE 0",
+                "face_code": "FACE 0",
+                "entity_type": "cad:Face",
+                "geometry_type": "cad:PlanarSurface",
+                "semantic_role": "cad:SupportFaceRole",
+                "name": "Front broad core-support face",
+                "description": "Large planar face at CAD x=-69.85 mm with multiple wires corresponding to openings or attached structures.",
+                "salience": "cad:PrimarySalience",
+                "confidence": 0.86,
+                "evidence": [
+                  "PLANE surface",
+                  "area 6411.982381 mm^2",
+                  "bbox y=-127 to 127 mm and z=-257.175 to 257.175 mm",
+                  "five wires",
+                  "visual radiator-panel correspondence"
+                ]
+              },
+              {
+                "brep_id": "FACE 5",
+                "face_code": "FACE 5",
+                "entity_type": "cad:Face",
+                "geometry_type": "cad:PlanarSurface",
+                "semantic_role": "cad:OuterWallRole",
+                "name": "Rear radiator panel face",
+                "description": "Large rectangular planar face at CAD x=-73.025 mm.",
+                "salience": "cad:PrimarySalience",
+                "confidence": 0.9,
+                "evidence": [
+                  "PLANE surface",
+                  "area 137177.145000 mm^2",
+                  "bbox 266.7 by 514.35 mm"
+                ]
+              },
+              {
+                "brep_id": "FACE 12",
+                "face_code": "FACE 12",
+                "entity_type": "cad:Face",
+                "geometry_type": "cad:PlanarSurface",
+                "semantic_role": "cad:OuterWallRole",
+                "name": "Opposed radiator panel face",
+                "description": "Large rectangular planar face at CAD x=-104.775 mm, parallel to FACE 5.",
+                "salience": "cad:PrimarySalience",
+                "confidence": 0.9,
+                "evidence": [
+                  "PLANE surface",
+                  "area 137177.145000 mm^2",
+                  "bbox 266.7 by 514.35 mm",
+                  "parallel opposed placement relative to FACE 5"
+                ]
+              }
+            ],
+            "confidence": 0.86
+          },
+          {
+            "id": "F003",
+            "name": "Peripheral attachment rails and rounded corner transitions",
+            "ontology_class": "cad:SupportFeature",
+            "parent_feature_id": "F001",
+            "description": "Peripheral rail surfaces and rounded transitions that stiffen the frame and provide attachment structure around the radiator body.",
+            "interface_type": "cad:MountingInterface",
+            "feature_functions": [
+              {
+                "ontology_class": "cad:MountFunction",
+                "name": "Provide peripheral attachment",
+                "description": "Provides structurally reinforced edges for attaching the radiator and fan shrouds.",
+                "primary": true,
+                "confidence": 0.82
+              },
+              {
+                "ontology_class": "cad:DistributeStressFunction",
+                "name": "Distribute corner stress",
+                "description": "Rounded rail transitions reduce local frame stress concentration.",
+                "primary": false,
+                "confidence": 0.85
+              }
+            ],
+            "feature_behaviors": [
+              {
+                "ontology_class": "cad:ReactContactLoadBehavior",
+                "name": "React attachment loads",
+                "description": "Peripheral surfaces react contact and fastening loads.",
+                "confidence": 0.82
+              },
+              {
+                "ontology_class": "cad:DistributeStressBehavior",
+                "name": "Distribute corner stress",
+                "description": "Cylindrical and toroidal corner surfaces smooth changes in direction.",
+                "confidence": 0.9
+              }
+            ],
+            "relationships": [
+              {
+                "target_feature_id": "F001",
+                "category": "cad:StructuralFeatureRelationship",
+                "relation": "cad:partOfFeature",
+                "description": "The attachment rails and corner transitions are subfeatures of the perimeter shell.",
+                "confidence": 0.94
+              }
+            ],
+            "brep_faces": [
+              {
+                "brep_id": "FACE 15",
+                "face_code": "FACE 15",
+                "entity_type": "cad:Face",
+                "geometry_type": "cad:CylindricalSurface",
+                "semantic_role": "cad:TransitionSurfaceRole",
+                "name": "Lower-front longitudinal edge blend",
+                "description": "Long radius-3.175 mm cylindrical transition running parallel to CAD z.",
+                "salience": "cad:RepresentativeSalience",
+                "confidence": 0.88,
+                "evidence": [
+                  "CYLINDER surface",
+                  "radius 3.175 mm",
+                  "axis parallel to CAD z",
+                  "length spans z=-266.7 to 266.7 mm"
+                ]
+              },
+              {
+                "brep_id": "FACE 19",
+                "face_code": "FACE 19",
+                "entity_type": "cad:Face",
+                "geometry_type": "cad:CylindricalSurface",
+                "semantic_role": "cad:TransitionSurfaceRole",
+                "name": "Lower outer edge blend",
+                "description": "Long radius-3.175 mm cylindrical transition along the lower header.",
+                "salience": "cad:RepresentativeSalience",
+                "confidence": 0.89,
+                "evidence": [
+                  "CYLINDER surface",
+                  "radius 3.175 mm",
+                  "bbox spans z=-241.3 to 241.3 mm"
+                ]
+              },
+              {
+                "brep_id": "FACE 27",
+                "face_code": "FACE 27",
+                "entity_type": "cad:Face",
+                "geometry_type": "cad:CylindricalSurface",
+                "semantic_role": "cad:TransitionSurfaceRole",
+                "name": "Opposed lower edge blend",
+                "description": "Mirrored long lower-header blend corresponding to FACE 19.",
+                "salience": "cad:RepresentativeSalience",
+                "confidence": 0.89,
+                "evidence": [
+                  "CYLINDER surface",
+                  "radius 3.175 mm",
+                  "mirror placement across radiator thickness"
+                ]
+              },
+              {
+                "brep_id": "FACE 32",
+                "face_code": "FACE 32",
+                "entity_type": "cad:Face",
+                "geometry_type": "cad:CylindricalSurface",
+                "semantic_role": "cad:TransitionSurfaceRole",
+                "name": "Upper rear longitudinal blend",
+                "description": "Long radius-3.175 mm edge transition near the upper header.",
+                "salience": "cad:SecondarySalience",
+                "confidence": 0.87,
+                "evidence": [
+                  "CYLINDER surface",
+                  "radius 3.175 mm",
+                  "bbox spans z=-266.7 to 266.7 mm"
+                ]
+              },
+              {
+                "brep_id": "FACE 38",
+                "face_code": "FACE 38",
+                "entity_type": "cad:Face",
+                "geometry_type": "cad:CylindricalSurface",
+                "semantic_role": "cad:TransitionSurfaceRole",
+                "name": "Upper outer edge blend",
+                "description": "Long radius-3.175 mm transition along the upper header.",
+                "salience": "cad:RepresentativeSalience",
+                "confidence": 0.88,
+                "evidence": [
+                  "CYLINDER surface",
+                  "radius 3.175 mm",
+                  "bbox spans z=-230.761912 to 230.761912 mm"
+                ]
+              },
+              {
+                "brep_id": "FACE 50",
+                "face_code": "FACE 50",
+                "entity_type": "cad:Face",
+                "geometry_type": "cad:CylindricalSurface",
+                "semantic_role": "cad:TransitionSurfaceRole",
+                "name": "Upper front longitudinal blend",
+                "description": "Front-side upper edge transition mirrored from FACE 32.",
+                "salience": "cad:SecondarySalience",
+                "confidence": 0.87,
+                "evidence": [
+                  "CYLINDER surface",
+                  "radius 3.175 mm",
+                  "axis parallel to CAD z"
+                ]
+              },
+              {
+                "brep_id": "FACE 56",
+                "face_code": "FACE 56",
+                "entity_type": "cad:Face",
+                "geometry_type": "cad:CylindricalSurface",
+                "semantic_role": "cad:TransitionSurfaceRole",
+                "name": "Upper front outer blend",
+                "description": "Front-side upper-header blend mirrored from FACE 38.",
+                "salience": "cad:RepresentativeSalience",
+                "confidence": 0.88,
+                "evidence": [
+                  "CYLINDER surface",
+                  "radius 3.175 mm",
+                  "bbox spans z=-230.761912 to 230.761912 mm"
+                ]
+              }
+            ],
+            "confidence": 0.86
+          }
+        ],
+        "unclassified_brep_faces": [
+          {
+            "brep_ids": [
+              "FACE 1-FACE 4",
+              "FACE 6-FACE 11",
+              "FACE 13-FACE 14",
+              "FACE 16-FACE 18",
+              "FACE 20-FACE 21",
+              "FACE 23",
+              "FACE 25-FACE 26",
+              "FACE 28-FACE 31",
+              "FACE 33-FACE 37",
+              "FACE 39-FACE 41",
+              "FACE 43-FACE 45",
+              "FACE 47-FACE 49",
+              "FACE 51-FACE 55",
+              "FACE 57-FACE 71"
+            ],
+            "salience": "cad:SecondarySalience",
+            "description": "Remaining planar, cylindrical, toroidal, and BSpline faces of the radiator perimeter, corner blends, local wall details, and frame attachment structure. Important representative faces are excluded from these inclusive ranges.",
+            "confidence": 0.82
+          }
+        ],
+        "relationships": [
+          {
+            "target_section_id": "R02",
+            "category": "cad:StructuralFeatureRelationship",
+            "relation": "cad:supportsFeature",
+            "description": "The radiator body supports both guarded fan assemblies.",
+            "confidence": 0.95
+          },
+          {
+            "target_section_id": "R03",
+            "category": "cad:StructuralFeatureRelationship",
+            "relation": "cad:attachedTo",
+            "description": "Coolant and service fittings are attached around the radiator perimeter.",
+            "confidence": 0.9
+          }
+        ],
+        "confidence": 0.92
+      },
+      {
+        "id": "R02",
+        "name": "Dual axial fan and protective-guard system",
+        "ontology_class": "cad:CentralSection",
+        "description": "Two side-by-side guarded axial fans mounted against the radiator core. SOLID 0 contains both shrouds, guards, hubs, and associated surfaces; SOLID 1 through SOLID 14 form two seven-blade patterns.",
+        "location": "On the interpreted front face of the radiator, centered near CAD z=+133.35 mm and z=-133.35 mm.",
+        "solid_ids": [
+          "SOLID 0",
+          "SOLID 1",
+          "SOLID 2",
+          "SOLID 3",
+          "SOLID 4",
+          "SOLID 5",
+          "SOLID 6",
+          "SOLID 7",
+          "SOLID 8",
+          "SOLID 9",
+          "SOLID 10",
+          "SOLID 11",
+          "SOLID 12",
+          "SOLID 13",
+          "SOLID 14"
+        ],
+        "colour": {
+          "R": 242,
+          "G": 153,
+          "B": 46
+        },
+        "section_functions": [
+          {
+            "ontology_class": "cad:GuideFunction",
+            "name": "Guide forced airflow",
+            "description": "The two axial fan assemblies guide air through the radiator core.",
+            "primary": true,
+            "confidence": 0.97
+          },
+          {
+            "ontology_class": "cad:ProtectFunction",
+            "name": "Protect rotating blades",
+            "description": "Concentric guards and radial supports reduce access to the rotating blade envelopes.",
+            "primary": false,
+            "confidence": 0.98
+          },
+          {
+            "ontology_class": "cad:SupportFunction",
+            "name": "Support rotating fan elements",
+            "description": "Hubs and shrouds locate the blades relative to the radiator.",
+            "primary": false,
+            "confidence": 0.94
+          }
+        ],
+        "section_behaviors": [
+          {
+            "ontology_class": "cad:PermitRotationBehavior",
+            "name": "Permit fan rotation",
+            "description": "The hub regions define the rotational centers for the blade patterns.",
+            "confidence": 0.96
+          },
+          {
+            "ontology_class": "cad:ReactBearingLoadBehavior",
+            "name": "React fan bearing loads",
+            "description": "The hub and support network react radial and axial loads from the rotating fans.",
+            "confidence": 0.9
+          },
+          {
+            "ontology_class": "cad:ResistBendingBehavior",
+            "name": "Resist guard deformation",
+            "description": "Concentric rings and radial members stiffen the protective guards.",
+            "confidence": 0.94
+          }
+        ],
+        "feature_groups": [
+          {
+            "id": "G001",
+            "name": "Paired fan assemblies",
+            "ontology_class": "cad:RepeatedFeatureGroup",
+            "feature_class": "cad:HousingFeature",
+            "pattern_type": "cad:PairedPattern",
+            "member_count": 2,
+            "member_feature_ids": [
+              "F004",
+              "F007"
+            ],
+            "representative_feature_ids": [
+              "F004",
+              "F007"
+            ],
+            "pattern_description": "Two similar guarded fan structures are offset along CAD z and centered near z=+133.35 mm and z=-133.35 mm.",
+            "confidence": 0.97
+          },
+          {
+            "id": "G002",
+            "name": "Left fan seven-blade pattern",
+            "ontology_class": "cad:RepeatedFeatureGroup",
+            "feature_class": "cad:SpokeFeature",
+            "pattern_type": "cad:CircularPattern",
+            "member_count": 7,
+            "member_feature_ids": [
+              "F006"
+            ],
+            "representative_feature_ids": [
+              "F006"
+            ],
+            "pattern_description": "Seven disconnected blade solids, SOLID 1 through SOLID 7, form a circular pattern around the fan centered near CAD z=+133.35 mm.",
+            "confidence": 0.99
+          },
+          {
+            "id": "G003",
+            "name": "Right fan seven-blade pattern",
+            "ontology_class": "cad:RepeatedFeatureGroup",
+            "feature_class": "cad:SpokeFeature",
+            "pattern_type": "cad:CircularPattern",
+            "member_count": 7,
+            "member_feature_ids": [
+              "F009"
+            ],
+            "representative_feature_ids": [
+              "F009"
+            ],
+            "pattern_description": "Seven disconnected blade solids, SOLID 8 through SOLID 14, form a circular pattern around the fan centered near CAD z=-133.35 mm.",
+            "confidence": 0.99
+          }
+        ],
+        "features": [
+          {
+            "id": "F004",
+            "name": "Left fan guard and shroud",
+            "ontology_class": "cad:HousingFeature",
+            "parent_feature_id": null,
+            "description": "Protective concentric cage, surrounding shroud, and support surfaces around the fan centered near CAD z=+133.35 mm.",
+            "interface_type": "cad:ContactInterface",
+            "feature_functions": [
+              {
+                "ontology_class": "cad:ProtectFunction",
+                "name": "Guard left fan blades",
+                "description": "Restricts contact with the rotating left fan while allowing airflow.",
+                "primary": true,
+                "confidence": 0.98
+              },
+              {
+                "ontology_class": "cad:GuideFunction",
+                "name": "Guide left fan airflow",
+                "description": "The surrounding shroud reduces bypass flow around the blade tips.",
+                "primary": false,
+                "confidence": 0.93
+              }
+            ],
+            "feature_behaviors": [
+              {
+                "ontology_class": "cad:ResistBendingBehavior",
+                "name": "Resist guard bending",
+                "description": "Concentric and radial guard geometry increases stiffness.",
+                "confidence": 0.94
+              },
+              {
+                "ontology_class": "cad:ReactContactLoadBehavior",
+                "name": "React incidental contact",
+                "description": "The cage reacts light contact before it reaches the blades.",
+                "confidence": 0.95
+              }
+            ],
+            "relationships": [
+              {
+                "target_feature_id": "F005",
+                "category": "cad:GeometricFeatureRelationship",
+                "relation": "cad:surroundsFeature",
+                "description": "The left guard surrounds the left hub.",
+                "confidence": 0.98
+              },
+              {
+                "target_feature_id": "F006",
+                "category": "cad:FunctionalFeatureRelationship",
+                "relation": "cad:providesClearanceFor",
+                "description": "The cage provides rotational and airflow clearance for the left blade pattern.",
+                "confidence": 0.96
+              },
+              {
+                "target_feature_id": "F007",
+                "category": "cad:GeometricFeatureRelationship",
+                "relation": "cad:offsetFrom",
+                "description": "The two fan guards are offset along CAD z.",
+                "confidence": 0.99
+              }
+            ],
+            "brep_faces": [
+              {
+                "brep_id": "FACE 395",
+                "face_code": "FACE 395",
+                "entity_type": "cad:Face",
+                "geometry_type": "cad:BSplineSurface",
+                "semantic_role": "cad:SupportFaceRole",
+                "name": "Left guard support surface",
+                "description": "Large multi-wire BSpline surface associated with the fan centered near CAD z=+133.35 mm.",
+                "salience": "cad:PrimarySalience",
+                "confidence": 0.91,
+                "evidence": [
+                  "BSPLINE surface",
+                  "43 wires",
+                  "bbox centered near z=+133.35 mm",
+                  "mirror correspondence with FACE 77"
+                ]
+              },
+              {
+                "brep_id": "FACE 457",
+                "face_code": "FACE 457",
+                "entity_type": "cad:Face",
+                "geometry_type": "cad:BSplineSurface",
+                "semantic_role": "cad:SupportFaceRole",
+                "name": "Left concentric guard network surface",
+                "description": "Large multi-wire BSpline surface corresponding to the concentric guard and radial support network.",
+                "salience": "cad:PrimarySalience",
+                "confidence": 0.9,
+                "evidence": [
+                  "BSPLINE surface",
+                  "50 wires",
+                  "bbox centered near z=+133.35 mm",
+                  "visual correspondence to fan cage"
+                ]
+              },
+              {
+                "brep_id": "FACE 652",
+                "face_code": "FACE 652",
+                "entity_type": "cad:Face",
+                "geometry_type": "cad:CylindricalSurface",
+                "semantic_role": "cad:OuterWallRole",
+                "name": "Left fan shroud outer wall",
+                "description": "Large cylindrical shroud surface of radius 123.825 mm about an axis parallel to CAD x.",
+                "salience": "cad:PrimarySalience",
+                "confidence": 0.97,
+                "evidence": [
+                  "CYLINDER surface",
+                  "radius 123.825 mm",
+                  "axis parallel to CAD x",
+                  "center near z=+133.35 mm"
+                ]
+              },
+              {
+                "brep_id": "FACE 656",
+                "face_code": "FACE 656",
+                "entity_type": "cad:Face",
+                "geometry_type": "cad:CylindricalSurface",
+                "semantic_role": "cad:OuterWallRole",
+                "name": "Left guard outer ring",
+                "description": "Outer cylindrical guard surface of radius 127 mm.",
+                "salience": "cad:PrimarySalience",
+                "confidence": 0.97,
+                "evidence": [
+                  "CYLINDER surface",
+                  "radius 127.0 mm",
+                  "axis parallel to CAD x",
+                  "bbox centered near z=+138.1125 mm"
+                ]
+              }
+            ],
+            "confidence": 0.96
+          },
+          {
+            "id": "F005",
+            "name": "Left fan hub and rotational interface",
+            "ontology_class": "cad:HubFeature",
+            "parent_feature_id": "F004",
+            "description": "Central hub, cap, and concentric rotational interface for the left blade pattern.",
+            "interface_type": "cad:BearingInterface",
+            "feature_functions": [
+              {
+                "ontology_class": "cad:LocateFunction",
+                "name": "Locate left fan axis",
+                "description": "Defines the center and axial position of the left rotating fan.",
+                "primary": true,
+                "confidence": 0.97
+              },
+              {
+                "ontology_class": "cad:SupportFunction",
+                "name": "Support left blades",
+                "description": "Transfers blade loads into the fan support structure.",
+                "primary": false,
+                "confidence": 0.95
+              }
+            ],
+            "feature_behaviors": [
+              {
+                "ontology_class": "cad:PermitRotationBehavior",
+                "name": "Permit rotation about hub axis",
+                "description": "Concentric cylindrical surfaces define a rotation axis parallel to CAD x.",
+                "confidence": 0.98
+              },
+              {
+                "ontology_class": "cad:ReactBearingLoadBehavior",
+                "name": "React left fan bearing load",
+                "description": "The hub reacts radial and axial loads generated by the rotating blades.",
+                "confidence": 0.93
+              }
+            ],
+            "relationships": [
+              {
+                "target_feature_id": "F006",
+                "category": "cad:GeometricFeatureRelationship",
+                "relation": "cad:concentricWith",
+                "description": "The left blade pattern is concentric with the left hub.",
+                "confidence": 0.99
+              },
+              {
+                "target_feature_id": "F006",
+                "category": "cad:StructuralFeatureRelationship",
+                "relation": "cad:supportsFeature",
+                "description": "The hub supports and locates the left blade pattern.",
+                "confidence": 0.98
+              },
+              {
+                "target_feature_id": "F008",
+                "category": "cad:GeometricFeatureRelationship",
+                "relation": "cad:parallelTo",
+                "description": "The left and right hub axes are parallel to CAD x.",
+                "confidence": 0.99
+              }
+            ],
+            "brep_faces": [
+              {
+                "brep_id": "FACE 479",
+                "face_code": "FACE 479",
+                "entity_type": "cad:Face",
+                "geometry_type": "cad:CylindricalSurface",
+                "semantic_role": "cad:OuterWallRole",
+                "name": "Left hub outer cylindrical wall",
+                "description": "Radius-38.1 mm hub wall centered near CAD z=+133.35 mm with axis parallel to CAD x.",
+                "salience": "cad:PrimarySalience",
+                "confidence": 0.98,
+                "evidence": [
+                  "CYLINDER surface",
+                  "radius 38.1 mm",
+                  "axis parallel to CAD x",
+                  "center near z=+133.35 mm"
+                ]
+              },
+              {
+                "brep_id": "FACE 653",
+                "face_code": "FACE 653",
+                "entity_type": "cad:Face",
+                "geometry_type": "cad:CylindricalSurface",
+                "semantic_role": "cad:InterfaceFaceRole",
+                "name": "Left central boss wall",
+                "description": "Radius-19.05 mm cylindrical hub interface.",
+                "salience": "cad:PrimarySalience",
+                "confidence": 0.97,
+                "evidence": [
+                  "CYLINDER surface",
+                  "radius 19.05 mm",
+                  "axis parallel to CAD x",
+                  "concentric with left fan"
+                ]
+              },
+              {
+                "brep_id": "FACE 654",
+                "face_code": "FACE 654",
+                "entity_type": "cad:Face",
+                "geometry_type": "cad:PlanarSurface",
+                "semantic_role": "cad:SeatingFaceRole",
+                "name": "Left hub seating face",
+                "description": "Circular planar seat at CAD x=3.175 mm.",
+                "salience": "cad:RepresentativeSalience",
+                "confidence": 0.96,
+                "evidence": [
+                  "PLANE surface",
+                  "center at z=+133.35 mm",
+                  "circular one-edge topology"
+                ]
+              },
+              {
+                "brep_id": "FACE 655",
+                "face_code": "FACE 655",
+                "entity_type": "cad:Face",
+                "geometry_type": "cad:CylindricalSurface",
+                "semantic_role": "cad:OuterWallRole",
+                "name": "Left intermediate hub wall",
+                "description": "Radius-34.925 mm cylindrical hub wall.",
+                "salience": "cad:RepresentativeSalience",
+                "confidence": 0.96,
+                "evidence": [
+                  "CYLINDER surface",
+                  "radius 34.925 mm",
+                  "axis parallel to CAD x"
+                ]
+              },
+              {
+                "brep_id": "FACE 707",
+                "face_code": "FACE 707",
+                "entity_type": "cad:Face",
+                "geometry_type": "cad:CylindricalSurface",
+                "semantic_role": "cad:InterfaceFaceRole",
+                "name": "Left inner hub wall",
+                "description": "Radius-15.875 mm cylindrical rotational interface.",
+                "salience": "cad:PrimarySalience",
+                "confidence": 0.97,
+                "evidence": [
+                  "CYLINDER surface",
+                  "radius 15.875 mm",
+                  "axis parallel to CAD x"
+                ]
+              },
+              {
+                "brep_id": "FACE 709",
+                "face_code": "FACE 709",
+                "entity_type": "cad:Face",
+                "geometry_type": "cad:PlanarSurface",
+                "semantic_role": "cad:SeatingFaceRole",
+                "name": "Left inner hub end seat",
+                "description": "Circular planar hub seat at CAD x=6.35 mm.",
+                "salience": "cad:RepresentativeSalience",
+                "confidence": 0.96,
+                "evidence": [
+                  "PLANE surface",
+                  "center at z=+133.35 mm",
+                  "circular one-edge topology"
+                ]
+              }
+            ],
+            "confidence": 0.97
+          },
+          {
+            "id": "F006",
+            "name": "Left fan blade pattern",
+            "ontology_class": "cad:SpokeFeature",
+            "parent_feature_id": "F005",
+            "description": "Seven curved aerodynamic blades represented by SOLID 1 through SOLID 7. FACE 710 through FACE 715 are the six faces of one representative blade.",
+            "interface_type": null,
+            "feature_functions": [
+              {
+                "ontology_class": "cad:GuideFunction",
+                "name": "Drive left fan airflow",
+                "description": "Rotating curved blades impart momentum to air through the radiator.",
+                "primary": true,
+                "confidence": 0.98
+              },
+              {
+                "ontology_class": "cad:TransferLoadFunction",
+                "name": "Transfer aerodynamic load to hub",
+                "description": "Blade roots transfer aerodynamic and inertial loads to the central hub.",
+                "primary": false,
+                "confidence": 0.95
+              }
+            ],
+            "feature_behaviors": [
+              {
+                "ontology_class": "cad:PermitRotationBehavior",
+                "name": "Rotate as a circular blade array",
+                "description": "The blades are arranged periodically around the left fan axis.",
+                "confidence": 0.99
+              },
+              {
+                "ontology_class": "cad:ResistBendingBehavior",
+                "name": "Resist aerodynamic bending",
+                "description": "Each curved blade carries bending from pressure and inertial loading.",
+                "confidence": 0.93
+              }
+            ],
+            "relationships": [
+              {
+                "target_feature_id": "F005",
+                "category": "cad:GeometricFeatureRelationship",
+                "relation": "cad:concentricWith",
+                "description": "The seven-blade circular pattern is concentric with the left hub.",
+                "confidence": 0.99
+              },
+              {
+                "target_feature_id": "F004",
+                "category": "cad:GeometricFeatureRelationship",
+                "relation": "cad:insideFeature",
+                "description": "The left blades rotate inside the left shroud and guard.",
+                "confidence": 0.98
+              }
+            ],
+            "brep_faces": [
+              {
+                "brep_id": "FACE 710",
+                "face_code": "FACE 710",
+                "entity_type": "cad:Face",
+                "geometry_type": "cad:BSplineSurface",
+                "semantic_role": "cad:SideWallRole",
+                "name": "Representative left blade pressure or suction surface",
+                "description": "Large curved surface of the representative blade in SOLID 1.",
+                "salience": "cad:PrimarySalience",
+                "confidence": 0.98,
+                "evidence": [
+                  "BSPLINE surface",
+                  "area 4688.029568 mm^2",
+                  "belongs to first six-face blade solid",
+                  "bbox near z=+133.35 mm"
+                ]
+              },
+              {
+                "brep_id": "FACE 711",
+                "face_code": "FACE 711",
+                "entity_type": "cad:Face",
+                "geometry_type": "cad:BSplineSurface",
+                "semantic_role": "cad:RootSurfaceRole",
+                "name": "Representative left blade tip or end transition",
+                "description": "Small curved end surface of the representative blade.",
+                "salience": "cad:RepresentativeSalience",
+                "confidence": 0.9,
+                "evidence": [
+                  "BSPLINE surface",
+                  "area 181.568077 mm^2",
+                  "same six-face blade topology"
+                ]
+              },
+              {
+                "brep_id": "FACE 712",
+                "face_code": "FACE 712",
+                "entity_type": "cad:Face",
+                "geometry_type": "cad:BSplineSurface",
+                "semantic_role": "cad:TransitionSurfaceRole",
+                "name": "Representative left blade edge surface",
+                "description": "Curved blade edge or root transition surface.",
+                "salience": "cad:RepresentativeSalience",
+                "confidence": 0.9,
+                "evidence": [
+                  "BSPLINE surface",
+                  "area 1385.460046 mm^2",
+                  "same blade solid"
+                ]
+              },
+              {
+                "brep_id": "FACE 713",
+                "face_code": "FACE 713",
+                "entity_type": "cad:Face",
+                "geometry_type": "cad:BSplineSurface",
+                "semantic_role": "cad:SideWallRole",
+                "name": "Opposed representative left blade surface",
+                "description": "Second large aerodynamic surface of the representative blade.",
+                "salience": "cad:PrimarySalience",
+                "confidence": 0.98,
+                "evidence": [
+                  "BSPLINE surface",
+                  "area 4858.588976 mm^2",
+                  "opposed to FACE 710"
+                ]
+              },
+              {
+                "brep_id": "FACE 714",
+                "face_code": "FACE 714",
+                "entity_type": "cad:Face",
+                "geometry_type": "cad:BSplineSurface",
+                "semantic_role": "cad:RootSurfaceRole",
+                "name": "Representative left blade root face",
+                "description": "Narrow blade-root or attachment-side surface.",
+                "salience": "cad:RepresentativeSalience",
+                "confidence": 0.91,
+                "evidence": [
+                  "BSPLINE surface",
+                  "area 852.744404 mm^2",
+                  "narrow bbox dimension near CAD y"
+                ]
+              },
+              {
+                "brep_id": "FACE 715",
+                "face_code": "FACE 715",
+                "entity_type": "cad:Face",
+                "geometry_type": "cad:BSplineSurface",
+                "semantic_role": "cad:TransitionSurfaceRole",
+                "name": "Representative left blade trailing or leading edge",
+                "description": "Narrow curved edge surface closing the representative blade.",
+                "salience": "cad:RepresentativeSalience",
+                "confidence": 0.9,
+                "evidence": [
+                  "BSPLINE surface",
+                  "area 1121.937827 mm^2",
+                  "completes six-face blade solid"
+                ]
+              }
+            ],
+            "confidence": 0.98
+          },
+          {
+            "id": "F007",
+            "name": "Right fan guard and shroud",
+            "ontology_class": "cad:HousingFeature",
+            "parent_feature_id": null,
+            "description": "Protective cage, surrounding shroud, and support surfaces around the fan centered near CAD z=-133.35 mm.",
+            "interface_type": "cad:ContactInterface",
+            "feature_functions": [
+              {
+                "ontology_class": "cad:ProtectFunction",
+                "name": "Guard right fan blades",
+                "description": "Restricts contact with the rotating right fan while preserving airflow.",
+                "primary": true,
+                "confidence": 0.98
+              },
+              {
+                "ontology_class": "cad:GuideFunction",
+                "name": "Guide right fan airflow",
+                "description": "The shroud guides air through the blade swept area and radiator core.",
+                "primary": false,
+                "confidence": 0.93
+              }
+            ],
+            "feature_behaviors": [
+              {
+                "ontology_class": "cad:ResistBendingBehavior",
+                "name": "Resist guard bending",
+                "description": "Concentric rings and radial supports stiffen the guard.",
+                "confidence": 0.94
+              },
+              {
+                "ontology_class": "cad:ReactContactLoadBehavior",
+                "name": "React incidental contact",
+                "description": "The cage reacts incidental external contact.",
+                "confidence": 0.95
+              }
+            ],
+            "relationships": [
+              {
+                "target_feature_id": "F008",
+                "category": "cad:GeometricFeatureRelationship",
+                "relation": "cad:surroundsFeature",
+                "description": "The right guard surrounds the right hub.",
+                "confidence": 0.98
+              },
+              {
+                "target_feature_id": "F009",
+                "category": "cad:FunctionalFeatureRelationship",
+                "relation": "cad:providesClearanceFor",
+                "description": "The cage provides clearance for the right blade pattern.",
+                "confidence": 0.96
+              },
+              {
+                "target_feature_id": "F004",
+                "category": "cad:GeometricFeatureRelationship",
+                "relation": "cad:offsetFrom",
+                "description": "The right guard is offset from the left guard along CAD z.",
+                "confidence": 0.99
+              }
+            ],
+            "brep_faces": [
+              {
+                "brep_id": "FACE 72",
+                "face_code": "FACE 72",
+                "entity_type": "cad:Face",
+                "geometry_type": "cad:CylindricalSurface",
+                "semantic_role": "cad:OuterWallRole",
+                "name": "Right guard outer ring",
+                "description": "Outer cylindrical guard surface of radius 127 mm centered near CAD z=-133.35 mm.",
+                "salience": "cad:PrimarySalience",
+                "confidence": 0.97,
+                "evidence": [
+                  "CYLINDER surface",
+                  "radius 127.0 mm",
+                  "axis parallel to CAD x",
+                  "bbox centered near negative z fan"
+                ]
+              },
+              {
+                "brep_id": "FACE 77",
+                "face_code": "FACE 77",
+                "entity_type": "cad:Face",
+                "geometry_type": "cad:BSplineSurface",
+                "semantic_role": "cad:SupportFaceRole",
+                "name": "Right guard support surface",
+                "description": "Large multi-wire BSpline surface associated with the right fan cage.",
+                "salience": "cad:PrimarySalience",
+                "confidence": 0.91,
+                "evidence": [
+                  "BSPLINE surface",
+                  "43 wires",
+                  "bbox centered near z=-133.35 mm",
+                  "mirror correspondence with FACE 395"
+                ]
+              },
+              {
+                "brep_id": "FACE 139",
+                "face_code": "FACE 139",
+                "entity_type": "cad:Face",
+                "geometry_type": "cad:BSplineSurface",
+                "semantic_role": "cad:SupportFaceRole",
+                "name": "Right concentric guard network surface",
+                "description": "Large multi-wire BSpline surface corresponding to the right concentric guard network.",
+                "salience": "cad:PrimarySalience",
+                "confidence": 0.9,
+                "evidence": [
+                  "BSPLINE surface",
+                  "50 wires",
+                  "bbox centered near z=-133.35 mm",
+                  "mirror correspondence with FACE 457"
+                ]
+              },
+              {
+                "brep_id": "FACE 334",
+                "face_code": "FACE 334",
+                "entity_type": "cad:Face",
+                "geometry_type": "cad:CylindricalSurface",
+                "semantic_role": "cad:OuterWallRole",
+                "name": "Right fan shroud outer wall",
+                "description": "Large cylindrical shroud surface of radius 123.825 mm.",
+                "salience": "cad:PrimarySalience",
+                "confidence": 0.97,
+                "evidence": [
+                  "CYLINDER surface",
+                  "radius 123.825 mm",
+                  "axis parallel to CAD x",
+                  "center near z=-133.35 mm"
+                ]
+              }
+            ],
+            "confidence": 0.96
+          },
+          {
+            "id": "F008",
+            "name": "Right fan hub and rotational interface",
+            "ontology_class": "cad:HubFeature",
+            "parent_feature_id": "F007",
+            "description": "Central hub and concentric rotational interface for the right blade pattern.",
+            "interface_type": "cad:BearingInterface",
+            "feature_functions": [
+              {
+                "ontology_class": "cad:LocateFunction",
+                "name": "Locate right fan axis",
+                "description": "Defines the center and axial position of the right rotating fan.",
+                "primary": true,
+                "confidence": 0.97
+              },
+              {
+                "ontology_class": "cad:SupportFunction",
+                "name": "Support right blades",
+                "description": "Transfers right blade loads into the support structure.",
+                "primary": false,
+                "confidence": 0.95
+              }
+            ],
+            "feature_behaviors": [
+              {
+                "ontology_class": "cad:PermitRotationBehavior",
+                "name": "Permit rotation about hub axis",
+                "description": "Concentric cylindrical surfaces define a rotation axis parallel to CAD x.",
+                "confidence": 0.98
+              },
+              {
+                "ontology_class": "cad:ReactBearingLoadBehavior",
+                "name": "React right fan bearing load",
+                "description": "The hub reacts radial and axial loads generated by the rotating blades.",
+                "confidence": 0.93
+              }
+            ],
+            "relationships": [
+              {
+                "target_feature_id": "F009",
+                "category": "cad:GeometricFeatureRelationship",
+                "relation": "cad:concentricWith",
+                "description": "The right blade pattern is concentric with the right hub.",
+                "confidence": 0.99
+              },
+              {
+                "target_feature_id": "F009",
+                "category": "cad:StructuralFeatureRelationship",
+                "relation": "cad:supportsFeature",
+                "description": "The right hub supports and locates the right blade pattern.",
+                "confidence": 0.98
+              },
+              {
+                "target_feature_id": "F005",
+                "category": "cad:GeometricFeatureRelationship",
+                "relation": "cad:parallelTo",
+                "description": "The two hub axes are parallel.",
+                "confidence": 0.99
+              }
+            ],
+            "brep_faces": [
+              {
+                "brep_id": "FACE 161",
+                "face_code": "FACE 161",
+                "entity_type": "cad:Face",
+                "geometry_type": "cad:CylindricalSurface",
+                "semantic_role": "cad:OuterWallRole",
+                "name": "Right hub outer cylindrical wall",
+                "description": "Radius-38.1 mm hub wall centered near CAD z=-133.35 mm.",
+                "salience": "cad:PrimarySalience",
+                "confidence": 0.98,
+                "evidence": [
+                  "CYLINDER surface",
+                  "radius 38.1 mm",
+                  "axis parallel to CAD x",
+                  "center near z=-133.35 mm"
+                ]
+              },
+              {
+                "brep_id": "FACE 335",
+                "face_code": "FACE 335",
+                "entity_type": "cad:Face",
+                "geometry_type": "cad:CylindricalSurface",
+                "semantic_role": "cad:InterfaceFaceRole",
+                "name": "Right central boss wall",
+                "description": "Radius-19.05 mm cylindrical hub interface.",
+                "salience": "cad:PrimarySalience",
+                "confidence": 0.97,
+                "evidence": [
+                  "CYLINDER surface",
+                  "radius 19.05 mm",
+                  "axis parallel to CAD x"
+                ]
+              },
+              {
+                "brep_id": "FACE 336",
+                "face_code": "FACE 336",
+                "entity_type": "cad:Face",
+                "geometry_type": "cad:PlanarSurface",
+                "semantic_role": "cad:SeatingFaceRole",
+                "name": "Right hub seating face",
+                "description": "Circular planar hub seat at CAD x=3.175 mm.",
+                "salience": "cad:RepresentativeSalience",
+                "confidence": 0.96,
+                "evidence": [
+                  "PLANE surface",
+                  "center at z=-133.35 mm",
+                  "circular one-edge topology"
+                ]
+              },
+              {
+                "brep_id": "FACE 337",
+                "face_code": "FACE 337",
+                "entity_type": "cad:Face",
+                "geometry_type": "cad:CylindricalSurface",
+                "semantic_role": "cad:OuterWallRole",
+                "name": "Right intermediate hub wall",
+                "description": "Radius-34.925 mm cylindrical hub wall.",
+                "salience": "cad:RepresentativeSalience",
+                "confidence": 0.96,
+                "evidence": [
+                  "CYLINDER surface",
+                  "radius 34.925 mm",
+                  "axis parallel to CAD x"
+                ]
+              },
+              {
+                "brep_id": "FACE 388",
+                "face_code": "FACE 388",
+                "entity_type": "cad:Face",
+                "geometry_type": "cad:CylindricalSurface",
+                "semantic_role": "cad:InterfaceFaceRole",
+                "name": "Right inner hub wall",
+                "description": "Radius-15.875 mm cylindrical rotational interface.",
+                "salience": "cad:PrimarySalience",
+                "confidence": 0.97,
+                "evidence": [
+                  "CYLINDER surface",
+                  "radius 15.875 mm",
+                  "axis parallel to CAD x"
+                ]
+              },
+              {
+                "brep_id": "FACE 390",
+                "face_code": "FACE 390",
+                "entity_type": "cad:Face",
+                "geometry_type": "cad:PlanarSurface",
+                "semantic_role": "cad:SeatingFaceRole",
+                "name": "Right inner hub end seat",
+                "description": "Circular planar hub seat at CAD x=6.35 mm.",
+                "salience": "cad:RepresentativeSalience",
+                "confidence": 0.96,
+                "evidence": [
+                  "PLANE surface",
+                  "center at z=-133.35 mm",
+                  "circular one-edge topology"
+                ]
+              }
+            ],
+            "confidence": 0.97
+          },
+          {
+            "id": "F009",
+            "name": "Right fan blade pattern",
+            "ontology_class": "cad:SpokeFeature",
+            "parent_feature_id": "F008",
+            "description": "Seven curved aerodynamic blades represented by SOLID 8 through SOLID 14. FACE 752 through FACE 757 are the six faces of one representative blade.",
+            "interface_type": null,
+            "feature_functions": [
+              {
+                "ontology_class": "cad:GuideFunction",
+                "name": "Drive right fan airflow",
+                "description": "Rotating curved blades impart momentum to air through the radiator.",
+                "primary": true,
+                "confidence": 0.98
+              },
+              {
+                "ontology_class": "cad:TransferLoadFunction",
+                "name": "Transfer aerodynamic load to hub",
+                "description": "Blade roots transfer aerodynamic and inertial loads to the central hub.",
+                "primary": false,
+                "confidence": 0.95
+              }
+            ],
+            "feature_behaviors": [
+              {
+                "ontology_class": "cad:PermitRotationBehavior",
+                "name": "Rotate as a circular blade array",
+                "description": "The blades are arranged periodically around the right fan axis.",
+                "confidence": 0.99
+              },
+              {
+                "ontology_class": "cad:ResistBendingBehavior",
+                "name": "Resist aerodynamic bending",
+                "description": "Each curved blade carries bending from pressure and inertial loading.",
+                "confidence": 0.93
+              }
+            ],
+            "relationships": [
+              {
+                "target_feature_id": "F008",
+                "category": "cad:GeometricFeatureRelationship",
+                "relation": "cad:concentricWith",
+                "description": "The seven-blade circular pattern is concentric with the right hub.",
+                "confidence": 0.99
+              },
+              {
+                "target_feature_id": "F007",
+                "category": "cad:GeometricFeatureRelationship",
+                "relation": "cad:insideFeature",
+                "description": "The right blades rotate inside the right shroud and guard.",
+                "confidence": 0.98
+              }
+            ],
+            "brep_faces": [
+              {
+                "brep_id": "FACE 752",
+                "face_code": "FACE 752",
+                "entity_type": "cad:Face",
+                "geometry_type": "cad:BSplineSurface",
+                "semantic_role": "cad:SideWallRole",
+                "name": "Representative right blade pressure or suction surface",
+                "description": "Large curved surface of the representative blade in SOLID 8.",
+                "salience": "cad:PrimarySalience",
+                "confidence": 0.98,
+                "evidence": [
+                  "BSPLINE surface",
+                  "area 4688.029568 mm^2",
+                  "belongs to first six-face blade of second fan",
+                  "bbox near z=-133.35 mm"
+                ]
+              },
+              {
+                "brep_id": "FACE 753",
+                "face_code": "FACE 753",
+                "entity_type": "cad:Face",
+                "geometry_type": "cad:BSplineSurface",
+                "semantic_role": "cad:RootSurfaceRole",
+                "name": "Representative right blade tip or end transition",
+                "description": "Small curved end surface of the representative blade.",
+                "salience": "cad:RepresentativeSalience",
+                "confidence": 0.9,
+                "evidence": [
+                  "BSPLINE surface",
+                  "area 181.568077 mm^2",
+                  "same six-face blade topology"
+                ]
+              },
+              {
+                "brep_id": "FACE 754",
+                "face_code": "FACE 754",
+                "entity_type": "cad:Face",
+                "geometry_type": "cad:BSplineSurface",
+                "semantic_role": "cad:TransitionSurfaceRole",
+                "name": "Representative right blade edge surface",
+                "description": "Curved blade edge or root transition surface.",
+                "salience": "cad:RepresentativeSalience",
+                "confidence": 0.9,
+                "evidence": [
+                  "BSPLINE surface",
+                  "area 1385.460046 mm^2",
+                  "same blade solid"
+                ]
+              },
+              {
+                "brep_id": "FACE 755",
+                "face_code": "FACE 755",
+                "entity_type": "cad:Face",
+                "geometry_type": "cad:BSplineSurface",
+                "semantic_role": "cad:SideWallRole",
+                "name": "Opposed representative right blade surface",
+                "description": "Second large aerodynamic surface of the representative blade.",
+                "salience": "cad:PrimarySalience",
+                "confidence": 0.98,
+                "evidence": [
+                  "BSPLINE surface",
+                  "area 4858.588976 mm^2",
+                  "opposed to FACE 752"
+                ]
+              },
+              {
+                "brep_id": "FACE 756",
+                "face_code": "FACE 756",
+                "entity_type": "cad:Face",
+                "geometry_type": "cad:BSplineSurface",
+                "semantic_role": "cad:RootSurfaceRole",
+                "name": "Representative right blade root face",
+                "description": "Narrow blade-root or attachment-side surface.",
+                "salience": "cad:RepresentativeSalience",
+                "confidence": 0.91,
+                "evidence": [
+                  "BSPLINE surface",
+                  "area 852.744404 mm^2",
+                  "narrow bbox dimension near CAD y"
+                ]
+              },
+              {
+                "brep_id": "FACE 757",
+                "face_code": "FACE 757",
+                "entity_type": "cad:Face",
+                "geometry_type": "cad:BSplineSurface",
+                "semantic_role": "cad:TransitionSurfaceRole",
+                "name": "Representative right blade trailing or leading edge",
+                "description": "Narrow curved edge surface closing the representative blade.",
+                "salience": "cad:RepresentativeSalience",
+                "confidence": 0.9,
+                "evidence": [
+                  "BSPLINE surface",
+                  "area 1121.937827 mm^2",
+                  "completes six-face blade solid"
+                ]
+              }
+            ],
+            "confidence": 0.98
+          }
+        ],
+        "unclassified_brep_faces": [
+          {
+            "brep_ids": [
+              "FACE 73-FACE 76",
+              "FACE 78-FACE 138",
+              "FACE 140-FACE 160",
+              "FACE 162-FACE 333",
+              "FACE 338-FACE 387",
+              "FACE 389",
+              "FACE 391-FACE 394",
+              "FACE 396-FACE 456",
+              "FACE 458-FACE 478",
+              "FACE 480-FACE 651",
+              "FACE 656-FACE 706",
+              "FACE 708",
+              "FACE 716-FACE 751",
+              "FACE 758-FACE 793"
+            ],
+            "salience": "cad:SecondarySalience",
+            "description": "Remaining cage rings, radial guard members, shroud transitions, hub details, blade-root geometry, and non-representative faces of the two seven-blade patterns. Important representative fan faces are excluded from these inclusive ranges.",
+            "confidence": 0.9
+          }
+        ],
+        "relationships": [
+          {
+            "target_section_id": "R01",
+            "category": "cad:StructuralFeatureRelationship",
+            "relation": "cad:attachedTo",
+            "description": "The dual-fan system is attached to and supported by the radiator frame and core.",
+            "confidence": 0.96
+          },
+          {
+            "target_section_id": "R03",
+            "category": "cad:GeometricFeatureRelationship",
+            "relation": "cad:adjacentTo",
+            "description": "The fan system occupies the central radiator face while fittings remain around the perimeter.",
+            "confidence": 0.86
+          }
+        ],
+        "confidence": 0.97
+      },
+      {
+        "id": "R03",
+        "name": "Coolant and service fitting region",
+        "ontology_class": "cad:EndSection",
+        "description": "Peripheral coolant hose connections, corner service or mounting plugs, and the upper filler/service cap. These are disconnected accessory solids in the STEP model.",
+        "location": "Around the radiator perimeter, including paired hose fittings near the positive-z end, opposed corner plugs, and a cap on the upper header.",
+        "solid_ids": [
+          "SOLID 15",
+          "SOLID 16",
+          "SOLID 17",
+          "SOLID 18",
+          "SOLID 19"
+        ],
+        "colour": {
+          "R": 120,
+          "G": 200,
+          "B": 105
+        },
+        "section_functions": [
+          {
+            "ontology_class": "cad:ConnectFunction",
+            "name": "Connect coolant circuit",
+            "description": "Paired fittings provide external coolant connections to the radiator.",
+            "primary": true,
+            "confidence": 0.94
+          },
+          {
+            "ontology_class": "cad:ContainFunction",
+            "name": "Close service openings",
+            "description": "Caps or plugs close service, fill, drain, or mounting openings around the perimeter.",
+            "primary": false,
+            "confidence": 0.84
+          },
+          {
+            "ontology_class": "cad:MountFunction",
+            "name": "Provide peripheral installation interfaces",
+            "description": "Some corner plug-like elements may also function as isolating mounts.",
+            "primary": false,
+            "confidence": 0.67
+          }
+        ],
+        "section_behaviors": [
+          {
+            "ontology_class": "cad:ReactContactLoadBehavior",
+            "name": "React fitting contact and sealing loads",
+            "description": "Fittings and caps react installation, hose, and sealing contact loads.",
+            "confidence": 0.87
+          },
+          {
+            "ontology_class": "cad:ConstrainTranslationBehavior",
+            "name": "Constrain connected hoses or closures",
+            "description": "Fitting geometry restrains attached hoses and installed plugs against translation.",
+            "confidence": 0.82
+          }
+        ],
+        "feature_groups": [
+          {
+            "id": "G004",
+            "name": "Paired coolant hose fittings",
+            "ontology_class": "cad:RepeatedFeatureGroup",
+            "feature_class": "cad:ShaftInterface",
+            "pattern_type": "cad:PairedPattern",
+            "member_count": 2,
+            "member_feature_ids": [
+              "F010"
+            ],
+            "representative_feature_ids": [
+              "F010"
+            ],
+            "pattern_description": "SOLID 15 and SOLID 16 are two similar adjacent fittings with equal reported volume, area, and bounding-box size.",
+            "confidence": 0.98
+          },
+          {
+            "id": "G005",
+            "name": "Opposed corner plugs or mounts",
+            "ontology_class": "cad:RepeatedFeatureGroup",
+            "feature_class": "cad:MountingInterface",
+            "pattern_type": "cad:PairedPattern",
+            "member_count": 2,
+            "member_feature_ids": [
+              "F011"
+            ],
+            "representative_feature_ids": [
+              "F011"
+            ],
+            "pattern_description": "SOLID 17 and SOLID 18 are similar single-face accessory solids placed near diagonally opposed corners.",
+            "confidence": 0.88
+          }
+        ],
+        "features": [
+          {
+            "id": "F010",
+            "name": "Paired coolant hose connector fittings",
+            "ontology_class": "cad:ShaftInterface",
+            "parent_feature_id": null,
+            "description": "Two adjacent curved external fittings, visually interpreted as radiator coolant hose connections. Each is represented by a single BSpline face in a separate solid.",
+            "interface_type": "cad:ShaftInterface",
+            "feature_functions": [
+              {
+                "ontology_class": "cad:ConnectFunction",
+                "name": "Connect coolant hoses",
+                "description": "Provides fluid connection points between the radiator and external hoses.",
+                "primary": true,
+                "confidence": 0.95
+              },
+              {
+                "ontology_class": "cad:FittingFunction",
+                "name": "Fit external hoses",
+                "description": "Shaped fitting surfaces retain and orient attached hoses.",
+                "primary": false,
+                "confidence": 0.93
+              }
+            ],
+            "feature_behaviors": [
+              {
+                "ontology_class": "cad:ReactContactLoadBehavior",
+                "name": "React hose contact loads",
+                "description": "The fitting surfaces react clamping and insertion loads from hoses.",
+                "confidence": 0.9
+              },
+              {
+                "ontology_class": "cad:ConstrainTranslationBehavior",
+                "name": "Retain connected hoses",
+                "description": "The shaped external geometry restrains hose translation.",
+                "confidence": 0.86
+              }
+            ],
+            "relationships": [
+              {
+                "target_feature_id": "F001",
+                "category": "cad:StructuralFeatureRelationship",
+                "relation": "cad:attachedTo",
+                "description": "The paired coolant fittings are attached at a radiator end region.",
+                "confidence": 0.94
+              },
+              {
+                "target_feature_id": "F011",
+                "category": "cad:GeometricFeatureRelationship",
+                "relation": "cad:offsetFrom",
+                "description": "The hose fittings are spatially offset from the corner plugs or mounts.",
+                "confidence": 0.9
+              }
+            ],
+            "brep_faces": [
+              {
+                "brep_id": "FACE 794",
+                "face_code": "FACE 794",
+                "entity_type": "cad:Face",
+                "geometry_type": "cad:BSplineSurface",
+                "semantic_role": "cad:InterfaceFaceRole",
+                "name": "Upper coolant hose fitting outer surface",
+                "description": "Single closed BSpline face representing SOLID 15.",
+                "salience": "cad:PrimarySalience",
+                "confidence": 0.96,
+                "evidence": [
+                  "BSPLINE surface",
+                  "only face of SOLID 15",
+                  "bbox near z=267.132629 to 309.983435 mm",
+                  "visual correspondence to one gold hose fitting"
+                ]
+              },
+              {
+                "brep_id": "FACE 795",
+                "face_code": "FACE 795",
+                "entity_type": "cad:Face",
+                "geometry_type": "cad:BSplineSurface",
+                "semantic_role": "cad:InterfaceFaceRole",
+                "name": "Lower coolant hose fitting outer surface",
+                "description": "Single closed BSpline face representing SOLID 16, paired with FACE 794.",
+                "salience": "cad:PrimarySalience",
+                "confidence": 0.96,
+                "evidence": [
+                  "BSPLINE surface",
+                  "only face of SOLID 16",
+                  "same area and bbox size as FACE 794",
+                  "offset along CAD y"
+                ]
+              }
+            ],
+            "confidence": 0.96
+          },
+          {
+            "id": "F011",
+            "name": "Opposed corner service plugs or isolating mounts",
+            "ontology_class": "cad:MountingInterface",
+            "parent_feature_id": null,
+            "description": "Two similar plug-like accessories near diagonally opposed perimeter corners. Their exact role may be mounting isolation, drain closure, or service closure.",
+            "interface_type": "cad:MountingInterface",
+            "feature_functions": [
+              {
+                "ontology_class": "cad:MountFunction",
+                "name": "Provide corner interface",
+                "description": "Likely provides a corner mounting or isolating interface.",
+                "primary": true,
+                "confidence": 0.67
+              },
+              {
+                "ontology_class": "cad:ContainFunction",
+                "name": "Close a peripheral opening",
+                "description": "An alternative interpretation is closure of a drain or service opening.",
+                "primary": false,
+                "confidence": 0.55
+              }
+            ],
+            "feature_behaviors": [
+              {
+                "ontology_class": "cad:ReactContactLoadBehavior",
+                "name": "React corner contact load",
+                "description": "The plug-like bodies react contact from a support, cap seat, or threaded opening.",
+                "confidence": 0.72
+              },
+              {
+                "ontology_class": "cad:ConstrainTranslationBehavior",
+                "name": "Constrain installed plug or mount",
+                "description": "The shaped bodies are retained relative to the radiator perimeter.",
+                "confidence": 0.7
+              }
+            ],
+            "relationships": [
+              {
+                "target_feature_id": "F001",
+                "category": "cad:StructuralFeatureRelationship",
+                "relation": "cad:attachedTo",
+                "description": "Both corner accessories are attached to the radiator perimeter.",
+                "confidence": 0.88
+              },
+              {
+                "target_feature_id": "F010",
+                "category": "cad:GeometricFeatureRelationship",
+                "relation": "cad:offsetFrom",
+                "description": "The corner accessories are separate from the paired coolant fittings.",
+                "confidence": 0.9
+              }
+            ],
+            "brep_faces": [
+              {
+                "brep_id": "FACE 796",
+                "face_code": "FACE 796",
+                "entity_type": "cad:Face",
+                "geometry_type": "cad:BSplineSurface",
+                "semantic_role": "cad:InterfaceFaceRole",
+                "name": "Positive-y positive-z corner plug or mount",
+                "description": "Single closed BSpline face representing SOLID 17.",
+                "salience": "cad:RepresentativeSalience",
+                "confidence": 0.83,
+                "evidence": [
+                  "BSPLINE surface",
+                  "only face of SOLID 17",
+                  "bbox near y=135.731255 to 169.068755 mm and z=214.471257 to 247.808757 mm",
+                  "visual corner-plug correspondence"
+                ]
+              },
+              {
+                "brep_id": "FACE 797",
+                "face_code": "FACE 797",
+                "entity_type": "cad:Face",
+                "geometry_type": "cad:BSplineSurface",
+                "semantic_role": "cad:InterfaceFaceRole",
+                "name": "Negative-y negative-z corner plug or mount",
+                "description": "Single closed BSpline face representing SOLID 18, placed near the diagonally opposed corner.",
+                "salience": "cad:RepresentativeSalience",
+                "confidence": 0.83,
+                "evidence": [
+                  "BSPLINE surface",
+                  "only face of SOLID 18",
+                  "same area and bounding-box size as FACE 796",
+                  "diagonally opposed placement"
+                ]
+              }
+            ],
+            "confidence": 0.77
+          },
+          {
+            "id": "F012",
+            "name": "Upper filler or service cap",
+            "ontology_class": "cad:SeatingInterface",
+            "parent_feature_id": null,
+            "description": "Single cap-like accessory centered on the upper header, visually interpreted as a filler neck cap or service closure.",
+            "interface_type": "cad:SeatingInterface",
+            "feature_functions": [
+              {
+                "ontology_class": "cad:ContainFunction",
+                "name": "Close filler or service opening",
+                "description": "Closes an opening in the upper radiator header.",
+                "primary": true,
+                "confidence": 0.91
+              },
+              {
+                "ontology_class": "cad:GripFunction",
+                "name": "Provide manual grip",
+                "description": "The protruding cap shape allows manual installation or removal.",
+                "primary": false,
+                "confidence": 0.79
+              }
+            ],
+            "feature_behaviors": [
+              {
+                "ontology_class": "cad:ReactContactLoadBehavior",
+                "name": "React sealing and handling loads",
+                "description": "The cap reacts seating, sealing, and manual handling loads.",
+                "confidence": 0.87
+              },
+              {
+                "ontology_class": "cad:ConstrainTranslationBehavior",
+                "name": "Remain seated in upper header",
+                "description": "The cap interface restrains removal during normal operation.",
+                "confidence": 0.84
+              }
+            ],
+            "relationships": [
+              {
+                "target_feature_id": "F001",
+                "category": "cad:StructuralFeatureRelationship",
+                "relation": "cad:attachedTo",
+                "description": "The cap is attached to the upper radiator header.",
+                "confidence": 0.95
+              },
+              {
+                "target_feature_id": "F010",
+                "category": "cad:GeometricFeatureRelationship",
+                "relation": "cad:offsetFrom",
+                "description": "The filler cap is offset from the paired end hose fittings.",
+                "confidence": 0.93
+              }
+            ],
+            "brep_faces": [
+              {
+                "brep_id": "FACE 798",
+                "face_code": "FACE 798",
+                "entity_type": "cad:Face",
+                "geometry_type": "cad:BSplineSurface",
+                "semantic_role": "cad:InterfaceFaceRole",
+                "name": "Filler or service cap outer surface",
+                "description": "Single closed BSpline face representing SOLID 19 near the upper header center.",
+                "salience": "cad:PrimarySalience",
+                "confidence": 0.94,
+                "evidence": [
+                  "BSPLINE surface",
+                  "only face of SOLID 19",
+                  "bbox y=174.984047 to 187.823519 mm",
+                  "centered around z=0 mm",
+                  "visual correspondence to top cap"
+                ]
+              }
+            ],
+            "confidence": 0.91
+          }
+        ],
+        "unclassified_brep_faces": [],
+        "relationships": [
+          {
+            "target_section_id": "R01",
+            "category": "cad:StructuralFeatureRelationship",
+            "relation": "cad:attachedTo",
+            "description": "All coolant and service fittings are attached around the radiator frame and headers.",
+            "confidence": 0.94
+          },
+          {
+            "target_section_id": "R02",
+            "category": "cad:GeometricFeatureRelationship",
+            "relation": "cad:adjacentTo",
+            "description": "The fittings occupy peripheral regions adjacent to, but outside, the central fan envelopes.",
+            "confidence": 0.86
+          }
+        ],
+        "confidence": 0.89
+      }
+    ]
+  }
+}
+
+
+The multiview images generated from the code sent in your last response are attached. The CadQuery function and program output from the last iteration are also provided. First, judge whether the required actions identified have been done correctly and whether the current model satisfies the desired final state in aim.json. aim.json is attached immediately after the last-iteration images and code so you can check the current output against it.
+
+The required actions are:
+1. Create a pouring section
+   Target: radiator
+   Constraints: The pouring section must be included in the filling system located on the radiator.
+2. Create a cap
+   Target: radiator
+   Constraints: The cap must be included in the filling system located on the radiator.
+
+If yes, report the operation is finished in your response.
+
+If not, analyse errors and update the code accordingly.
+
+Once you have generated the new function, it will be executed in CadQuery on the original CAD model. You will then be provided with the latest rendering of the CAD model created by your function, and any prints, debug or error messages. You will then have the opportunity to refine your function based on this feedback, and it will be re-executed.
+
+Continue this process until the task is complete, or you reach the maximum number of iterations. If the task involves editing an existing model, the path to that model's .step file is passed to your function as args["input_file"], and is also listed as brep_start_path_step in the task information. Load it from args["input_file"] rather than hard-coding a path. For these cases, you might need to print out debug information once the model is loaded in your first iteration.
+
+Return a json object with three fields. Do not include any other text outside of the json object in your response:
+'complete': true if the task has been completed. IMPORTANT: This should only be judged by looking at the output from the last iteration, not whether a function has been returned this iteration. If there is no valid output that corresponds to the instruction, the task is not complete. The first iteration can never be complete. If this is true, then the current function will NOT be executed, and the function from the last iteration will be used.
+'my_cad_function': CadQuery python function as a string. Use the same definition and arguments as the example.
+'error': a description of errors and misalignments within the current model compared to the desired target.
+        
+
+Instruction:
+
+Edit the existing model according to the provided instructions.
+
+Task information:
+
+request_text:
+
+Hi , Please create a filling system on the radiator , including a pouring section and a cap.
+
+brep_start_path_step:
+
+/home/adml/Research/Hackathon2026/IDETC26-Hackathon-Autodesk-neuralCAD-Edit/data/edit_192_external/breps/SUJ2G2UMJQR7PMBX_1759203782.7519994.step
+
+Program output from last iteration:
+
+stdout: Loading function from: /home/adml/Research/Hackathon2026/IDETC26-Hackathon-Autodesk-neuralCAD-Edit/output/gpt-5.6-sol-ontology-full48/gpt-5.6-sol-ontology_cadquery-script_1787116059.505567/brep_end/1787116059.505567/temp_script.py
+Loaded STEP: /home/adml/Research/Hackathon2026/IDETC26-Hackathon-Autodesk-neuralCAD-Edit/data/edit_192_external/breps/SUJ2G2UMJQR7PMBX_1759203782.7519994.step
+Model valid: False
+Face count: 799
+Solid count: 20
+Model bbox: x=(-112.029, 12.700), y=(-171.450, 187.824), z=(-266.700, 309.983)
+FACE 38: type=CYLINDER area=2301.748 center=(-109.971, 173.698, 0.000) bbox=[x -111.125..-107.950, y 171.677..174.852, z -230.762..230.762]
+FACE 46: type=PLANE area=17584.058 center=(-88.900, 174.852, -0.000) bbox=[x -107.950..-69.850, y 174.852..174.852, z -230.762..230.762]
+FACE 56: type=CYLINDER area=2301.748 center=(-67.829, 173.698, -0.000) bbox=[x -69.850..-66.675, y 171.677..174.852, z -230.762..230.762]
+FACE 798: type=BSPLINE area=3658.611 center=(-88.900, 181.911, 0.000) bbox=[x -112.029..-65.774, y 174.984..187.824, z -23.129..23.129]
+Upper-header planar-face candidates: [(46, 17584.057710106412, -88.89999999999999, 174.8517557723207, -3.3306690738754696e-14, 461.5238244122419)]
+SOLID 0: volume=6600791.747 center=(-49.212, 1.701, -0.000) size=(123.825, 346.302, 533.400)
+SOLID 1: volume=45873.525 center=(-38.968, 64.515, 133.350) size=(60.440, 116.330, 25.666)
+SOLID 2: volume=45873.525 center=(-38.968, 43.866, 179.700) size=(60.440, 84.203, 85.408)
+SOLID 3: volume=45873.525 center=(-38.968, -12.528, 197.395) size=(60.440, 29.118, 116.268)
+SOLID 4: volume=45873.525 center=(-38.968, -55.315, 165.308) size=(60.440, 100.680, 64.714)
+SOLID 5: volume=45873.525 center=(-38.968, -60.273, 110.455) size=(60.440, 110.667, 45.578)
+SOLID 6: volume=45873.525 center=(-38.968, -18.149, 71.855) size=(60.440, 42.703, 111.157)
+SOLID 7: volume=45873.525 center=(-38.968, 35.227, 79.903) size=(60.440, 66.446, 99.812)
+SOLID 8: volume=45873.525 center=(-38.968, -60.273, -110.455) size=(60.440, 110.667, 45.578)
+SOLID 9: volume=45873.525 center=(-38.968, -55.315, -165.308) size=(60.440, 100.680, 64.714)
+SOLID 10: volume=45873.525 center=(-38.968, -18.149, -71.855) size=(60.440, 42.703, 111.157)
+SOLID 11: volume=45873.525 center=(-38.968, -12.528, -197.395) size=(60.440, 29.118, 116.268)
+SOLID 12: volume=45873.525 center=(-38.968, 43.866, -179.700) size=(60.440, 84.203, 85.408)
+SOLID 13: volume=45873.525 center=(-38.968, 35.227, -79.903) size=(60.440, 66.446, 99.812)
+SOLID 14: volume=45873.525 center=(-38.968, 64.515, -133.350) size=(60.440, 116.330, 25.666)
+SOLID 15: volume=1690.107 center=(-80.879, -111.760, 288.558) size=(31.740, 21.167, 42.851)
+SOLID 16: volume=1690.107 center=(-80.879, -134.620, 288.558) size=(31.740, 21.167, 42.851)
+SOLID 17: volume=2948.991 center=(-56.629, 152.400, 231.140) size=(20.005, 33.338, 33.338)
+SOLID 18: volume=2948.991 center=(-56.629, -152.400, -233.680) size=(20.005, 33.338, 33.338)
+SOLID 19: volume=2905.218 center=(-88.902, 181.404, 0.000) size=(46.254, 12.839, 46.258)
+Bound F012/FACE 798 to SOLID 19
+Filler axis: (x=-88.902, z=0.000), header y=174.852
+Filling-system dimensions: bore=28.00, neck OD=36.00, flange OD=43.00, cap OD=46.26
+Created pouring bore through the upper header
+Neck valid: True volume: 9769.436854806965
+Replacement cap valid: True volume: 7325.474308495487
+Final compound solids: 21
+Final compound valid: False
+Exported shape to: /home/adml/Research/Hackathon2026/IDETC26-Hackathon-Autodesk-neuralCAD-Edit/output/gpt-5.6-sol-ontology-full48/gpt-5.6-sol-ontology_cadquery-script_1787116059.505567/brep_end/1787116059.505567/tmp.step
+Exported STL to: /home/adml/Research/Hackathon2026/IDETC26-Hackathon-Autodesk-neuralCAD-Edit/output/gpt-5.6-sol-ontology-full48/gpt-5.6-sol-ontology_cadquery-script_1787116059.505567/brep_end/1787116059.505567/tmp.stl
+Exported PNG image to: /home/adml/Research/Hackathon2026/IDETC26-Hackathon-Autodesk-neuralCAD-Edit/output/gpt-5.6-sol-ontology-full48/gpt-5.6-sol-ontology_cadquery-script_1787116059.505567/brep_end/1787116059.505567/tmp.png
+Script completed.
+
+stderr: 
+
+Multi-view images from last iteration:
+
+View: +Z
+
+[IMAGE 0: /home/adml/Research/Hackathon2026/IDETC26-Hackathon-Autodesk-neuralCAD-Edit/output/gpt-5.6-sol-ontology-full48/gpt-5.6-sol-ontology_cadquery-script_1787116059.505567/brep_end/1787116059.505567/tmp_+Z.png]
+
+View: -Z
+
+[IMAGE 1: /home/adml/Research/Hackathon2026/IDETC26-Hackathon-Autodesk-neuralCAD-Edit/output/gpt-5.6-sol-ontology-full48/gpt-5.6-sol-ontology_cadquery-script_1787116059.505567/brep_end/1787116059.505567/tmp_-Z.png]
+
+View: -X
+
+[IMAGE 2: /home/adml/Research/Hackathon2026/IDETC26-Hackathon-Autodesk-neuralCAD-Edit/output/gpt-5.6-sol-ontology-full48/gpt-5.6-sol-ontology_cadquery-script_1787116059.505567/brep_end/1787116059.505567/tmp_-X.png]
+
+View: +X
+
+[IMAGE 3: /home/adml/Research/Hackathon2026/IDETC26-Hackathon-Autodesk-neuralCAD-Edit/output/gpt-5.6-sol-ontology-full48/gpt-5.6-sol-ontology_cadquery-script_1787116059.505567/brep_end/1787116059.505567/tmp_+X.png]
+
+View: +Y
+
+[IMAGE 4: /home/adml/Research/Hackathon2026/IDETC26-Hackathon-Autodesk-neuralCAD-Edit/output/gpt-5.6-sol-ontology-full48/gpt-5.6-sol-ontology_cadquery-script_1787116059.505567/brep_end/1787116059.505567/tmp_+Y.png]
+
+View: -Y
+
+[IMAGE 5: /home/adml/Research/Hackathon2026/IDETC26-Hackathon-Autodesk-neuralCAD-Edit/output/gpt-5.6-sol-ontology-full48/gpt-5.6-sol-ontology_cadquery-script_1787116059.505567/brep_end/1787116059.505567/tmp_-Y.png]
+
+View: iso1
+
+[IMAGE 6: /home/adml/Research/Hackathon2026/IDETC26-Hackathon-Autodesk-neuralCAD-Edit/output/gpt-5.6-sol-ontology-full48/gpt-5.6-sol-ontology_cadquery-script_1787116059.505567/brep_end/1787116059.505567/tmp_iso1.png]
+
+View: iso2
+
+[IMAGE 7: /home/adml/Research/Hackathon2026/IDETC26-Hackathon-Autodesk-neuralCAD-Edit/output/gpt-5.6-sol-ontology-full48/gpt-5.6-sol-ontology_cadquery-script_1787116059.505567/brep_end/1787116059.505567/tmp_iso2.png]
+
+CadQuery function from last iteration:
+
+def my_cad_function(args):
+    import os
+    import math
+
+    input_file = os.path.expanduser(args["input_file"])
+    imported = cq.importers.importStep(input_file)
+    model = imported.val() if hasattr(imported, "val") else imported
+
+    print("Loaded STEP:", input_file)
+    print("Model valid:", model.isValid())
+    print("Face count:", len(model.Faces()))
+    print("Solid count:", len(model.Solids()))
+    mb = model.BoundingBox()
+    print("Model bbox: x=(%.3f, %.3f), y=(%.3f, %.3f), z=(%.3f, %.3f)" %
+          (mb.xmin, mb.xmax, mb.ymin, mb.ymax, mb.zmin, mb.zmax))
+
+    faces = list(model.Faces())
+
+    # Bind the planning FACE indices to the actual imported geometry.
+    for face_index in (38, 46, 56, 798):
+        if 0 <= face_index < len(faces):
+            f = faces[face_index]
+            bb = f.BoundingBox()
+            c = f.Center()
+            try:
+                gt = f.geomType()
+            except Exception:
+                gt = "unknown"
+            print("FACE %d: type=%s area=%.3f center=(%.3f, %.3f, %.3f) bbox=[x %.3f..%.3f, y %.3f..%.3f, z %.3f..%.3f]" %
+                  (face_index, gt, f.Area(), c.x, c.y, c.z,
+                   bb.xmin, bb.xmax, bb.ymin, bb.ymax, bb.zmin, bb.zmax))
+
+    # Confirm FACE 46 against nearby broad, horizontal upper-header faces.
+    upper_candidates = []
+    for i, f in enumerate(faces):
+        bb = f.BoundingBox()
+        c = f.Center()
+        if bb.ylen < 0.05 and 165.0 < c.y < 180.0 and f.Area() > 5000.0:
+            upper_candidates.append((i, f.Area(), c.x, c.y, c.z, bb.zlen))
+    print("Upper-header planar-face candidates:", upper_candidates)
+
+    solids = list(model.Solids())
+    for i, s in enumerate(solids):
+        bb = s.BoundingBox()
+        c = bb.center
+        print("SOLID %d: volume=%.3f center=(%.3f, %.3f, %.3f) size=(%.3f, %.3f, %.3f)" %
+              (i, s.Volume(), c.x, c.y, c.z, bb.xlen, bb.ylen, bb.zlen))
+
+    # Locate the existing F012 cap solid by its reported upper-header position.
+    cap_candidates = []
+    for i, s in enumerate(solids):
+        bb = s.BoundingBox()
+        c = bb.center
+        if c.y > 174.0 and abs(c.z) < 30.0 and bb.ylen < 35.0 and max(bb.xlen, bb.zlen) < 80.0:
+            score = abs(c.z) + abs(c.y - 181.0) + 0.05 * abs(bb.xlen - bb.zlen)
+            cap_candidates.append((score, i, s))
+
+    old_cap_index = None
+    old_cap = None
+    if cap_candidates:
+        cap_candidates.sort(key=lambda item: item[0])
+        old_cap_index = cap_candidates[0][1]
+        old_cap = cap_candidates[0][2]
+        print("Bound F012/FACE 798 to SOLID", old_cap_index)
+    else:
+        print("Warning: existing F012 cap solid was not isolated; using FACE 46 fallback coordinates")
+
+    # Establish the filler axis from the existing cap envelope, with FACE 46 as
+    # the upper-header attachment reference.
+    if old_cap is not None:
+        cb = old_cap.BoundingBox()
+        axis_x = cb.center.x
+        axis_z = cb.center.z
+        measured_cap_diameter = max(cb.xlen, cb.zlen)
+    else:
+        axis_x = -88.9
+        axis_z = 0.0
+        measured_cap_diameter = 40.0
+
+    header_y = 174.851756
+    if 46 < len(faces):
+        f46 = faces[46]
+        b46 = f46.BoundingBox()
+        c46 = f46.Center()
+        if b46.ylen < 0.1 and 165.0 < c46.y < 180.0:
+            header_y = c46.y
+
+    # If FACE 46 ordering differs, use the largest matching upper face.
+    if upper_candidates and not (165.0 < header_y < 180.0):
+        upper_candidates.sort(key=lambda item: item[1], reverse=True)
+        header_y = upper_candidates[0][3]
+
+    cap_od = max(36.0, min(48.0, measured_cap_diameter))
+    neck_od = max(28.0, min(36.0, cap_od - 7.0))
+    bore_d = max(20.0, neck_od - 8.0)
+    flange_od = min(cap_od - 2.0, neck_od + 7.0)
+    neck_height = 18.0
+    flange_height = 4.0
+    cap_height = 15.0
+    cap_clearance = 0.6
+
+    print("Filler axis: (x=%.3f, z=%.3f), header y=%.3f" % (axis_x, axis_z, header_y))
+    print("Filling-system dimensions: bore=%.2f, neck OD=%.2f, flange OD=%.2f, cap OD=%.2f" %
+          (bore_d, neck_od, flange_od, cap_od))
+
+    def axis_plane(y_value):
+        return cq.Plane(origin=(axis_x, y_value, axis_z),
+                        xDir=(1, 0, 0), normal=(0, 1, 0))
+
+    def annulus(y_value, height, outer_d, inner_d):
+        return (cq.Workplane(axis_plane(y_value))
+                .circle(outer_d / 2.0)
+                .circle(inner_d / 2.0)
+                .extrude(height)
+                .val())
+
+    def cylinder(y_value, height, diameter):
+        return (cq.Workplane(axis_plane(y_value))
+                .circle(diameter / 2.0)
+                .extrude(height)
+                .val())
+
+    # Suppress the old single-face cap so it is replaced rather than duplicated.
+    kept_solids = [s for i, s in enumerate(solids) if i != old_cap_index]
+
+    # Cut a true pouring passage into the largest connected radiator/frame body.
+    # If the known-invalid imported body rejects the boolean, preserve it and
+    # retain the neck as a separate watertight solid on the exact header plane.
+    if kept_solids:
+        main_index = max(range(len(kept_solids)), key=lambda i: kept_solids[i].Volume())
+        main_body = kept_solids[main_index]
+        bore_cutter = cylinder(header_y - 22.0, 26.0, bore_d)
+        try:
+            cut_body = main_body.cut(bore_cutter)
+            if cut_body is not None and len(cut_body.Solids()) > 0 and cut_body.Volume() > 0.5 * main_body.Volume():
+                kept_solids[main_index] = cut_body
+                print("Created pouring bore through the upper header")
+            else:
+                print("Header bore boolean returned an implausible result; original radiator retained")
+        except Exception as exc:
+            print("Header bore boolean failed on imported invalid B-rep; using separate neck fallback:", exc)
+
+    # Pressure-containing pouring neck: main annular tube, reinforced root, and
+    # an upper retention/sealing flange. All pieces share a continuous bore.
+    neck = annulus(header_y, neck_height, neck_od, bore_d)
+    root = annulus(header_y, 3.0, neck_od + 5.0, bore_d)
+    flange_y = header_y + neck_height - flange_height
+    flange = annulus(flange_y, flange_height, flange_od, bore_d)
+    neck_shape = neck.fuse(root).fuse(flange)
+
+    # Add a conical lead-in at the pouring lip to protect the seal and aid filling.
+    try:
+        lead_in = cq.Solid.makeCone(
+            bore_d / 2.0,
+            bore_d / 2.0 + 1.25,
+            2.0,
+            cq.Vector(axis_x, header_y + neck_height - 2.0, axis_z),
+            cq.Vector(0, 1, 0)
+        )
+        neck_shape = neck_shape.cut(lead_in)
+    except Exception as exc:
+        print("Lip lead-in construction skipped:", exc)
+
+    # Build a separate removable cup-shaped cap. Its cavity clears the flange,
+    # while the crown closes the bore and the internal annular pad forms a seal.
+    cap_bottom_y = flange_y - 0.8
+    skirt_height = cap_height - 4.0
+    outer_skirt = cylinder(cap_bottom_y, skirt_height, cap_od)
+    crown_frustum = cq.Solid.makeCone(
+        cap_od / 2.0,
+        cap_od / 2.0 - 2.3,
+        3.0,
+        cq.Vector(axis_x, cap_bottom_y + skirt_height, axis_z),
+        cq.Vector(0, 1, 0)
+    )
+    crown_top = cylinder(cap_bottom_y + skirt_height + 3.0, 1.0, cap_od - 4.6)
+    cap_shape = outer_skirt.fuse(crown_frustum).fuse(crown_top)
+
+    cavity_d = flange_od + 2.0 * cap_clearance
+    cavity_depth = cap_height - 3.2
+    cavity = cylinder(cap_bottom_y - 0.5, cavity_depth + 0.5, cavity_d)
+    cap_shape = cap_shape.cut(cavity)
+
+    # Annular sealing pad attached beneath the crown and bearing on the neck land.
+    seal_y = cap_bottom_y + cavity_depth - 1.2
+    seal_outer_d = neck_od - 1.0
+    seal_inner_d = bore_d + 2.0
+    if seal_outer_d > seal_inner_d:
+        seal_ring = annulus(seal_y, 1.2, seal_outer_d, seal_inner_d)
+        cap_shape = cap_shape.fuse(seal_ring)
+
+    # Eight external grip ribs recreate a manually grippable flared cap crown.
+    rib_radial = 3.0
+    rib_tangent = 5.0
+    rib_height = 8.0
+    rib_center_y = cap_bottom_y + 0.55 * skirt_height
+    for angle in range(0, 360, 45):
+        rib = (cq.Workplane("XY")
+               .box(rib_radial, rib_height, rib_tangent)
+               .translate((axis_x + cap_od / 2.0 + rib_radial / 2.0 - 0.8,
+                           rib_center_y,
+                           axis_z))
+               .rotate((axis_x, 0, axis_z), (axis_x, 1, axis_z), angle)
+               .val())
+        try:
+            cap_shape = cap_shape.fuse(rib)
+        except Exception:
+            pass
+
+    print("Neck valid:", neck_shape.isValid(), "volume:", neck_shape.Volume())
+    print("Replacement cap valid:", cap_shape.isValid(), "volume:", cap_shape.Volume())
+
+    # Preserve all radiator, fan, blade, hose-fitting, and corner-mount solids.
+    # Neck and cap remain distinct solids so the cap is functionally removable.
+    final_shapes = kept_solids + [neck_shape, cap_shape]
+    result = cq.Compound.makeCompound(final_shapes)
+    print("Final compound solids:", len(result.Solids()))
+    print("Final compound valid:", result.isValid())
+    return result
+
+aim.json (desired final state). Check the last-iteration images, CadQuery function, and program output against this:
+
+{
+  "request": "Hi, Please create a filling system on the radiator, including a pouring section and a cap.",
+  "request_wording": {
+    "action_words": [
+      "create",
+      "system",
+      "on",
+      "section",
+      "cap"
+    ],
+    "referenced_feature_words": [
+      "radiator"
+    ],
+    "intention_words": [
+      "filling",
+      "pouring"
+    ],
+    "grammatical_words": [
+      "Hi",
+      "Please",
+      "a",
+      "the",
+      "including",
+      "a",
+      "and",
+      "a"
+    ]
+  },
+  "actions": [
+    {
+      "operation": "Create a pouring section",
+      "parameters": {},
+      "target": "radiator",
+      "relational_constraint": "The pouring section must be included in the filling system located on the radiator.",
+      "unresolved_reference": "The radiator surface or region on which the pouring section is to be placed must be identified from the CAD model."
+    },
+    {
+      "operation": "Create a cap",
+      "parameters": {},
+      "target": "radiator",
+      "relational_constraint": "The cap must be included in the filling system located on the radiator.",
+      "unresolved_reference": "The cap location and the geometry or interface that it is intended to close must be identified from the CAD model or clarified."
+    }
+  ],
+  "intention": [
+    "Provide a filling system that allows the radiator to be filled or poured into and subsequently closed with a cap."
+  ]
+}
+
+Iterations remaining: 9

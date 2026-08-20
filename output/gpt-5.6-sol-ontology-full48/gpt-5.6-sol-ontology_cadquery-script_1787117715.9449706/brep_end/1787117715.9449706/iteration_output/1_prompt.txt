@@ -1,0 +1,1066 @@
+The planning stage produced model.json (hierarchical part → sections → features
+→ B-rep faces), aim.json (desired final state from the edit request), and
+operation.json (grounded edit operations, parameters, constraints, targets,
+and modeling plans). Use those artifacts when writing my_cad_function.
+
+Section ids look like R01. Feature ids look like F001. FACE N values are
+CadQuery Faces() indices from the STEP analysis. Bind them to actual STEP
+geometry by inspecting the loaded model (print faces and coordinates) before
+editing. If an operation needs boundary topology such as a chamfer or fillet
+edge, derive it in CadQuery from the grounded face(s).
+
+Implement each operation's modeling_plan steps. Load the start model from
+args["input_file"].
+
+model.json from the planning stage:
+
+{
+  "part": {
+    "id": "P001",
+    "name": "Hollow cylindrical support cradle",
+    "description": "Single-piece hollow saddle block with a concave cylindrical upper seating surface, paired planar end landings, enclosing outer walls, a planar underside perimeter rim, and an underside cavity. The likely purpose is to support or locate a cylindrical external component while reducing mass through the hollow underside.",
+    "source_views": [
+      "+Z",
+      "-Z",
+      "-X",
+      "+X",
+      "+Y",
+      "-Y",
+      "iso1"
+    ],
+    "solid_ids": [
+      "SOLID 0"
+    ],
+    "symmetry_note": "The geometry is bilaterally symmetric about the CAD x=0 and y=0 planes. The paired end landings and cavity end walls are mirrored across y=0. Both cylindrical faces have axes parallel to the CAD X axis.",
+    "semantic_orientation": {
+      "status": "inferred",
+      "description": "The concave cylindrical surface is interpreted as the functional top of the cradle, and the planar perimeter rim at z=-0.75 mm as the bottom mounting side. The long direction follows CAD Y and the cylindrical seating axis follows CAD X. Front versus back is functionally interchangeable because of y=0 symmetry.",
+      "confidence": 0.88,
+      "view_sides": {
+        "+X": "right",
+        "-X": "left",
+        "+Y": "back",
+        "-Y": "front",
+        "+Z": "top",
+        "-Z": "bottom"
+      }
+    },
+    "sections": [
+      {
+        "id": "R01",
+        "name": "Upper support cradle region",
+        "ontology_class": "cad:CentralSection",
+        "description": "Upper load-contacting region comprising the concave cylindrical seat and the two planar end landings.",
+        "location": "Above the hollow body and centered around the cylindrical seating surface; extends along CAD Y with the seating cylinder axis parallel to CAD X.",
+        "solid_ids": [
+          "SOLID 0"
+        ],
+        "colour": {
+          "R": 55,
+          "G": 135,
+          "B": 210
+        },
+        "section_functions": [
+          {
+            "ontology_class": "cad:SupportFunction",
+            "name": "Support cylindrical component",
+            "description": "Provides the principal upward-facing cradle on which a cylindrical external component can rest.",
+            "primary": true,
+            "confidence": 0.91
+          },
+          {
+            "ontology_class": "cad:LocateFunction",
+            "name": "Locate cylindrical component",
+            "description": "The concave curvature laterally locates a mating cylindrical component relative to the cradle center.",
+            "primary": false,
+            "confidence": 0.84
+          }
+        ],
+        "section_behaviors": [
+          {
+            "ontology_class": "cad:ReactContactLoadBehavior",
+            "name": "React contact load",
+            "description": "Receives distributed normal contact load from a component resting in the concave seat.",
+            "confidence": 0.9
+          },
+          {
+            "ontology_class": "cad:SpreadLoadBehavior",
+            "name": "Spread seating load",
+            "description": "The broad cylindrical surface spreads contact load into the surrounding shell.",
+            "confidence": 0.87
+          }
+        ],
+        "feature_groups": [
+          {
+            "id": "G001",
+            "name": "Paired end landings",
+            "ontology_class": "cad:RepeatedFeatureGroup",
+            "feature_class": "cad:SupportFeature",
+            "pattern_type": "cad:PairedPattern",
+            "member_count": 2,
+            "member_feature_ids": [
+              "F003",
+              "F004"
+            ],
+            "representative_feature_ids": [
+              "F003"
+            ],
+            "pattern_description": "Two geometrically equivalent planar end landings mirrored across the CAD y=0 plane.",
+            "confidence": 0.99
+          }
+        ],
+        "features": [
+          {
+            "id": "F001",
+            "name": "Support cradle compound feature",
+            "ontology_class": "cad:CradleFeature",
+            "parent_feature_id": null,
+            "description": "Compound upper cradle formed by the cylindrical seating interface and two planar end landings.",
+            "interface_type": null,
+            "feature_functions": [
+              {
+                "ontology_class": "cad:SupportFunction",
+                "name": "Support external component",
+                "description": "Combines the curved seat and end landings into the principal support geometry.",
+                "primary": true,
+                "confidence": 0.92
+              }
+            ],
+            "feature_behaviors": [
+              {
+                "ontology_class": "cad:SpreadLoadBehavior",
+                "name": "Spread applied load",
+                "description": "Distributes load from the seating surface and landings into the hollow structural body.",
+                "confidence": 0.88
+              }
+            ],
+            "relationships": [
+              {
+                "target_feature_id": "F005",
+                "category": "cad:StructuralFeatureRelationship",
+                "relation": "cad:attachedTo",
+                "description": "The upper cradle is materially continuous with the surrounding wall shell.",
+                "confidence": 0.97
+              }
+            ],
+            "brep_faces": [],
+            "confidence": 0.92
+          },
+          {
+            "id": "F002",
+            "name": "Concave cylindrical seating interface",
+            "ontology_class": "cad:SeatingInterface",
+            "parent_feature_id": "F001",
+            "description": "Primary concave cylindrical contact surface. CadQuery reports radius 4.215 mm and an axis parallel to CAD X.",
+            "interface_type": "cad:SeatingInterface",
+            "feature_functions": [
+              {
+                "ontology_class": "cad:SupportFunction",
+                "name": "Support cylindrical component",
+                "description": "Provides distributed support under a mating cylindrical object.",
+                "primary": true,
+                "confidence": 0.94
+              },
+              {
+                "ontology_class": "cad:LocateFunction",
+                "name": "Laterally locate component",
+                "description": "The concave profile tends to center a mating cylindrical object in the cradle.",
+                "primary": false,
+                "confidence": 0.87
+              }
+            ],
+            "feature_behaviors": [
+              {
+                "ontology_class": "cad:ReactContactLoadBehavior",
+                "name": "React seating contact",
+                "description": "Reacts normal contact pressure over the cylindrical seating area.",
+                "confidence": 0.94
+              }
+            ],
+            "relationships": [
+              {
+                "target_feature_id": "F001",
+                "category": "cad:StructuralFeatureRelationship",
+                "relation": "cad:partOfFeature",
+                "description": "The cylindrical seating interface is a subfeature of the compound cradle.",
+                "confidence": 0.99
+              },
+              {
+                "target_feature_id": "F003",
+                "category": "cad:StructuralFeatureRelationship",
+                "relation": "cad:adjacentTo",
+                "description": "The seat terminates at the negative-Y planar end landing.",
+                "confidence": 0.98
+              },
+              {
+                "target_feature_id": "F004",
+                "category": "cad:StructuralFeatureRelationship",
+                "relation": "cad:adjacentTo",
+                "description": "The seat terminates at the positive-Y planar end landing.",
+                "confidence": 0.98
+              }
+            ],
+            "brep_faces": [
+              {
+                "brep_id": "FACE 7",
+                "face_code": "FACE 7",
+                "entity_type": "cad:Face",
+                "geometry_type": "cad:CylindricalSurface",
+                "semantic_role": "cad:SeatingFaceRole",
+                "name": "Primary cylindrical seating face",
+                "description": "Concave upper cylindrical face forming the main support seat.",
+                "salience": "cad:PrimarySalience",
+                "confidence": 0.99,
+                "evidence": [
+                  "CadQuery surface type is CYLINDER.",
+                  "CadQuery cylinder radius is 4.215000 mm.",
+                  "CadQuery cylinder axis is (-1.000000, 0.000000, 0.000000), parallel to CAD X.",
+                  "Bounding box is x=(-1.000000,1.000000), y=(-2.400000,2.400000), z=(0.000000,0.750000).",
+                  "The multi-view images show this face as the dominant concave upper cradle surface."
+                ]
+              }
+            ],
+            "confidence": 0.96
+          },
+          {
+            "id": "F003",
+            "name": "Negative-Y end landing",
+            "ontology_class": "cad:SupportFeature",
+            "parent_feature_id": "F001",
+            "description": "Planar upper landing adjoining one end of the cylindrical seat at CAD y<0.",
+            "interface_type": "cad:ContactInterface",
+            "feature_functions": [
+              {
+                "ontology_class": "cad:SupportFunction",
+                "name": "Provide end support",
+                "description": "Provides a flat support or transition area at one end of the cradle.",
+                "primary": true,
+                "confidence": 0.78
+              }
+            ],
+            "feature_behaviors": [
+              {
+                "ontology_class": "cad:ReactContactLoadBehavior",
+                "name": "React planar contact load",
+                "description": "Can react compressive contact on the planar landing.",
+                "confidence": 0.75
+              }
+            ],
+            "relationships": [
+              {
+                "target_feature_id": "F001",
+                "category": "cad:StructuralFeatureRelationship",
+                "relation": "cad:partOfFeature",
+                "description": "The landing is a subfeature of the compound cradle.",
+                "confidence": 0.99
+              },
+              {
+                "target_feature_id": "F004",
+                "category": "cad:GeometricFeatureRelationship",
+                "relation": "cad:parallelTo",
+                "description": "The two end landing faces are parallel and coplanar at z=0.75 mm.",
+                "confidence": 0.99
+              }
+            ],
+            "brep_faces": [
+              {
+                "brep_id": "FACE 8",
+                "face_code": "FACE 8",
+                "entity_type": "cad:Face",
+                "geometry_type": "cad:PlanarSurface",
+                "semantic_role": "cad:SupportFaceRole",
+                "name": "Negative-Y upper landing face",
+                "description": "Planar landing at the negative-Y end of the upper cradle.",
+                "salience": "cad:SecondarySalience",
+                "confidence": 0.98,
+                "evidence": [
+                  "CadQuery surface type is PLANE.",
+                  "Plane normal is (0.000000,0.000000,1.000000).",
+                  "Face lies at z=0.750000 mm with y=(-3.000000,-2.400000).",
+                  "Area is 1.200000 mm^2.",
+                  "Visual correspondence shows a flat end region adjoining the concave seat."
+                ]
+              }
+            ],
+            "confidence": 0.88
+          },
+          {
+            "id": "F004",
+            "name": "Positive-Y end landing",
+            "ontology_class": "cad:SupportFeature",
+            "parent_feature_id": "F001",
+            "description": "Planar upper landing adjoining the opposite end of the cylindrical seat at CAD y>0.",
+            "interface_type": "cad:ContactInterface",
+            "feature_functions": [
+              {
+                "ontology_class": "cad:SupportFunction",
+                "name": "Provide end support",
+                "description": "Provides a flat support or transition area at the second end of the cradle.",
+                "primary": true,
+                "confidence": 0.78
+              }
+            ],
+            "feature_behaviors": [
+              {
+                "ontology_class": "cad:ReactContactLoadBehavior",
+                "name": "React planar contact load",
+                "description": "Can react compressive contact on the planar landing.",
+                "confidence": 0.75
+              }
+            ],
+            "relationships": [
+              {
+                "target_feature_id": "F001",
+                "category": "cad:StructuralFeatureRelationship",
+                "relation": "cad:partOfFeature",
+                "description": "The landing is a subfeature of the compound cradle.",
+                "confidence": 0.99
+              },
+              {
+                "target_feature_id": "F003",
+                "category": "cad:GeometricFeatureRelationship",
+                "relation": "cad:offsetFrom",
+                "description": "The landing is the y=0 mirrored counterpart of the negative-Y landing.",
+                "confidence": 0.99
+              }
+            ],
+            "brep_faces": [
+              {
+                "brep_id": "FACE 9",
+                "face_code": "FACE 9",
+                "entity_type": "cad:Face",
+                "geometry_type": "cad:PlanarSurface",
+                "semantic_role": "cad:SupportFaceRole",
+                "name": "Positive-Y upper landing face",
+                "description": "Planar landing at the positive-Y end of the upper cradle.",
+                "salience": "cad:SecondarySalience",
+                "confidence": 0.98,
+                "evidence": [
+                  "CadQuery surface type is PLANE.",
+                  "Plane normal is (0.000000,0.000000,1.000000).",
+                  "Face lies at z=0.750000 mm with y=(2.400000,3.000000).",
+                  "Area is 1.200000 mm^2.",
+                  "Geometry mirrors FACE 8 across y=0."
+                ]
+              }
+            ],
+            "confidence": 0.88
+          }
+        ],
+        "unclassified_brep_faces": [],
+        "relationships": [],
+        "confidence": 0.94
+      },
+      {
+        "id": "R02",
+        "name": "Hollow structural body and mounting region",
+        "ontology_class": "cad:MainBodySection",
+        "description": "Load-bearing shell beneath and around the upper cradle. It includes the exterior walls, planar underside perimeter rim, and the enclosed underside cavity.",
+        "location": "Surrounds the underside cavity and connects the upper cradle to the planar bottom perimeter at z=-0.75 mm.",
+        "solid_ids": [
+          "SOLID 0"
+        ],
+        "colour": {
+          "R": 225,
+          "G": 135,
+          "B": 55
+        },
+        "section_functions": [
+          {
+            "ontology_class": "cad:TransferLoadFunction",
+            "name": "Transfer cradle load",
+            "description": "Transfers load from the upper seating region toward the underside support or mounting perimeter.",
+            "primary": true,
+            "confidence": 0.91
+          },
+          {
+            "ontology_class": "cad:MountFunction",
+            "name": "Provide mounting base",
+            "description": "Provides a planar underside perimeter that can seat against a supporting structure.",
+            "primary": false,
+            "confidence": 0.79
+          },
+          {
+            "ontology_class": "cad:ReduceMassFunction",
+            "name": "Reduce body mass",
+            "description": "The underside cavity removes central material while retaining an enclosing shell and perimeter rim.",
+            "primary": false,
+            "confidence": 0.94
+          }
+        ],
+        "section_behaviors": [
+          {
+            "ontology_class": "cad:ResistBendingBehavior",
+            "name": "Resist bending",
+            "description": "The separated side walls and curved upper shell provide bending stiffness around the hollow interior.",
+            "confidence": 0.87
+          },
+          {
+            "ontology_class": "cad:CarryCompressionBehavior",
+            "name": "Carry compression",
+            "description": "Carries compressive load from the cradle toward the underside perimeter.",
+            "confidence": 0.88
+          },
+          {
+            "ontology_class": "cad:DistributeStressBehavior",
+            "name": "Distribute stress",
+            "description": "The shell and perimeter rim distribute localized cradle loads over a broader base region.",
+            "confidence": 0.85
+          }
+        ],
+        "feature_groups": [],
+        "features": [
+          {
+            "id": "F005",
+            "name": "Exterior structural wall shell",
+            "ontology_class": "cad:ShellFeature",
+            "parent_feature_id": null,
+            "description": "Exterior planar side and end walls enclosing the underside cavity and supporting the upper cradle.",
+            "interface_type": null,
+            "feature_functions": [
+              {
+                "ontology_class": "cad:TransferLoadFunction",
+                "name": "Transfer load to base",
+                "description": "Conducts seating loads from the upper cradle to the bottom perimeter rim.",
+                "primary": true,
+                "confidence": 0.92
+              },
+              {
+                "ontology_class": "cad:ProtectFunction",
+                "name": "Protect interior cavity",
+                "description": "Encloses the cavity laterally and protects its interior boundaries.",
+                "primary": false,
+                "confidence": 0.7
+              }
+            ],
+            "feature_behaviors": [
+              {
+                "ontology_class": "cad:ResistBendingBehavior",
+                "name": "Resist shell bending",
+                "description": "The opposing outer walls resist bending under loads applied to the cradle.",
+                "confidence": 0.89
+              },
+              {
+                "ontology_class": "cad:CarryShearBehavior",
+                "name": "Carry wall shear",
+                "description": "The walls carry shear between the upper seat and underside rim.",
+                "confidence": 0.86
+              }
+            ],
+            "relationships": [
+              {
+                "target_feature_id": "F001",
+                "category": "cad:FunctionalFeatureRelationship",
+                "relation": "cad:supportsFeature",
+                "description": "The exterior shell structurally supports the compound upper cradle.",
+                "confidence": 0.94
+              },
+              {
+                "target_feature_id": "F006",
+                "category": "cad:StructuralFeatureRelationship",
+                "relation": "cad:attachedTo",
+                "description": "The exterior walls are materially continuous with the bottom perimeter rim.",
+                "confidence": 0.98
+              },
+              {
+                "target_feature_id": "F007",
+                "category": "cad:GeometricFeatureRelationship",
+                "relation": "cad:surroundsFeature",
+                "description": "The exterior wall shell laterally surrounds the underside cavity.",
+                "confidence": 0.97
+              }
+            ],
+            "brep_faces": [
+              {
+                "brep_id": "FACE 10",
+                "face_code": "FACE 10",
+                "entity_type": "cad:Face",
+                "geometry_type": "cad:PlanarSurface",
+                "semantic_role": "cad:OuterWallRole",
+                "name": "Positive-X exterior wall",
+                "description": "Outer planar longitudinal wall at x=1.000000 mm.",
+                "salience": "cad:SecondarySalience",
+                "confidence": 0.99,
+                "evidence": [
+                  "CadQuery surface type is PLANE.",
+                  "Plane lies at x=1.000000 mm.",
+                  "Bounding box spans y=(-3.000000,3.000000) and z=(-0.750000,0.750000).",
+                  "Area is 6.553759 mm^2."
+                ]
+              },
+              {
+                "brep_id": "FACE 12",
+                "face_code": "FACE 12",
+                "entity_type": "cad:Face",
+                "geometry_type": "cad:PlanarSurface",
+                "semantic_role": "cad:OuterWallRole",
+                "name": "Negative-X exterior wall",
+                "description": "Outer planar longitudinal wall at x=-1.000000 mm.",
+                "salience": "cad:SecondarySalience",
+                "confidence": 0.99,
+                "evidence": [
+                  "CadQuery surface type is PLANE.",
+                  "Plane lies at x=-1.000000 mm.",
+                  "Bounding box spans y=(-3.000000,3.000000) and z=(-0.750000,0.750000).",
+                  "Geometry mirrors FACE 10 across x=0."
+                ]
+              },
+              {
+                "brep_id": "FACE 13",
+                "face_code": "FACE 13",
+                "entity_type": "cad:Face",
+                "geometry_type": "cad:PlanarSurface",
+                "semantic_role": "cad:OuterWallRole",
+                "name": "Positive-Y exterior end wall",
+                "description": "Planar end wall closing the exterior at y=3.000000 mm.",
+                "salience": "cad:SecondarySalience",
+                "confidence": 0.99,
+                "evidence": [
+                  "CadQuery surface type is PLANE.",
+                  "Plane lies at y=3.000000 mm.",
+                  "Bounding box spans x=(-1.000000,1.000000) and z=(-0.750000,0.750000).",
+                  "Area is 3.000000 mm^2."
+                ]
+              },
+              {
+                "brep_id": "FACE 14",
+                "face_code": "FACE 14",
+                "entity_type": "cad:Face",
+                "geometry_type": "cad:PlanarSurface",
+                "semantic_role": "cad:OuterWallRole",
+                "name": "Negative-Y exterior end wall",
+                "description": "Planar end wall closing the exterior at y=-3.000000 mm.",
+                "salience": "cad:SecondarySalience",
+                "confidence": 0.99,
+                "evidence": [
+                  "CadQuery surface type is PLANE.",
+                  "Plane lies at y=-3.000000 mm.",
+                  "Bounding box spans x=(-1.000000,1.000000) and z=(-0.750000,0.750000).",
+                  "Geometry mirrors FACE 13 across y=0."
+                ]
+              }
+            ],
+            "confidence": 0.96
+          },
+          {
+            "id": "F006",
+            "name": "Underside perimeter mounting rim",
+            "ontology_class": "cad:MountingInterface",
+            "parent_feature_id": null,
+            "description": "Planar annular-like rectangular perimeter face around the underside cavity at z=-0.75 mm.",
+            "interface_type": "cad:MountingInterface",
+            "feature_functions": [
+              {
+                "ontology_class": "cad:MountFunction",
+                "name": "Seat on supporting structure",
+                "description": "Provides the planar underside contact perimeter for mounting or resting the cradle on another structure.",
+                "primary": true,
+                "confidence": 0.84
+              },
+              {
+                "ontology_class": "cad:DistributeStressFunction",
+                "name": "Distribute base reaction",
+                "description": "Spreads reaction forces around the cavity perimeter.",
+                "primary": false,
+                "confidence": 0.86
+              }
+            ],
+            "feature_behaviors": [
+              {
+                "ontology_class": "cad:ReactContactLoadBehavior",
+                "name": "React base contact",
+                "description": "Reacts compressive contact load over the planar perimeter.",
+                "confidence": 0.88
+              },
+              {
+                "ontology_class": "cad:SpreadLoadBehavior",
+                "name": "Spread base load",
+                "description": "Distributes wall loads around the rectangular support perimeter.",
+                "confidence": 0.85
+              }
+            ],
+            "relationships": [
+              {
+                "target_feature_id": "F005",
+                "category": "cad:FunctionalFeatureRelationship",
+                "relation": "cad:supportsFeature",
+                "description": "The underside perimeter provides the base reaction for the exterior wall shell.",
+                "confidence": 0.88
+              },
+              {
+                "target_feature_id": "F007",
+                "category": "cad:GeometricFeatureRelationship",
+                "relation": "cad:surroundsFeature",
+                "description": "The planar bottom rim surrounds the rectangular opening into the underside cavity.",
+                "confidence": 0.99
+              }
+            ],
+            "brep_faces": [
+              {
+                "brep_id": "FACE 11",
+                "face_code": "FACE 11",
+                "entity_type": "cad:Face",
+                "geometry_type": "cad:PlanarSurface",
+                "semantic_role": "cad:MountingFaceRole",
+                "name": "Bottom perimeter mounting face",
+                "description": "Planar underside rim surrounding the cavity opening.",
+                "salience": "cad:PrimarySalience",
+                "confidence": 0.98,
+                "evidence": [
+                  "CadQuery surface type is PLANE.",
+                  "Face lies at z=-0.750000 mm.",
+                  "Bounding box is x=(-1.000000,1.000000), y=(-3.000000,3.000000).",
+                  "Face has two wires, consistent with a planar perimeter surrounding an inner opening.",
+                  "Reported area is 3.040000 mm^2, equal to the 2 by 6 mm outer rectangle minus the 1.6 by 5.6 mm cavity opening."
+                ]
+              }
+            ],
+            "confidence": 0.91
+          },
+          {
+            "id": "F007",
+            "name": "Underside hollow cavity",
+            "ontology_class": "cad:CavityFeature",
+            "parent_feature_id": null,
+            "description": "Open underside cavity bounded by a concave cylindrical internal ceiling, two internal longitudinal walls, two internal end walls, and paired internal planar ceiling ledges.",
+            "interface_type": null,
+            "feature_functions": [
+              {
+                "ontology_class": "cad:ReduceMassFunction",
+                "name": "Reduce material and mass",
+                "description": "Removes the central underside volume while retaining an outer load-bearing shell.",
+                "primary": true,
+                "confidence": 0.97
+              },
+              {
+                "ontology_class": "cad:ProvideClearanceFunction",
+                "name": "Provide underside clearance",
+                "description": "Provides open internal clearance beneath the curved upper support region.",
+                "primary": false,
+                "confidence": 0.89
+              }
+            ],
+            "feature_behaviors": [
+              {
+                "ontology_class": "cad:DistributeStressBehavior",
+                "name": "Enable shell load distribution",
+                "description": "The cavity leaves a surrounding shell that redirects load through side and end walls rather than through a solid core.",
+                "confidence": 0.82
+              }
+            ],
+            "relationships": [
+              {
+                "target_feature_id": "F005",
+                "category": "cad:GeometricFeatureRelationship",
+                "relation": "cad:insideFeature",
+                "description": "The cavity is inside the exterior structural wall shell.",
+                "confidence": 0.98
+              },
+              {
+                "target_feature_id": "F006",
+                "category": "cad:StructuralFeatureRelationship",
+                "relation": "cad:sharesBoundaryWith",
+                "description": "The cavity opening shares its perimeter with the bottom mounting rim.",
+                "confidence": 0.97
+              },
+              {
+                "target_feature_id": "F002",
+                "category": "cad:GeometricFeatureRelationship",
+                "relation": "cad:coaxialWith",
+                "description": "The internal cylindrical cavity ceiling and upper seating surface have parallel coincident CAD-X cylinder axes, while their radii differ.",
+                "confidence": 0.99
+              }
+            ],
+            "brep_faces": [
+              {
+                "brep_id": "FACE 0",
+                "face_code": "FACE 0",
+                "entity_type": "cad:Face",
+                "geometry_type": "cad:CylindricalSurface",
+                "semantic_role": "cad:CavityWallRole",
+                "name": "Curved cavity ceiling",
+                "description": "Internal cylindrical ceiling of the underside cavity.",
+                "salience": "cad:PrimarySalience",
+                "confidence": 0.99,
+                "evidence": [
+                  "CadQuery surface type is CYLINDER.",
+                  "CadQuery cylinder radius is 4.415000 mm.",
+                  "Cylinder axis is (-1.000000,0.000000,0.000000), coincident in direction and origin data with the upper cylindrical seat axis.",
+                  "Bounding box is x=(-0.800000,0.800000), y=(-2.461707,2.461707), z=(-0.200000,0.550000).",
+                  "The narrower x extent relative to FACE 7 is consistent with an interior cavity surface."
+                ]
+              },
+              {
+                "brep_id": "FACE 1",
+                "face_code": "FACE 1",
+                "entity_type": "cad:Face",
+                "geometry_type": "cad:PlanarSurface",
+                "semantic_role": "cad:CavityWallRole",
+                "name": "Negative-Y internal ceiling ledge",
+                "description": "Planar cavity ceiling transition between the curved internal ceiling and negative-Y internal end wall.",
+                "salience": "cad:SecondarySalience",
+                "confidence": 0.97,
+                "evidence": [
+                  "CadQuery surface type is PLANE.",
+                  "Face lies at z=0.550000 mm.",
+                  "Bounding box is x=(-0.800000,0.800000), y=(-2.800000,-2.461707).",
+                  "The face adjoins the geometric end range of the internal cylindrical ceiling."
+                ]
+              },
+              {
+                "brep_id": "FACE 2",
+                "face_code": "FACE 2",
+                "entity_type": "cad:Face",
+                "geometry_type": "cad:PlanarSurface",
+                "semantic_role": "cad:CavityWallRole",
+                "name": "Positive-Y internal ceiling ledge",
+                "description": "Planar cavity ceiling transition between the curved internal ceiling and positive-Y internal end wall.",
+                "salience": "cad:SecondarySalience",
+                "confidence": 0.97,
+                "evidence": [
+                  "CadQuery surface type is PLANE.",
+                  "Face lies at z=0.550000 mm.",
+                  "Bounding box is x=(-0.800000,0.800000), y=(2.461707,2.800000).",
+                  "Geometry mirrors FACE 1 across y=0."
+                ]
+              },
+              {
+                "brep_id": "FACE 3",
+                "face_code": "FACE 3",
+                "entity_type": "cad:Face",
+                "geometry_type": "cad:PlanarSurface",
+                "semantic_role": "cad:InnerWallRole",
+                "name": "Positive-X internal cavity wall",
+                "description": "Longitudinal internal side wall of the underside cavity at x=0.800000 mm.",
+                "salience": "cad:SecondarySalience",
+                "confidence": 0.99,
+                "evidence": [
+                  "CadQuery surface type is PLANE.",
+                  "Face lies at x=0.800000 mm.",
+                  "Bounding box spans y=(-2.800000,2.800000) and z=(-0.750000,0.550000).",
+                  "The normal points toward negative CAD X, consistent with an inward-facing cavity wall."
+                ]
+              },
+              {
+                "brep_id": "FACE 4",
+                "face_code": "FACE 4",
+                "entity_type": "cad:Face",
+                "geometry_type": "cad:PlanarSurface",
+                "semantic_role": "cad:InnerWallRole",
+                "name": "Negative-X internal cavity wall",
+                "description": "Longitudinal internal side wall of the underside cavity at x=-0.800000 mm.",
+                "salience": "cad:SecondarySalience",
+                "confidence": 0.99,
+                "evidence": [
+                  "CadQuery surface type is PLANE.",
+                  "Face lies at x=-0.800000 mm.",
+                  "Bounding box spans y=(-2.800000,2.800000) and z=(-0.750000,0.550000).",
+                  "Geometry mirrors FACE 3 across x=0."
+                ]
+              },
+              {
+                "brep_id": "FACE 5",
+                "face_code": "FACE 5",
+                "entity_type": "cad:Face",
+                "geometry_type": "cad:PlanarSurface",
+                "semantic_role": "cad:InnerWallRole",
+                "name": "Positive-Y internal cavity end wall",
+                "description": "Internal end wall of the cavity at y=2.800000 mm.",
+                "salience": "cad:SecondarySalience",
+                "confidence": 0.99,
+                "evidence": [
+                  "CadQuery surface type is PLANE.",
+                  "Face lies at y=2.800000 mm.",
+                  "Bounding box spans x=(-0.800000,0.800000) and z=(-0.750000,0.550000).",
+                  "Area is 2.080000 mm^2."
+                ]
+              },
+              {
+                "brep_id": "FACE 6",
+                "face_code": "FACE 6",
+                "entity_type": "cad:Face",
+                "geometry_type": "cad:PlanarSurface",
+                "semantic_role": "cad:InnerWallRole",
+                "name": "Negative-Y internal cavity end wall",
+                "description": "Internal end wall of the cavity at y=-2.800000 mm.",
+                "salience": "cad:SecondarySalience",
+                "confidence": 0.99,
+                "evidence": [
+                  "CadQuery surface type is PLANE.",
+                  "Face lies at y=-2.800000 mm.",
+                  "Bounding box spans x=(-0.800000,0.800000) and z=(-0.750000,0.550000).",
+                  "Geometry mirrors FACE 5 across y=0."
+                ]
+              }
+            ],
+            "confidence": 0.98
+          }
+        ],
+        "unclassified_brep_faces": [],
+        "relationships": [],
+        "confidence": 0.95
+      }
+    ]
+  }
+}
+
+
+The multiview images generated from the code sent in your last response are attached. The CadQuery function and program output from the last iteration are also provided. First, judge whether the required actions identified have been done correctly and whether the current model satisfies the desired final state in aim.json. aim.json is attached immediately after the last-iteration images and code so you can check the current output against it.
+
+The required actions are:
+1. Add edge rounds (fillets)
+   Target: All edges of the part
+   Parameters: radius = 0.2 mm
+   Constraints: Apply the specified round to every edge of the part
+
+If yes, report the operation is finished in your response.
+
+If not, analyse errors and update the code accordingly.
+
+Once you have generated the new function, it will be executed in CadQuery on the original CAD model. You will then be provided with the latest rendering of the CAD model created by your function, and any prints, debug or error messages. You will then have the opportunity to refine your function based on this feedback, and it will be re-executed.
+
+Continue this process until the task is complete, or you reach the maximum number of iterations. If the task involves editing an existing model, the path to that model's .step file is passed to your function as args["input_file"], and is also listed as brep_start_path_step in the task information. Load it from args["input_file"] rather than hard-coding a path. For these cases, you might need to print out debug information once the model is loaded in your first iteration.
+
+Return a json object with three fields. Do not include any other text outside of the json object in your response:
+'complete': true if the task has been completed. IMPORTANT: This should only be judged by looking at the output from the last iteration, not whether a function has been returned this iteration. If there is no valid output that corresponds to the instruction, the task is not complete. The first iteration can never be complete. If this is true, then the current function will NOT be executed, and the function from the last iteration will be used.
+'my_cad_function': CadQuery python function as a string. Use the same definition and arguments as the example.
+'error': a description of errors and misalignments within the current model compared to the desired target.
+        
+
+Instruction:
+
+Edit the existing model according to the provided instructions.
+
+Task information:
+
+request_text:
+
+Add rounds to all edges of the part. R=0,2mm
+
+brep_start_path_step:
+
+/home/adml/Research/Hackathon2026/IDETC26-Hackathon-Autodesk-neuralCAD-Edit/data/edit_192_external/breps/F332D3FXML85WLR2_1769424114.3880424.step
+
+Program output from last iteration:
+
+stdout: Loading function from: /home/adml/Research/Hackathon2026/IDETC26-Hackathon-Autodesk-neuralCAD-Edit/output/gpt-5.6-sol-ontology-full48/gpt-5.6-sol-ontology_cadquery-script_1787117715.9449706/brep_end/1787117715.9449706/temp_script.py
+INPUT VALID: True
+INPUT SOLIDS: 1
+INPUT FACES: 15
+INPUT EDGES: 36
+INPUT VOLUME: 5.470427083
+FACE 0 type=CYLINDER center=(0.000000, 0.000000, 0.052952) bbox=(-0.800000, -2.461707, -0.200000)-(0.800000, 2.461707, 0.550000) area=8.356221156
+FACE 1 type=PLANE center=(0.000000, -2.630853, 0.550000) bbox=(-0.800000, -2.800000, 0.550000)-(0.800000, -2.461707, 0.550000) area=0.541269240
+FACE 2 type=PLANE center=(-0.000000, 2.630853, 0.550000) bbox=(-0.800000, 2.461707, 0.550000)-(0.800000, 2.800000, 0.550000) area=0.541269240
+FACE 3 type=PLANE center=(0.800000, 0.000000, -0.282609) bbox=(0.800000, -2.800000, -0.750000)-(0.800000, 2.800000, 0.550000) area=4.773181271
+FACE 4 type=PLANE center=(-0.800000, 0.000000, -0.282609) bbox=(-0.800000, -2.800000, -0.750000)-(-0.800000, 2.800000, 0.550000) area=4.773181271
+FACE 5 type=PLANE center=(-0.000000, 2.800000, -0.100000) bbox=(-0.800000, 2.800000, -0.750000)-(0.800000, 2.800000, 0.550000) area=2.080000000
+FACE 6 type=PLANE center=(0.000000, -2.800000, -0.100000) bbox=(-0.800000, -2.800000, -0.750000)-(0.800000, -2.800000, 0.550000) area=2.080000000
+FACE 7 type=CYLINDER center=(0.000000, -0.000000, 0.253099) bbox=(-1.000000, -2.400000, 0.000000)-(1.000000, 2.400000, 0.750000) area=10.213277762
+FACE 8 type=PLANE center=(0.000000, -2.700000, 0.750000) bbox=(-1.000000, -3.000000, 0.750000)-(1.000000, -2.400000, 0.750000) area=1.200000000
+FACE 9 type=PLANE center=(0.000000, 2.700000, 0.750000) bbox=(-1.000000, 2.400000, 0.750000)-(1.000000, 3.000000, 0.750000) area=1.200000000
+FACE 10 type=PLANE center=(1.000000, -0.000000, -0.167066) bbox=(1.000000, -3.000000, -0.750000)-(1.000000, 3.000000, 0.750000) area=6.553758559
+FACE 11 type=PLANE center=(0.000000, -0.000000, -0.750000) bbox=(-1.000000, -3.000000, -0.750000)-(1.000000, 3.000000, -0.750000) area=3.040000000
+FACE 12 type=PLANE center=(-1.000000, 0.000000, -0.167066) bbox=(-1.000000, -3.000000, -0.750000)-(-1.000000, 3.000000, 0.750000) area=6.553758559
+FACE 13 type=PLANE center=(-0.000000, 3.000000, 0.000000) bbox=(-1.000000, 3.000000, -0.750000)-(1.000000, 3.000000, 0.750000) area=3.000000000
+FACE 14 type=PLANE center=(0.000000, -3.000000, 0.000000) bbox=(-1.000000, -3.000000, -0.750000)-(1.000000, -3.000000, 0.750000) area=3.000000000
+EDGE 0 type=CIRCLE length=5.222638222 center=(-0.800000, -0.000000, 0.052952) bbox=(-0.800000, -2.461707, -0.200000)-(-0.800000, 2.461707, 0.550000)
+EDGE 1 type=LINE length=1.600000000 center=(-0.000000, 2.461707, 0.550000) bbox=(-0.800000, 2.461707, 0.550000)-(0.800000, 2.461707, 0.550000)
+EDGE 2 type=CIRCLE length=5.222638222 center=(0.800000, 0.000000, 0.052952) bbox=(0.800000, -2.461707, -0.200000)-(0.800000, 2.461707, 0.550000)
+EDGE 3 type=LINE length=1.600000000 center=(0.000000, -2.461707, 0.550000) bbox=(-0.800000, -2.461707, 0.550000)-(0.800000, -2.461707, 0.550000)
+EDGE 4 type=LINE length=0.338293275 center=(0.800000, -2.630853, 0.550000) bbox=(0.800000, -2.800000, 0.550000)-(0.800000, -2.461707, 0.550000)
+EDGE 5 type=LINE length=1.600000000 center=(0.000000, -2.800000, 0.550000) bbox=(-0.800000, -2.800000, 0.550000)-(0.800000, -2.800000, 0.550000)
+EDGE 6 type=LINE length=0.338293275 center=(-0.800000, -2.630853, 0.550000) bbox=(-0.800000, -2.800000, 0.550000)-(-0.800000, -2.461707, 0.550000)
+EDGE 7 type=LINE length=0.338293275 center=(-0.800000, 2.630853, 0.550000) bbox=(-0.800000, 2.461707, 0.550000)-(-0.800000, 2.800000, 0.550000)
+EDGE 8 type=LINE length=1.600000000 center=(-0.000000, 2.800000, 0.550000) bbox=(-0.800000, 2.800000, 0.550000)-(0.800000, 2.800000, 0.550000)
+EDGE 9 type=LINE length=0.338293275 center=(0.800000, 2.630853, 0.550000) bbox=(0.800000, 2.461707, 0.550000)-(0.800000, 2.800000, 0.550000)
+EDGE 10 type=LINE length=1.300000000 center=(0.800000, 2.800000, -0.100000) bbox=(0.800000, 2.800000, -0.750000)-(0.800000, 2.800000, 0.550000)
+EDGE 11 type=LINE length=5.600000000 center=(0.800000, 0.000000, -0.750000) bbox=(0.800000, -2.800000, -0.750000)-(0.800000, 2.800000, -0.750000)
+EDGE 12 type=LINE length=1.300000000 center=(0.800000, -2.800000, -0.100000) bbox=(0.800000, -2.800000, -0.750000)-(0.800000, -2.800000, 0.550000)
+EDGE 13 type=LINE length=1.300000000 center=(-0.800000, -2.800000, -0.100000) bbox=(-0.800000, -2.800000, -0.750000)-(-0.800000, -2.800000, 0.550000)
+EDGE 14 type=LINE length=5.600000000 center=(-0.800000, -0.000000, -0.750000) bbox=(-0.800000, -2.800000, -0.750000)-(-0.800000, 2.800000, -0.750000)
+EDGE 15 type=LINE length=1.300000000 center=(-0.800000, 2.800000, -0.100000) bbox=(-0.800000, 2.800000, -0.750000)-(-0.800000, 2.800000, 0.550000)
+EDGE 16 type=LINE length=1.600000000 center=(-0.000000, 2.800000, -0.750000) bbox=(-0.800000, 2.800000, -0.750000)-(0.800000, 2.800000, -0.750000)
+EDGE 17 type=LINE length=1.600000000 center=(0.000000, -2.800000, -0.750000) bbox=(-0.800000, -2.800000, -0.750000)-(0.800000, -2.800000, -0.750000)
+EDGE 18 type=LINE length=2.000000000 center=(0.000000, 2.400000, 0.750000) bbox=(-1.000000, 2.400000, 0.750000)-(1.000000, 2.400000, 0.750000)
+EDGE 19 type=CIRCLE length=5.106638881 center=(1.000000, 0.000000, 0.253099) bbox=(1.000000, -2.400000, 0.000000)-(1.000000, 2.400000, 0.750000)
+EDGE 20 type=LINE length=2.000000000 center=(0.000000, -2.400000, 0.750000) bbox=(-1.000000, -2.400000, 0.750000)-(1.000000, -2.400000, 0.750000)
+EDGE 21 type=CIRCLE length=5.106638881 center=(-1.000000, 0.000000, 0.253099) bbox=(-1.000000, -2.400000, 0.000000)-(-1.000000, 2.400000, 0.750000)
+EDGE 22 type=LINE length=0.600000000 center=(-1.000000, -2.700000, 0.750000) bbox=(-1.000000, -3.000000, 0.750000)-(-1.000000, -2.400000, 0.750000)
+EDGE 23 type=LINE length=2.000000000 center=(0.000000, -3.000000, 0.750000) bbox=(-1.000000, -3.000000, 0.750000)-(1.000000, -3.000000, 0.750000)
+EDGE 24 type=LINE length=0.600000000 center=(1.000000, -2.700000, 0.750000) bbox=(1.000000, -3.000000, 0.750000)-(1.000000, -2.400000, 0.750000)
+EDGE 25 type=LINE length=0.600000000 center=(1.000000, 2.700000, 0.750000) bbox=(1.000000, 2.400000, 0.750000)-(1.000000, 3.000000, 0.750000)
+EDGE 26 type=LINE length=2.000000000 center=(0.000000, 3.000000, 0.750000) bbox=(-1.000000, 3.000000, 0.750000)-(1.000000, 3.000000, 0.750000)
+EDGE 27 type=LINE length=0.600000000 center=(-1.000000, 2.700000, 0.750000) bbox=(-1.000000, 2.400000, 0.750000)-(-1.000000, 3.000000, 0.750000)
+EDGE 28 type=LINE length=1.500000000 center=(1.000000, -3.000000, -0.000000) bbox=(1.000000, -3.000000, -0.750000)-(1.000000, -3.000000, 0.750000)
+EDGE 29 type=LINE length=6.000000000 center=(1.000000, 0.000000, -0.750000) bbox=(1.000000, -3.000000, -0.750000)-(1.000000, 3.000000, -0.750000)
+EDGE 30 type=LINE length=1.500000000 center=(1.000000, 3.000000, -0.000000) bbox=(1.000000, 3.000000, -0.750000)-(1.000000, 3.000000, 0.750000)
+EDGE 31 type=LINE length=2.000000000 center=(0.000000, -3.000000, -0.750000) bbox=(-1.000000, -3.000000, -0.750000)-(1.000000, -3.000000, -0.750000)
+EDGE 32 type=LINE length=6.000000000 center=(-1.000000, -0.000000, -0.750000) bbox=(-1.000000, -3.000000, -0.750000)-(-1.000000, 3.000000, -0.750000)
+EDGE 33 type=LINE length=2.000000000 center=(0.000000, 3.000000, -0.750000) bbox=(-1.000000, 3.000000, -0.750000)-(1.000000, 3.000000, -0.750000)
+EDGE 34 type=LINE length=1.500000000 center=(-1.000000, 3.000000, -0.000000) bbox=(-1.000000, 3.000000, -0.750000)-(-1.000000, 3.000000, 0.750000)
+EDGE 35 type=LINE length=1.500000000 center=(-1.000000, -3.000000, 0.000000) bbox=(-1.000000, -3.000000, -0.750000)-(-1.000000, -3.000000, 0.750000)
+NON-DEGENERATE ORIGINAL EDGES SELECTED: 36
+GLOBAL ALL-EDGE R=0.2 MM FILLET FAILED: StdFail_NotDone('BRep_API: command not done')
+The requested radius equals the nominal 0.2 mm side-wall thickness; no radius reduction or edge exclusion was applied.
+Exported shape to: /home/adml/Research/Hackathon2026/IDETC26-Hackathon-Autodesk-neuralCAD-Edit/output/gpt-5.6-sol-ontology-full48/gpt-5.6-sol-ontology_cadquery-script_1787117715.9449706/brep_end/1787117715.9449706/tmp.step
+Exported STL to: /home/adml/Research/Hackathon2026/IDETC26-Hackathon-Autodesk-neuralCAD-Edit/output/gpt-5.6-sol-ontology-full48/gpt-5.6-sol-ontology_cadquery-script_1787117715.9449706/brep_end/1787117715.9449706/tmp.stl
+Exported PNG image to: /home/adml/Research/Hackathon2026/IDETC26-Hackathon-Autodesk-neuralCAD-Edit/output/gpt-5.6-sol-ontology-full48/gpt-5.6-sol-ontology_cadquery-script_1787117715.9449706/brep_end/1787117715.9449706/tmp.png
+Script completed.
+
+stderr: 
+
+Multi-view images from last iteration:
+
+View: +Z
+
+[IMAGE 0: /home/adml/Research/Hackathon2026/IDETC26-Hackathon-Autodesk-neuralCAD-Edit/output/gpt-5.6-sol-ontology-full48/gpt-5.6-sol-ontology_cadquery-script_1787117715.9449706/brep_end/1787117715.9449706/tmp_+Z.png]
+
+View: -Z
+
+[IMAGE 1: /home/adml/Research/Hackathon2026/IDETC26-Hackathon-Autodesk-neuralCAD-Edit/output/gpt-5.6-sol-ontology-full48/gpt-5.6-sol-ontology_cadquery-script_1787117715.9449706/brep_end/1787117715.9449706/tmp_-Z.png]
+
+View: -X
+
+[IMAGE 2: /home/adml/Research/Hackathon2026/IDETC26-Hackathon-Autodesk-neuralCAD-Edit/output/gpt-5.6-sol-ontology-full48/gpt-5.6-sol-ontology_cadquery-script_1787117715.9449706/brep_end/1787117715.9449706/tmp_-X.png]
+
+View: +X
+
+[IMAGE 3: /home/adml/Research/Hackathon2026/IDETC26-Hackathon-Autodesk-neuralCAD-Edit/output/gpt-5.6-sol-ontology-full48/gpt-5.6-sol-ontology_cadquery-script_1787117715.9449706/brep_end/1787117715.9449706/tmp_+X.png]
+
+View: +Y
+
+[IMAGE 4: /home/adml/Research/Hackathon2026/IDETC26-Hackathon-Autodesk-neuralCAD-Edit/output/gpt-5.6-sol-ontology-full48/gpt-5.6-sol-ontology_cadquery-script_1787117715.9449706/brep_end/1787117715.9449706/tmp_+Y.png]
+
+View: -Y
+
+[IMAGE 5: /home/adml/Research/Hackathon2026/IDETC26-Hackathon-Autodesk-neuralCAD-Edit/output/gpt-5.6-sol-ontology-full48/gpt-5.6-sol-ontology_cadquery-script_1787117715.9449706/brep_end/1787117715.9449706/tmp_-Y.png]
+
+View: iso1
+
+[IMAGE 6: /home/adml/Research/Hackathon2026/IDETC26-Hackathon-Autodesk-neuralCAD-Edit/output/gpt-5.6-sol-ontology-full48/gpt-5.6-sol-ontology_cadquery-script_1787117715.9449706/brep_end/1787117715.9449706/tmp_iso1.png]
+
+View: iso2
+
+[IMAGE 7: /home/adml/Research/Hackathon2026/IDETC26-Hackathon-Autodesk-neuralCAD-Edit/output/gpt-5.6-sol-ontology-full48/gpt-5.6-sol-ontology_cadquery-script_1787117715.9449706/brep_end/1787117715.9449706/tmp_iso2.png]
+
+CadQuery function from last iteration:
+
+def my_cad_function(args):
+    input_file = os.path.expanduser(args["input_file"])
+    imported = cq.importers.importStep(input_file)
+
+    solids = imported.solids().vals()
+    if len(solids) != 1:
+        raise ValueError("Expected exactly one input solid, found %d" % len(solids))
+    solid = solids[0]
+
+    print("INPUT VALID:", solid.isValid())
+    print("INPUT SOLIDS:", len(solids))
+    print("INPUT FACES:", len(solid.Faces()))
+    print("INPUT EDGES:", len(solid.Edges()))
+    print("INPUT VOLUME: %.9f" % solid.Volume())
+
+    for i, face in enumerate(solid.Faces()):
+        bb = face.BoundingBox()
+        c = face.Center()
+        try:
+            geom_type = face.geomType()
+        except Exception:
+            geom_type = "UNKNOWN"
+        print(
+            "FACE %d type=%s center=(%.6f, %.6f, %.6f) "
+            "bbox=(%.6f, %.6f, %.6f)-(%.6f, %.6f, %.6f) area=%.9f"
+            % (i, geom_type, c.x, c.y, c.z,
+               bb.xmin, bb.ymin, bb.zmin, bb.xmax, bb.ymax, bb.zmax,
+               face.Area())
+        )
+
+    original_edges = []
+    for i, edge in enumerate(solid.Edges()):
+        length = edge.Length()
+        c = edge.Center()
+        bb = edge.BoundingBox()
+        try:
+            geom_type = edge.geomType()
+        except Exception:
+            geom_type = "UNKNOWN"
+        print(
+            "EDGE %d type=%s length=%.9f center=(%.6f, %.6f, %.6f) "
+            "bbox=(%.6f, %.6f, %.6f)-(%.6f, %.6f, %.6f)"
+            % (i, geom_type, length, c.x, c.y, c.z,
+               bb.xmin, bb.ymin, bb.zmin, bb.xmax, bb.ymax, bb.zmax)
+        )
+        if length > 1.0e-7:
+            original_edges.append(edge)
+
+    print("NON-DEGENERATE ORIGINAL EDGES SELECTED:", len(original_edges))
+    if len(original_edges) != len(solid.Edges()):
+        print("DEGENERATE EDGES OMITTED:", len(solid.Edges()) - len(original_edges))
+
+    radius = 0.2
+    try:
+        # Apply one global constant-radius rolling-ball fillet to the complete
+        # collection captured from the original, unmodified B-rep.
+        filleted_solid = solid.fillet(radius, original_edges)
+        if filleted_solid is None:
+            raise RuntimeError("The OCC fillet operation returned no shape")
+
+        result_solids = filleted_solid.Solids()
+        print("FILLET SUCCEEDED")
+        print("RESULT VALID:", filleted_solid.isValid())
+        print("RESULT SOLIDS:", len(result_solids))
+        print("RESULT FACES:", len(filleted_solid.Faces()))
+        print("RESULT EDGES:", len(filleted_solid.Edges()))
+        print("RESULT VOLUME: %.9f" % filleted_solid.Volume())
+
+        if not filleted_solid.isValid():
+            raise RuntimeError("Global all-edge fillet produced an invalid shape")
+        if len(result_solids) != 1:
+            raise RuntimeError("Global all-edge fillet did not preserve one closed solid")
+
+        return cq.Workplane(obj=filleted_solid)
+    except Exception as exc:
+        print("GLOBAL ALL-EDGE R=0.2 MM FILLET FAILED:", repr(exc))
+        print("The requested radius equals the nominal 0.2 mm side-wall thickness; no radius reduction or edge exclusion was applied.")
+        # Return the valid source body so its geometry and printed edge data can
+        # be inspected during this diagnostic first iteration.
+        return cq.Workplane(obj=solid)
+
+aim.json (desired final state). Check the last-iteration images, CadQuery function, and program output against this:
+
+{
+  "request": "Add rounds to all edges of the part. R=0,2mm",
+  "request_wording": {
+    "action_words": [
+      "Add",
+      "rounds",
+      "R=0,2mm"
+    ],
+    "referenced_feature_words": [
+      "all",
+      "edges",
+      "part"
+    ],
+    "intention_words": [],
+    "grammatical_words": [
+      "to",
+      "of",
+      "the"
+    ]
+  },
+  "actions": [
+    {
+      "operation": "Add edge rounds (fillets)",
+      "parameters": {
+        "radius": "0.2 mm"
+      },
+      "target": "All edges of the part",
+      "relational_constraint": "Apply the specified round to every edge of the part",
+      "unresolved_reference": "Identify the complete set of edges belonging to the part in the original CAD model"
+    }
+  ],
+  "intention": []
+}
+
+Iterations remaining: 9

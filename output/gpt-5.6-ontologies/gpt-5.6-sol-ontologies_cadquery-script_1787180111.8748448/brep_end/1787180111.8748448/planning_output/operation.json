@@ -1,0 +1,652 @@
+{
+  "request_id": "REQUEST-001",
+  "operation_ontology": {
+    "id": "cqop:CadQueryOperationOntology",
+    "version": "1.2.0"
+  },
+  "aim_summary": {
+    "goal": "Make the part symmetric by leveling the one-sided step, removing existing chamfers and fillets, and applying replacement radii.",
+    "change_targets": [
+      "T01",
+      "T02",
+      "T03",
+      "T04",
+      "T05"
+    ],
+    "preserve_targets": [
+      "Non-targeted whistle geometry, including the overall narrow-part and bigger-part form"
+    ],
+    "expected_outcome": "A symmetric part with the side step eliminated, no original edge treatments retained, 20 mm radii on horizontal narrow-to-bigger junction edges, and 5 mm radii on all other specified edges."
+  },
+  "operations_plan": [
+    {
+      "operation_id": "OP01",
+      "summary": "Remove all existing chamfers represented by F004.",
+      "confidence": 0.84,
+      "depends_on_operation_ids": [],
+      "steps": [
+        {
+          "step_id": "S01",
+          "step_index": 1,
+          "ontology_operation": "RemoveEdgeTreatmenttoEdges",
+          "description": "Restore sharp geometry along all chamfer-treated boundaries of F004.",
+          "required_parameters": {
+            "target_body": {
+              "value": "SOLID 0",
+              "unit": "",
+              "source_type": "model_json_entity",
+              "cadquery_type": "cq.Workplane",
+              "model_reference": {
+                "part_id": "P001",
+                "section_ids": [
+                  "R01"
+                ],
+                "feature_ids": [
+                  "F004"
+                ],
+                "face_ids": [],
+                "solid_ids": [
+                  "SOLID 0"
+                ]
+              },
+              "source_step_id": "",
+              "confidence": 0.99
+            },
+            "treated_edges": {
+              "value": "[e for f in resolve_model_faces(['FACE 0','FACE 1','FACE 3','FACE 4','FACE 8']) for e in f.Edges()]",
+              "unit": "",
+              "source_type": "cadquery_object",
+              "cadquery_type": "list[cq.Edge]",
+              "model_reference": {
+                "part_id": "P001",
+                "section_ids": [
+                  "R01"
+                ],
+                "feature_ids": [
+                  "F004"
+                ],
+                "face_ids": [
+                  "FACE 0",
+                  "FACE 1",
+                  "FACE 3",
+                  "FACE 4",
+                  "FACE 8"
+                ],
+                "solid_ids": [
+                  "SOLID 0"
+                ]
+              },
+              "source_step_id": "",
+              "confidence": 0.86
+            },
+            "treatment_type": {
+              "value": "chamfer",
+              "unit": "",
+              "source_type": "request_value",
+              "cadquery_type": "str",
+              "model_reference": {
+                "part_id": "P001",
+                "section_ids": [
+                  "R01"
+                ],
+                "feature_ids": [
+                  "F004"
+                ],
+                "face_ids": [],
+                "solid_ids": [
+                  "SOLID 0"
+                ]
+              },
+              "source_step_id": "",
+              "confidence": 0.99
+            },
+            "restoration_solid": {
+              "value": null,
+              "unit": "",
+              "source_type": "unresolved",
+              "cadquery_type": "cq.Shape",
+              "model_reference": {
+                "part_id": "P001",
+                "section_ids": [
+                  "R01"
+                ],
+                "feature_ids": [
+                  "F004"
+                ],
+                "face_ids": [
+                  "FACE 0",
+                  "FACE 1",
+                  "FACE 3",
+                  "FACE 4",
+                  "FACE 8"
+                ],
+                "solid_ids": [
+                  "SOLID 0"
+                ]
+              },
+              "source_step_id": "",
+              "confidence": 0.28
+            }
+          },
+          "ontology_conformant": false,
+          "depends_on_step_ids": [],
+          "output": {
+            "name": "body_without_chamfers",
+            "cadquery_type": "cq.Workplane"
+          },
+          "confidence": 0.68
+        }
+      ],
+      "expected_result": {
+        "geometry": "All pre-existing chamfer geometry in F004 is removed and its corresponding sharp corner geometry is restored.",
+        "function": "",
+        "behavior": ""
+      },
+      "validation_criteria": [
+        {
+          "category": "geometry",
+          "description": "No chamfer surfaces corresponding to F004 remain on the resulting body."
+        },
+        {
+          "category": "preservation",
+          "description": "Geometry outside the F004 chamfer regions remains unchanged."
+        }
+      ]
+    },
+    {
+      "operation_id": "OP02",
+      "summary": "Remove all existing fillets represented by F005 and F007.",
+      "confidence": 0.87,
+      "depends_on_operation_ids": [
+        "OP01"
+      ],
+      "steps": [
+        {
+          "step_id": "S02",
+          "step_index": 1,
+          "ontology_operation": "RemoveEdgeTreatmenttoEdges",
+          "description": "Restore sharp geometry along all existing fillet-treated boundaries.",
+          "required_parameters": {
+            "target_body": {
+              "value": "body_without_chamfers",
+              "unit": "",
+              "source_type": "previous_step_output",
+              "cadquery_type": "cq.Workplane",
+              "model_reference": {
+                "part_id": "P001",
+                "section_ids": [
+                  "R01",
+                  "R02"
+                ],
+                "feature_ids": [
+                  "F005",
+                  "F007"
+                ],
+                "face_ids": [],
+                "solid_ids": [
+                  "SOLID 0"
+                ]
+              },
+              "source_step_id": "S01",
+              "confidence": 0.98
+            },
+            "treated_edges": {
+              "value": "[e for f in resolve_model_faces(['FACE 2','FACE 6','FACE 9','FACE 21','FACE 22','FACE 23','FACE 25','FACE 27','FACE 28','FACE 29','FACE 30','FACE 33','FACE 35','FACE 36','FACE 37']) for e in f.Edges()]",
+              "unit": "",
+              "source_type": "cadquery_object",
+              "cadquery_type": "list[cq.Edge]",
+              "model_reference": {
+                "part_id": "P001",
+                "section_ids": [
+                  "R01",
+                  "R02"
+                ],
+                "feature_ids": [
+                  "F005",
+                  "F007"
+                ],
+                "face_ids": [
+                  "FACE 2",
+                  "FACE 6",
+                  "FACE 9",
+                  "FACE 21",
+                  "FACE 22",
+                  "FACE 23",
+                  "FACE 25",
+                  "FACE 27",
+                  "FACE 28",
+                  "FACE 29",
+                  "FACE 30",
+                  "FACE 33",
+                  "FACE 35",
+                  "FACE 36",
+                  "FACE 37"
+                ],
+                "solid_ids": [
+                  "SOLID 0"
+                ]
+              },
+              "source_step_id": "",
+              "confidence": 0.82
+            },
+            "treatment_type": {
+              "value": "fillet",
+              "unit": "",
+              "source_type": "request_value",
+              "cadquery_type": "str",
+              "model_reference": {
+                "part_id": "P001",
+                "section_ids": [
+                  "R01",
+                  "R02"
+                ],
+                "feature_ids": [
+                  "F005",
+                  "F007"
+                ],
+                "face_ids": [],
+                "solid_ids": [
+                  "SOLID 0"
+                ]
+              },
+              "source_step_id": "",
+              "confidence": 0.99
+            },
+            "restoration_solid": {
+              "value": null,
+              "unit": "",
+              "source_type": "unresolved",
+              "cadquery_type": "cq.Shape",
+              "model_reference": {
+                "part_id": "P001",
+                "section_ids": [
+                  "R01",
+                  "R02"
+                ],
+                "feature_ids": [
+                  "F005",
+                  "F007"
+                ],
+                "face_ids": [
+                  "FACE 2",
+                  "FACE 6",
+                  "FACE 9",
+                  "FACE 21",
+                  "FACE 22",
+                  "FACE 23",
+                  "FACE 25",
+                  "FACE 27",
+                  "FACE 28",
+                  "FACE 29",
+                  "FACE 30",
+                  "FACE 33",
+                  "FACE 35",
+                  "FACE 36",
+                  "FACE 37"
+                ],
+                "solid_ids": [
+                  "SOLID 0"
+                ]
+              },
+              "source_step_id": "",
+              "confidence": 0.24
+            }
+          },
+          "ontology_conformant": false,
+          "depends_on_step_ids": [
+            "S01"
+          ],
+          "output": {
+            "name": "body_without_edge_treatments",
+            "cadquery_type": "cq.Workplane"
+          },
+          "confidence": 0.65
+        }
+      ],
+      "expected_result": {
+        "geometry": "All pre-existing fillets in F005 and F007 are removed, leaving untreated sharp geometry for replacement edge radii.",
+        "function": "",
+        "behavior": ""
+      },
+      "validation_criteria": [
+        {
+          "category": "geometry",
+          "description": "No original fillet surfaces corresponding to F005 or F007 remain."
+        },
+        {
+          "category": "preservation",
+          "description": "The bore, engagement pocket, structural body, and enlarged-head form remain unchanged outside the removed edge treatments."
+        }
+      ]
+    },
+    {
+      "operation_id": "OP03",
+      "summary": "Trim the one-sided protruding step until its surface is level with the adjacent surface.",
+      "confidence": 0.55,
+      "depends_on_operation_ids": [
+        "OP02"
+      ],
+      "steps": [
+        {
+          "step_id": "S03",
+          "step_index": 1,
+          "ontology_operation": "TrimBodytoPlane",
+          "description": "Remove the protruding side-step material using the adjacent level surface as the trim reference.",
+          "required_parameters": {
+            "target_body": {
+              "value": "body_without_edge_treatments",
+              "unit": "",
+              "source_type": "previous_step_output",
+              "cadquery_type": "cq.Workplane",
+              "model_reference": {
+                "part_id": "P001",
+                "section_ids": [
+                  "R01",
+                  "R02"
+                ],
+                "feature_ids": [
+                  "F001",
+                  "F006"
+                ],
+                "face_ids": [],
+                "solid_ids": [
+                  "SOLID 0"
+                ]
+              },
+              "source_step_id": "S02",
+              "confidence": 0.98
+            },
+            "splitter": {
+              "value": null,
+              "unit": "",
+              "source_type": "unresolved",
+              "cadquery_type": "cq.Plane",
+              "model_reference": {
+                "part_id": "P001",
+                "section_ids": [
+                  "R01",
+                  "R02"
+                ],
+                "feature_ids": [
+                  "F001",
+                  "F006"
+                ],
+                "face_ids": [],
+                "solid_ids": [
+                  "SOLID 0"
+                ]
+              },
+              "source_step_id": "",
+              "confidence": 0.3
+            },
+            "keep_selector": {
+              "value": null,
+              "unit": "",
+              "source_type": "unresolved",
+              "cadquery_type": "cq.Selector",
+              "model_reference": {
+                "part_id": "P001",
+                "section_ids": [
+                  "R01",
+                  "R02"
+                ],
+                "feature_ids": [
+                  "F001",
+                  "F006"
+                ],
+                "face_ids": [],
+                "solid_ids": [
+                  "SOLID 0"
+                ]
+              },
+              "source_step_id": "",
+              "confidence": 0.25
+            }
+          },
+          "ontology_conformant": false,
+          "depends_on_step_ids": [
+            "S02"
+          ],
+          "output": {
+            "name": "sharp_leveled_body",
+            "cadquery_type": "cq.Workplane"
+          },
+          "confidence": 0.47
+        }
+      ],
+      "expected_result": {
+        "geometry": "The protruding surface is coplanar with its adjacent surface, the one-sided step is absent, and the external form is symmetric.",
+        "function": "Supports the requested part symmetry.",
+        "behavior": ""
+      },
+      "validation_criteria": [
+        {
+          "category": "geometry",
+          "description": "The former protruding surface and its adjacent surface are level and the referenced side step is absent."
+        },
+        {
+          "category": "function",
+          "description": "The final external geometry achieves the requested symmetry."
+        },
+        {
+          "category": "preservation",
+          "description": "Only the protruding step region is trimmed; the remaining narrow-part and enlarged-part geometry is retained."
+        }
+      ]
+    },
+    {
+      "operation_id": "OP04",
+      "summary": "Apply 20 mm fillets to horizontal edges where the narrow and enlarged sections meet.",
+      "confidence": 0.71,
+      "depends_on_operation_ids": [
+        "OP03"
+      ],
+      "steps": [
+        {
+          "step_id": "S04",
+          "step_index": 1,
+          "ontology_operation": "CreateFillettoEdges",
+          "description": "Round the horizontal sharp junction edges between R01 and R02 with a 20 mm radius.",
+          "required_parameters": {
+            "target_body": {
+              "value": "sharp_leveled_body",
+              "unit": "",
+              "source_type": "previous_step_output",
+              "cadquery_type": "cq.Workplane",
+              "model_reference": {
+                "part_id": "P001",
+                "section_ids": [
+                  "R01",
+                  "R02"
+                ],
+                "feature_ids": [
+                  "F001",
+                  "F006"
+                ],
+                "face_ids": [],
+                "solid_ids": [
+                  "SOLID 0"
+                ]
+              },
+              "source_step_id": "S03",
+              "confidence": 0.98
+            },
+            "target_edges": {
+              "value": null,
+              "unit": "",
+              "source_type": "unresolved",
+              "cadquery_type": "list[cq.Edge]",
+              "model_reference": {
+                "part_id": "P001",
+                "section_ids": [
+                  "R01",
+                  "R02"
+                ],
+                "feature_ids": [
+                  "F001",
+                  "F006"
+                ],
+                "face_ids": [],
+                "solid_ids": [
+                  "SOLID 0"
+                ]
+              },
+              "source_step_id": "",
+              "confidence": 0.38
+            },
+            "radius": {
+              "value": 20,
+              "unit": "mm",
+              "source_type": "request_value",
+              "cadquery_type": "float",
+              "model_reference": {
+                "part_id": "",
+                "section_ids": [],
+                "feature_ids": [],
+                "face_ids": [],
+                "solid_ids": []
+              },
+              "source_step_id": "",
+              "confidence": 1.0
+            }
+          },
+          "ontology_conformant": false,
+          "depends_on_step_ids": [
+            "S03"
+          ],
+          "output": {
+            "name": "body_with_20mm_junction_fillets",
+            "cadquery_type": "cq.Workplane"
+          },
+          "confidence": 0.62
+        }
+      ],
+      "expected_result": {
+        "geometry": "Every horizontal edge in the meeting area between the narrow and enlarged sections has a constant 20 mm radius.",
+        "function": "",
+        "behavior": ""
+      },
+      "validation_criteria": [
+        {
+          "category": "geometry",
+          "description": "All horizontal narrow-to-enlarged-section junction edges have a measured radius of 20 mm."
+        },
+        {
+          "category": "preservation",
+          "description": "Edges outside the identified junction set are not modified by the 20 mm fillet operation."
+        }
+      ]
+    },
+    {
+      "operation_id": "OP05",
+      "summary": "Apply 5 mm fillets to all other edges excluded from the 20 mm junction set.",
+      "confidence": 0.63,
+      "depends_on_operation_ids": [
+        "OP04"
+      ],
+      "steps": [
+        {
+          "step_id": "S05",
+          "step_index": 1,
+          "ontology_operation": "CreateFillettoEdges",
+          "description": "Round the remaining requested edges with a 5 mm radius while excluding the 20 mm junction edges.",
+          "required_parameters": {
+            "target_body": {
+              "value": "body_with_20mm_junction_fillets",
+              "unit": "",
+              "source_type": "previous_step_output",
+              "cadquery_type": "cq.Workplane",
+              "model_reference": {
+                "part_id": "P001",
+                "section_ids": [
+                  "R01",
+                  "R02"
+                ],
+                "feature_ids": [
+                  "F001",
+                  "F002",
+                  "F003",
+                  "F006"
+                ],
+                "face_ids": [],
+                "solid_ids": [
+                  "SOLID 0"
+                ]
+              },
+              "source_step_id": "S04",
+              "confidence": 0.98
+            },
+            "target_edges": {
+              "value": null,
+              "unit": "",
+              "source_type": "unresolved",
+              "cadquery_type": "list[cq.Edge]",
+              "model_reference": {
+                "part_id": "P001",
+                "section_ids": [
+                  "R01",
+                  "R02"
+                ],
+                "feature_ids": [
+                  "F001",
+                  "F002",
+                  "F003",
+                  "F006"
+                ],
+                "face_ids": [],
+                "solid_ids": [
+                  "SOLID 0"
+                ]
+              },
+              "source_step_id": "",
+              "confidence": 0.24
+            },
+            "radius": {
+              "value": 5,
+              "unit": "mm",
+              "source_type": "request_value",
+              "cadquery_type": "float",
+              "model_reference": {
+                "part_id": "",
+                "section_ids": [],
+                "feature_ids": [],
+                "face_ids": [],
+                "solid_ids": []
+              },
+              "source_step_id": "",
+              "confidence": 1.0
+            }
+          },
+          "ontology_conformant": false,
+          "depends_on_step_ids": [
+            "S04"
+          ],
+          "output": {
+            "name": "final_symmetric_rounded_body",
+            "cadquery_type": "cq.Workplane"
+          },
+          "confidence": 0.52
+        }
+      ],
+      "expected_result": {
+        "geometry": "All edges within the resolved meaning of other edges, excluding the 20 mm junction set, have a constant 5 mm radius.",
+        "function": "",
+        "behavior": ""
+      },
+      "validation_criteria": [
+        {
+          "category": "geometry",
+          "description": "Every edge included by the resolved other-edge scope and not assigned a 20 mm radius has a measured radius of 5 mm."
+        },
+        {
+          "category": "geometry",
+          "description": "No pre-existing chamfer or fillet geometry remains; all final edge treatments conform to the 20 mm or 5 mm replacement rules."
+        },
+        {
+          "category": "preservation",
+          "description": "The axial blind bore, engagement pocket, and overall narrow-part and enlarged-part form remain unchanged except where directly affected by leveling and replacement edge treatments."
+        }
+      ]
+    }
+  ]
+}

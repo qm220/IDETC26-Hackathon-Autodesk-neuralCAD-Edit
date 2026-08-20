@@ -1,0 +1,849 @@
+Now use all the given information:
+1. model.json
+2. operation.json
+3. Multiview images labelled with CAD look directions (+X, -X, +Y, -Y, +Z, -Z, and iso1 / iso2 when present)
+
+Decide which sections and features of the original model should be modified, removed, interacted with, or whether new features should be created. Use as much information from the multiview images, model.json, and operation.json as possible.
+
+Make this decision using the following evidence, in this order:
+
+1. If the action target clearly identifies geometry, locate the corresponding section(s), feature(s), and B-rep FACE/EDGE IDs in model.json (part.sections, features, brep_faces, brep_edges, unclassified_brep_faces).
+2. If the request indicates a side using "front", "back", "top", "bottom", "left", or "right", use part.semantic_orientation from model.json.
+   - Prefer view_sides: that maps each CAD view label (+X, -Y, …) to a human-semantic side.
+   - Also use status, description, and confidence.
+   - If status is "unknown", the requested side is missing from view_sides, or confidence is below 0.6, treat the directional word as ambiguous. Do not guess an axis from the camera label alone. Use other evidence instead.
+3. If no clear geometry is identified, use referenced_feature_words and relational_constraint to identify candidate sections and features.
+4. Also consider the intention of the edit. Based on each section's and feature's functions and behaviors, decide which entity most needs the action. Then record the corresponding section id, feature id, and FACE IDs from model.json.
+
+Brep_id values are CadQuery Faces()/Edges() indices from the STEP analysis report (for example FACE 0, EDGE 12). Prefer listing those exact IDs in "target face code" (and in steps when they help later CadQuery implementation). You may also list feature ids (F001) and section ids (R01).
+
+Plan the modeling procedure needed to perform each action. Describe it in professional CAD modelling language, from choosing the plane and drawing sketches through extrusion, cuts, fillets, and chamfers. Be thorough and detailed.
+
+Edit operation.json accordingly. Keep the previous request_wording and actions, and add localization plus steps.
+
+OUTPUT FORMAT (JSON, operation.json, no markdown fences, use this schema):
+{
+  "request": "",
+  "request_wording": {
+    "action_words": ["..."],
+    "referenced_feature_words": ["..."],
+    "intention_words": ["..."],
+    "grammatical_words": ["..."]
+  },
+  "actions": [
+    {
+      "operation": "...",
+      "parameters": {
+        "parameter_name": "..."
+      },
+      "target": "...",
+      "relational_constraint": "...",
+      "unresolved_reference": "...",
+      "target section code": ["R01"],
+      "target face code": ["F001", "FACE 0"],
+      "steps": [
+        "...",
+        "..."
+      ]
+    }
+  ],
+  "intention": ["..."]
+}
+
+The model.json, operation.json, and labeled multi-view images follow.
+
+
+aim.json:
+
+{
+  "request": "Mirror the part according to the plane lying on the not rounded end of the part. Merge the mirrored part together with the existing one so they create one body.",
+  "request_wording": {
+    "action_words": [
+      "Mirror",
+      "Merge"
+    ],
+    "referenced_feature_words": [
+      "part",
+      "according",
+      "to",
+      "plane",
+      "lying",
+      "on",
+      "not",
+      "rounded",
+      "end",
+      "of",
+      "part",
+      "mirrored",
+      "part",
+      "together",
+      "with",
+      "existing",
+      "one"
+    ],
+    "intention_words": [
+      "create",
+      "one",
+      "body"
+    ],
+    "grammatical_words": [
+      "the",
+      "the",
+      "the",
+      "the",
+      "the",
+      "the",
+      "so",
+      "they"
+    ]
+  },
+  "actions": [
+    {
+      "operation": "Mirror the part",
+      "parameters": {},
+      "target": "The existing part",
+      "relational_constraint": "Use the plane lying on the non-rounded end of the part as the mirror plane.",
+      "unresolved_reference": "Identify the non-rounded end of the part and resolve the plane located on that end, including whether it is an existing datum plane or a planar end face."
+    },
+    {
+      "operation": "Merge the mirrored part with the existing part using a Boolean union",
+      "parameters": {
+        "resulting_body_count": "1"
+      },
+      "target": "The mirrored part created by the preceding action and the existing original part",
+      "relational_constraint": "The mirrored and existing parts must be joined into a single body.",
+      "unresolved_reference": "Identify the existing original body and the mirrored result, and verify that their geometry permits a single merged body."
+    }
+  ],
+  "intention": [
+    "Produce one unified body from the original part and its mirrored copy."
+  ]
+}
+
+model.json:
+
+{
+  "part": {
+    "id": "P01",
+    "name": "Lever arm with blind-bore cylindrical boss",
+    "description": "Single-piece mechanical lever or support arm consisting of a long planar web, a rounded proximal end, and an integrally blended cylindrical boss containing a blind axial bore. The single CadQuery solid represents connected geometry rather than separate functional components.",
+    "source_views": [
+      "+X",
+      "-X",
+      "+Y",
+      "-Y",
+      "+Z",
+      "-Z",
+      "iso1"
+    ],
+    "solid_ids": [
+      "SOLID 0"
+    ],
+    "symmetry_note": "The boss and blind bore are rotationally symmetric about the CAD Y-axis through x=0 and z=4. The arm is approximately symmetric about the CAD plane z=4, apart from the boss-to-arm transition details. No repeated feature pattern is present.",
+    "semantic_orientation": {
+      "status": "inferred",
+      "description": "The boss opening is treated as the semantic top of the part, with the long arm extending primarily toward the semantic right. Front and back are assigned to the two broad arm sides but remain conventional because the part has no definitive visual front marker.",
+      "confidence": 0.72,
+      "view_sides": {
+        "+X": "right",
+        "-X": "left",
+        "+Y": "top",
+        "-Y": "bottom",
+        "+Z": "front",
+        "-Z": "back"
+      }
+    },
+    "sections": [
+      {
+        "id": "R01",
+        "name": "Elongated lever arm section",
+        "ontology_class": "cad:MainBodySection",
+        "description": "Long, thin structural arm extending along the CAD X direction from a rounded end near the boss to a planar distal end. It forms the principal load-transfer member.",
+        "location": "Extends from x=-25 to x=80, primarily between y=11 and y=23 and between z=2 and z=6; attached beneath and beside the boss region.",
+        "solid_ids": [
+          "SOLID 0"
+        ],
+        "colour": {
+          "R": 74,
+          "G": 144,
+          "B": 226
+        },
+        "section_functions": [
+          {
+            "ontology_class": "cad:TransferLoadFunction",
+            "name": "Transfer load along the arm",
+            "description": "Transfers loads between the boss region and the distal end of the arm.",
+            "primary": true,
+            "confidence": 0.91
+          },
+          {
+            "ontology_class": "cad:SupportFunction",
+            "name": "Support the boss",
+            "description": "Provides the structural base supporting the elevated cylindrical boss.",
+            "primary": false,
+            "confidence": 0.88
+          }
+        ],
+        "section_behaviors": [
+          {
+            "ontology_class": "cad:ResistBendingBehavior",
+            "name": "Resist arm bending",
+            "description": "The elongated web reacts bending generated by loads applied at the boss or distal end.",
+            "confidence": 0.91
+          },
+          {
+            "ontology_class": "cad:CarryShearBehavior",
+            "name": "Carry transverse shear",
+            "description": "The continuous web carries shear between the two functional ends.",
+            "confidence": 0.87
+          }
+        ],
+        "feature_groups": [],
+        "features": [
+          {
+            "id": "F001",
+            "name": "Elongated structural web",
+            "ontology_class": "cad:WebFeature",
+            "parent_feature_id": null,
+            "description": "Constant-thickness elongated web forming most of the lever arm, with broad planar skins and longitudinal side walls.",
+            "interface_type": null,
+            "feature_functions": [
+              {
+                "ontology_class": "cad:TransferLoadFunction",
+                "name": "Transfer load",
+                "description": "Carries loads along the length of the part between the boss and arm end.",
+                "primary": true,
+                "confidence": 0.94
+              },
+              {
+                "ontology_class": "cad:SupportFunction",
+                "name": "Support attached features",
+                "description": "Supports the boss and its transition region.",
+                "primary": false,
+                "confidence": 0.9
+              }
+            ],
+            "feature_behaviors": [
+              {
+                "ontology_class": "cad:ResistBendingBehavior",
+                "name": "Resist bending",
+                "description": "The broad, continuous web provides bending stiffness along the arm.",
+                "confidence": 0.93
+              },
+              {
+                "ontology_class": "cad:CarryShearBehavior",
+                "name": "Carry shear",
+                "description": "Transfers transverse shear through the arm material.",
+                "confidence": 0.89
+              }
+            ],
+            "relationships": [
+              {
+                "target_feature_id": "F004",
+                "category": "cad:FunctionalFeatureRelationship",
+                "relation": "cad:supportsFeature",
+                "description": "The structural web supports the cylindrical boss.",
+                "confidence": 0.92
+              },
+              {
+                "target_feature_id": "F004",
+                "category": "cad:FunctionalFeatureRelationship",
+                "relation": "cad:transmitsLoadTo",
+                "description": "Loads carried by the arm are transmitted to or from the boss.",
+                "confidence": 0.88
+              },
+              {
+                "target_feature_id": "F002",
+                "category": "cad:StructuralFeatureRelationship",
+                "relation": "cad:sharesBoundaryWith",
+                "description": "The web terminates continuously at the rounded proximal end.",
+                "confidence": 0.96
+              },
+              {
+                "target_feature_id": "F003",
+                "category": "cad:StructuralFeatureRelationship",
+                "relation": "cad:containsFeature",
+                "description": "The distal contact interface is the terminal face of the web.",
+                "confidence": 0.9
+              }
+            ],
+            "brep_faces": [
+              {
+                "brep_id": "FACE 1",
+                "face_code": "FACE 1",
+                "entity_type": "cad:Face",
+                "geometry_type": "cad:PlanarSurface",
+                "semantic_role": "cad:SupportFaceRole",
+                "name": "First broad arm skin",
+                "description": "Broad planar skin of the elongated arm at CAD z=2.",
+                "salience": "cad:PrimarySalience",
+                "confidence": 0.99,
+                "evidence": [
+                  "CadQuery reports a PLANE with area 1164.352266 mm^2.",
+                  "Plane normal is (0,0,-1) and the face spans x=-25 to 80 and y=11 to 23.",
+                  "The large planar extent matches one broad skin of the arm in the rendered views."
+                ]
+              },
+              {
+                "brep_id": "FACE 2",
+                "face_code": "FACE 2",
+                "entity_type": "cad:Face",
+                "geometry_type": "cad:PlanarSurface",
+                "semantic_role": "cad:SideWallRole",
+                "name": "Short proximal longitudinal side segment",
+                "description": "Short planar side-wall segment at CAD y=23 between the rounded arm end and the boss transition.",
+                "salience": "cad:SecondarySalience",
+                "confidence": 0.96,
+                "evidence": [
+                  "CadQuery reports a PLANE at y=23 spanning x=-8.386753 to -6.602720 and z=2 to 6.",
+                  "Its location continues the arm side wall adjacent to the rounded proximal end."
+                ]
+              },
+              {
+                "brep_id": "FACE 5",
+                "face_code": "FACE 5",
+                "entity_type": "cad:Face",
+                "geometry_type": "cad:PlanarSurface",
+                "semantic_role": "cad:SideWallRole",
+                "name": "Continuous lower longitudinal side wall",
+                "description": "Long planar side wall of the arm at CAD y=11.",
+                "salience": "cad:PrimarySalience",
+                "confidence": 0.99,
+                "evidence": [
+                  "CadQuery reports a PLANE with area 420 mm^2.",
+                  "The face spans the complete x range from -25 to 80 and z=2 to 6 at y=11."
+                ]
+              },
+              {
+                "brep_id": "FACE 6",
+                "face_code": "FACE 6",
+                "entity_type": "cad:Face",
+                "geometry_type": "cad:PlanarSurface",
+                "semantic_role": "cad:SupportFaceRole",
+                "name": "Second broad arm skin",
+                "description": "Broad planar skin of the elongated arm at CAD z=6.",
+                "salience": "cad:PrimarySalience",
+                "confidence": 0.99,
+                "evidence": [
+                  "CadQuery reports a PLANE with area 1164.317039 mm^2.",
+                  "Plane normal is (0,0,1) and the face spans x=-25 to 80 and y=11 to 23.",
+                  "It is parallel to and opposite FACE 1."
+                ]
+              },
+              {
+                "brep_id": "FACE 8",
+                "face_code": "FACE 8",
+                "entity_type": "cad:Face",
+                "geometry_type": "cad:PlanarSurface",
+                "semantic_role": "cad:SideWallRole",
+                "name": "Long upper longitudinal side wall",
+                "description": "Planar arm side wall at CAD y=23 extending from the boss clearance region to the distal end.",
+                "salience": "cad:PrimarySalience",
+                "confidence": 0.98,
+                "evidence": [
+                  "CadQuery reports a PLANE with area 292.795636 mm^2.",
+                  "The face lies at y=23, spans x=6.602720 to 80, and has z extent from 2 to 6.",
+                  "Its inner termination corresponds to the boss transition envelope."
+                ]
+              }
+            ],
+            "confidence": 0.96
+          },
+          {
+            "id": "F002",
+            "name": "Rounded proximal arm termination",
+            "ontology_class": "cad:FilletFeature",
+            "parent_feature_id": null,
+            "description": "Large-radius curved termination at the short end of the arm near the boss, reducing the abruptness of the arm outline.",
+            "interface_type": null,
+            "feature_functions": [
+              {
+                "ontology_class": "cad:DistributeStressFunction",
+                "name": "Distribute stress at the arm end",
+                "description": "The rounded outline avoids a sharp planar corner at the proximal termination.",
+                "primary": true,
+                "confidence": 0.73
+              }
+            ],
+            "feature_behaviors": [
+              {
+                "ontology_class": "cad:DistributeStressBehavior",
+                "name": "Distribute terminal stress",
+                "description": "The curved end spreads local stress through a gradual profile.",
+                "confidence": 0.72
+              }
+            ],
+            "relationships": [
+              {
+                "target_feature_id": "F001",
+                "category": "cad:StructuralFeatureRelationship",
+                "relation": "cad:blendsInto",
+                "description": "The curved termination blends into the planar structural web.",
+                "confidence": 0.91
+              }
+            ],
+            "brep_faces": [
+              {
+                "brep_id": "FACE 0",
+                "face_code": "FACE 0",
+                "entity_type": "cad:Face",
+                "geometry_type": "cad:CylindricalSurface",
+                "semantic_role": "cad:TransitionSurfaceRole",
+                "name": "Rounded proximal end wall",
+                "description": "Curved side face realizing the rounded arm termination.",
+                "salience": "cad:SecondarySalience",
+                "confidence": 0.95,
+                "evidence": [
+                  "CadQuery reports a CYLINDER of radius 17.5 mm with axis (0,0,-1).",
+                  "The face spans x=-25 to -8.386753, y=11 to 23, and z=2 to 6.",
+                  "The rendered views show this face as the rounded short end of the arm."
+                ]
+              }
+            ],
+            "confidence": 0.79
+          },
+          {
+            "id": "F003",
+            "name": "Distal arm end interface",
+            "ontology_class": "cad:ContactInterface",
+            "parent_feature_id": "F001",
+            "description": "Planar terminal face at the far end of the elongated arm, potentially serving as a contact, attachment, or load-input interface. The exact mating intent is not geometrically explicit.",
+            "interface_type": "cad:ContactInterface",
+            "feature_functions": [
+              {
+                "ontology_class": "cad:ConnectFunction",
+                "name": "Provide distal connection surface",
+                "description": "Provides a terminal surface through which the arm may contact or connect to another component.",
+                "primary": true,
+                "confidence": 0.58
+              },
+              {
+                "ontology_class": "cad:TransferLoadFunction",
+                "name": "Receive or transfer end load",
+                "description": "Provides a possible load-transfer surface at the distal end.",
+                "primary": false,
+                "confidence": 0.68
+              }
+            ],
+            "feature_behaviors": [
+              {
+                "ontology_class": "cad:ReactContactLoadBehavior",
+                "name": "React terminal contact",
+                "description": "The planar end can react compressive contact loads if used as an interface.",
+                "confidence": 0.63
+              }
+            ],
+            "relationships": [
+              {
+                "target_feature_id": "F001",
+                "category": "cad:StructuralFeatureRelationship",
+                "relation": "cad:partOfFeature",
+                "description": "The distal interface is the terminal subfeature of the structural web.",
+                "confidence": 0.95
+              }
+            ],
+            "brep_faces": [
+              {
+                "brep_id": "FACE 7",
+                "face_code": "FACE 7",
+                "entity_type": "cad:Face",
+                "geometry_type": "cad:PlanarSurface",
+                "semantic_role": "cad:InterfaceFaceRole",
+                "name": "Distal planar end face",
+                "description": "Rectangular planar end at the maximum CAD X position.",
+                "salience": "cad:SecondarySalience",
+                "confidence": 0.9,
+                "evidence": [
+                  "CadQuery reports a PLANE at x=80 with area 48 mm^2.",
+                  "The face spans y=11 to 23 and z=2 to 6.",
+                  "Its position and outward normal (1,0,0) identify it as the arm's distal terminal face."
+                ]
+              }
+            ],
+            "confidence": 0.66
+          }
+        ],
+        "unclassified_brep_faces": [],
+        "relationships": [
+          {
+            "target_section_id": "R02",
+            "category": "cad:StructuralFeatureRelationship",
+            "relation": "cad:attachedTo",
+            "description": "The boss section is integrally attached to the elongated arm through a blended transition.",
+            "confidence": 0.97
+          }
+        ],
+        "confidence": 0.95
+      },
+      {
+        "id": "R02",
+        "name": "Blind-bore boss section",
+        "ontology_class": "cad:EndSection",
+        "description": "Raised cylindrical boss centered at CAD x=0 and z=4, with an axial blind bore opening at y=34 and a blended base joining the arm.",
+        "location": "Centered over the arm near its rounded end; boss and bore axes follow the CAD Y direction through x=0 and z=4.",
+        "solid_ids": [
+          "SOLID 0"
+        ],
+        "colour": {
+          "R": 230,
+          "G": 126,
+          "B": 64
+        },
+        "section_functions": [
+          {
+            "ontology_class": "cad:ReceivePinFunction",
+            "name": "Receive a cylindrical pin or shaft end",
+            "description": "The blind axial bore provides a cylindrical receiving interface for a mating pin or shaft-like element.",
+            "primary": true,
+            "confidence": 0.82
+          },
+          {
+            "ontology_class": "cad:TransferLoadFunction",
+            "name": "Transfer interface load to the arm",
+            "description": "Transfers loads from the bore and boss into the elongated structural arm.",
+            "primary": false,
+            "confidence": 0.9
+          },
+          {
+            "ontology_class": "cad:LocateFunction",
+            "name": "Radially locate a mating element",
+            "description": "The cylindrical bore wall locates an inserted element relative to the boss axis.",
+            "primary": false,
+            "confidence": 0.84
+          }
+        ],
+        "section_behaviors": [
+          {
+            "ontology_class": "cad:ReactBearingLoadBehavior",
+            "name": "React radial bearing load",
+            "description": "The boss and bore wall react radial contact loads from an inserted cylindrical element.",
+            "confidence": 0.84
+          },
+          {
+            "ontology_class": "cad:SpreadLoadBehavior",
+            "name": "Spread boss load into the arm",
+            "description": "The enlarged boss and blended base distribute interface loads into the arm web.",
+            "confidence": 0.91
+          }
+        ],
+        "feature_groups": [],
+        "features": [
+          {
+            "id": "F004",
+            "name": "Cylindrical support boss",
+            "ontology_class": "cad:HubFeature",
+            "parent_feature_id": null,
+            "description": "Outer cylindrical material surrounding the blind bore and projecting from the arm, including the annular rim around the bore opening.",
+            "interface_type": null,
+            "feature_functions": [
+              {
+                "ontology_class": "cad:SupportFunction",
+                "name": "Support the blind bore",
+                "description": "Provides material around the bore to react and transfer interface loads.",
+                "primary": true,
+                "confidence": 0.94
+              },
+              {
+                "ontology_class": "cad:DistributeStressFunction",
+                "name": "Distribute bore loads",
+                "description": "Distributes loads from the bore wall into the boss base and arm.",
+                "primary": false,
+                "confidence": 0.9
+              }
+            ],
+            "feature_behaviors": [
+              {
+                "ontology_class": "cad:ReactBearingLoadBehavior",
+                "name": "React bore bearing loads",
+                "description": "The radial wall thickness around the bore reacts contact and bearing stresses.",
+                "confidence": 0.9
+              },
+              {
+                "ontology_class": "cad:CarryShearBehavior",
+                "name": "Carry boss shear",
+                "description": "Transfers shear from the received element toward the arm.",
+                "confidence": 0.86
+              }
+            ],
+            "relationships": [
+              {
+                "target_feature_id": "F005",
+                "category": "cad:GeometricFeatureRelationship",
+                "relation": "cad:surroundsFeature",
+                "description": "The cylindrical boss concentrically surrounds the blind bore.",
+                "confidence": 0.99
+              },
+              {
+                "target_feature_id": "F005",
+                "category": "cad:GeometricFeatureRelationship",
+                "relation": "cad:coaxialWith",
+                "description": "The outer boss and blind bore share the axis through x=0 and z=4 parallel to CAD Y.",
+                "confidence": 0.99
+              },
+              {
+                "target_feature_id": "F006",
+                "category": "cad:StructuralFeatureRelationship",
+                "relation": "cad:blendsInto",
+                "description": "The outer boss blends into the arm through the shaped transition surface.",
+                "confidence": 0.98
+              }
+            ],
+            "brep_faces": [
+              {
+                "brep_id": "FACE 10",
+                "face_code": "FACE 10",
+                "entity_type": "cad:Face",
+                "geometry_type": "cad:CylindricalSurface",
+                "semantic_role": "cad:OuterWallRole",
+                "name": "Outer boss wall",
+                "description": "Outer cylindrical wall of the raised boss.",
+                "salience": "cad:PrimarySalience",
+                "confidence": 0.99,
+                "evidence": [
+                  "CadQuery reports a CYLINDER of radius 7 mm.",
+                  "Its axis is (0,-1,0) through x=0 and z=4.",
+                  "The face spans x=-7 to 7, y=24 to 34, and z=-3 to 11.",
+                  "It is concentric with the radius-5 cylindrical bore face."
+                ]
+              },
+              {
+                "brep_id": "FACE 11",
+                "face_code": "FACE 11",
+                "entity_type": "cad:Face",
+                "geometry_type": "cad:PlanarSurface",
+                "semantic_role": "cad:SeatingFaceRole",
+                "name": "Annular boss rim",
+                "description": "Planar annular rim surrounding the bore opening at the exposed end of the boss.",
+                "salience": "cad:PrimarySalience",
+                "confidence": 0.99,
+                "evidence": [
+                  "CadQuery reports a PLANE at y=34 with two wires.",
+                  "Its area is 75.398224 mm^2, equal to the annular area between radii 7 mm and 5 mm.",
+                  "The rendered isometric view visibly shows the annular rim around the bore."
+                ]
+              }
+            ],
+            "confidence": 0.97
+          },
+          {
+            "id": "F005",
+            "name": "Axial blind pin bore",
+            "ontology_class": "cad:BlindHoleFeature",
+            "parent_feature_id": null,
+            "description": "Radius-5 cylindrical blind bore extending from the boss opening at CAD y=34 to a planar bottom at y=25.",
+            "interface_type": "cad:PinInterface",
+            "feature_functions": [
+              {
+                "ontology_class": "cad:ReceivePinFunction",
+                "name": "Receive a pin",
+                "description": "Accepts a cylindrical pin or shaft end within the boss.",
+                "primary": true,
+                "confidence": 0.86
+              },
+              {
+                "ontology_class": "cad:LocateFunction",
+                "name": "Locate the inserted element",
+                "description": "The cylindrical wall provides radial location about the bore axis.",
+                "primary": false,
+                "confidence": 0.88
+              },
+              {
+                "ontology_class": "cad:ConstrainMotionFunction",
+                "name": "Constrain axial insertion",
+                "description": "The planar blind-hole bottom limits insertion depth.",
+                "primary": false,
+                "confidence": 0.91
+              }
+            ],
+            "feature_behaviors": [
+              {
+                "ontology_class": "cad:ReactBearingLoadBehavior",
+                "name": "React radial bearing contact",
+                "description": "The cylindrical bore wall can react radial loads from an inserted pin.",
+                "confidence": 0.86
+              },
+              {
+                "ontology_class": "cad:ConstrainTranslationBehavior",
+                "name": "Constrain insertion depth",
+                "description": "The closed planar bottom prevents translation beyond y=25.",
+                "confidence": 0.93
+              }
+            ],
+            "relationships": [
+              {
+                "target_feature_id": "F004",
+                "category": "cad:GeometricFeatureRelationship",
+                "relation": "cad:insideFeature",
+                "description": "The blind bore lies inside the cylindrical boss.",
+                "confidence": 0.99
+              },
+              {
+                "target_feature_id": "F004",
+                "category": "cad:GeometricFeatureRelationship",
+                "relation": "cad:concentricWith",
+                "description": "The bore and outer boss are concentric about the same CAD Y-directed axis.",
+                "confidence": 0.99
+              }
+            ],
+            "brep_faces": [
+              {
+                "brep_id": "FACE 3",
+                "face_code": "FACE 3",
+                "entity_type": "cad:Face",
+                "geometry_type": "cad:CylindricalSurface",
+                "semantic_role": "cad:BoreWallRole",
+                "name": "Blind-bore cylindrical wall",
+                "description": "Cylindrical inner wall of the radius-5 blind bore.",
+                "salience": "cad:PrimarySalience",
+                "confidence": 0.99,
+                "evidence": [
+                  "CadQuery reports a CYLINDER of radius 5 mm.",
+                  "The cylinder axis is (0,-1,0) through x=0 and z=4.",
+                  "The face extends from y=25 to y=34 and is concentric with the radius-7 outer boss.",
+                  "The isometric view shows the corresponding circular internal wall."
+                ]
+              },
+              {
+                "brep_id": "FACE 4",
+                "face_code": "FACE 4",
+                "entity_type": "cad:Face",
+                "geometry_type": "cad:PlanarSurface",
+                "semantic_role": "cad:CavityWallRole",
+                "name": "Blind-bore bottom",
+                "description": "Circular planar bottom closing the bore at CAD y=25.",
+                "salience": "cad:PrimarySalience",
+                "confidence": 0.99,
+                "evidence": [
+                  "CadQuery reports a single-wire PLANE at y=25.",
+                  "The face area is 78.539816 mm^2, equal to pi times the square of the 5 mm bore radius.",
+                  "Its bbox spans x=-5 to 5 and z=-1 to 9, matching the bore diameter.",
+                  "The closed circular face establishes that the bore is blind rather than through."
+                ]
+              }
+            ],
+            "confidence": 0.96
+          },
+          {
+            "id": "F006",
+            "name": "Boss-to-arm blended transition",
+            "ontology_class": "cad:FilletFeature",
+            "parent_feature_id": null,
+            "description": "Shaped transition around the base of the boss that merges its cylindrical wall into the arm and spreads concentrated loads.",
+            "interface_type": null,
+            "feature_functions": [
+              {
+                "ontology_class": "cad:DistributeStressFunction",
+                "name": "Distribute boss stress",
+                "description": "Reduces the abruptness of the boss-to-arm junction and distributes boss loads into the web.",
+                "primary": true,
+                "confidence": 0.94
+              },
+              {
+                "ontology_class": "cad:ConnectFunction",
+                "name": "Connect boss to arm",
+                "description": "Forms the continuous material connection between the boss and arm.",
+                "primary": false,
+                "confidence": 0.97
+              }
+            ],
+            "feature_behaviors": [
+              {
+                "ontology_class": "cad:SpreadLoadBehavior",
+                "name": "Spread junction load",
+                "description": "Spreads bearing and shear loads over a larger arm area.",
+                "confidence": 0.95
+              },
+              {
+                "ontology_class": "cad:DistributeStressBehavior",
+                "name": "Reduce stress concentration",
+                "description": "The smooth freeform transition avoids a sharp boss-base corner.",
+                "confidence": 0.94
+              }
+            ],
+            "relationships": [
+              {
+                "target_feature_id": "F004",
+                "category": "cad:StructuralFeatureRelationship",
+                "relation": "cad:attachedTo",
+                "description": "The transition is attached to and continuous with the cylindrical boss.",
+                "confidence": 0.98
+              },
+              {
+                "target_feature_id": "F001",
+                "category": "cad:StructuralFeatureRelationship",
+                "relation": "cad:blendsInto",
+                "description": "The transition blends the boss into the elongated structural web.",
+                "confidence": 0.99
+              }
+            ],
+            "brep_faces": [
+              {
+                "brep_id": "FACE 9",
+                "face_code": "FACE 9",
+                "entity_type": "cad:Face",
+                "geometry_type": "cad:BSplineSurface",
+                "semantic_role": "cad:TransitionSurfaceRole",
+                "name": "Freeform boss-base blend",
+                "description": "B-spline transition surface joining the lower boss envelope to the arm around the boss base.",
+                "salience": "cad:PrimarySalience",
+                "confidence": 0.99,
+                "evidence": [
+                  "CadQuery reports a BSPLINE face with area 198.026029 mm^2.",
+                  "Its bbox spans x=-7 to 7, y=19 to 24, and z=-3 to 11.",
+                  "The x and z extents match the radius-7 boss envelope, while its y range bridges the arm and outer cylindrical boss.",
+                  "The rendered views show a smooth bulbous transition at this location."
+                ]
+              }
+            ],
+            "confidence": 0.97
+          }
+        ],
+        "unclassified_brep_faces": [],
+        "relationships": [
+          {
+            "target_section_id": "R01",
+            "category": "cad:FunctionalFeatureRelationship",
+            "relation": "cad:transmitsLoadTo",
+            "description": "The boss section transmits pin or shaft interface loads into the elongated arm section.",
+            "confidence": 0.91
+          }
+        ],
+        "confidence": 0.96
+      }
+    ]
+  }
+}
+
+Natural-language edit request:
+
+Mirror the part according to the plane lying on the not rounded end of the part. Merge the mirrored part together with the existing one so they create one body.
+
+Multi-view images of the original CAD model:
+
+View: +Z
+
+[IMAGE 0: /home/adml/Research/Hackathon2026/IDETC26-Hackathon-Autodesk-neuralCAD-Edit/data/edit_192_external/breps/3YH2WFSRM22W7DKT_1769174995.910249_+Z.jpg]
+
+View: -Z
+
+[IMAGE 1: /home/adml/Research/Hackathon2026/IDETC26-Hackathon-Autodesk-neuralCAD-Edit/data/edit_192_external/breps/3YH2WFSRM22W7DKT_1769174995.910249_-Z.jpg]
+
+View: -X
+
+[IMAGE 2: /home/adml/Research/Hackathon2026/IDETC26-Hackathon-Autodesk-neuralCAD-Edit/data/edit_192_external/breps/3YH2WFSRM22W7DKT_1769174995.910249_-X.jpg]
+
+View: +X
+
+[IMAGE 3: /home/adml/Research/Hackathon2026/IDETC26-Hackathon-Autodesk-neuralCAD-Edit/data/edit_192_external/breps/3YH2WFSRM22W7DKT_1769174995.910249_+X.jpg]
+
+View: +Y
+
+[IMAGE 4: /home/adml/Research/Hackathon2026/IDETC26-Hackathon-Autodesk-neuralCAD-Edit/data/edit_192_external/breps/3YH2WFSRM22W7DKT_1769174995.910249_+Y.jpg]
+
+View: -Y
+
+[IMAGE 5: /home/adml/Research/Hackathon2026/IDETC26-Hackathon-Autodesk-neuralCAD-Edit/data/edit_192_external/breps/3YH2WFSRM22W7DKT_1769174995.910249_-Y.jpg]
+
+View: iso1
+
+[IMAGE 6: /home/adml/Research/Hackathon2026/IDETC26-Hackathon-Autodesk-neuralCAD-Edit/data/edit_192_external/breps/3YH2WFSRM22W7DKT_1769174995.910249_iso1.jpg]

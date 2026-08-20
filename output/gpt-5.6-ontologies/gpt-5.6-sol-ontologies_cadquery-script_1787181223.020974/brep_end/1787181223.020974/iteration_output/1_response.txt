@@ -1,0 +1,164 @@
+Thinking text:
+**Reflecting on geometry and function**
+
+I need to craft a function and understand the orientation involved. The semantics say +Z is at the bottom and -Z at the top, with the ZX plane at y=0. There seems to be a shallow handle pocket on one top side, which I consider a "lowered plateau." To make it symmetrical, I’ll need to mirror the geometry across y=0. I'll also check the original model to clarify these details. If it's asymmetric, cutting the mirrored pocket might be necessary.
+**Processing mirrored geometry**
+
+I think I can create a mirrored copy and use an intersection to refine the shape, which helps keep symmetry while accommodating the top pocket. Since the overall geometry is likely symmetrical, intersecting the original with the mirror will give me the same structure with pockets on both sides. However, I'm running into some confusion about orientation; the semantics suggest different sides for top and bottom. I need to clarify which side the existing pocket is on by analyzing the geometry solid’s bounding box and faces.
+**Creating output with symmetry**
+
+I need to think through how to derive the axes and pocket surfaces, but I should focus on producing the output now. I can use the section operation to intersect the shape with its mirror. For CadQuery, I believe the syntax might be something like `shape.mirror(mirrorPlane="ZX", basePointVector=(0,0,0))`. Transferring via reflection could also work. So, I’ll intersect the original shape with the mirrored one while ensuring alignment with the symmetry plane at y=0. Finally, I want to add text to the top of the lowered plateau on either +Y or -Y using the XZ plane.
+**Investigating workplane normals**
+
+I’m examining the workplane named XZ, where it seems like zDir is (0, -1, 0), suggesting that the normal is likely -Y based on the right-hand rule. For "ZX," it might be normal +Y, but CadQuery supports "XZ" instead. I'm thinking about placing text on a planar face using a custom Plane definition. I need to check the existing pocket side to ensure accurate placement. I’ll inspect face centers to identify candidates for the interior planar face and determine their areas.
+**Determining text placement**
+
+I’m using the Y and center X, Z values for text placement, considering mirroring about the Y-plane. The ZX plane is strictly Y=0, but the model might be centered. I need to check if the model's Y bounding box is symmetric to ensure correct positioning. I’ll confirm that the solid is imported properly and access the solids using `model.solids().vals()`. For the text, I’ll determine the extrusion direction based on the pocket candidate's center Y value, adjusting for the sign accordingly and considering the font settings as needed.
+**Locating the Arial font**
+
+I need to locate the Arial font file, checking common paths or possibly using `fc-match`, but I'm not sure if subprocess imports are allowed. It seems like the available functions are limited to just `os` and `cq`. I could explore the directories through `os`. I’ll also look into whether the `fontPath` parameter is supported in the text function signature, which includes options like `font`, `fontsize`, and `distance`. This will help me ensure the text displays correctly.
+**Evaluating extrusions and text projection**
+
+I'm considering how to use the CadQuery tool for extruding a face. It seems like I can project text onto a plane and then intersect it with an extruded prism to ensure it fits correctly. I’ll aim for font size 10 and center the text, but the face centroid might be tricky since part of it extends along the handle. I want to make sure the largest interior face is selected for this. Finally, mirroring may yield exact intersections after adding the text.
+**Selecting candidate surfaces for text**
+
+I need to use the top side as the candidate for the existing plateau, focusing on the y-coordinate of the plateau. It's important that this candidate surface remains identifiable after the intersection process. For text orientation, I want it to be legible from the top outward. I’m thinking the tool is likely elongated along the X or Z axis, possibly leaning towards Z given the wrench context. I need to ensure the text is centered and its baseline aligns with the longer axis.
+**Considering design choices**
+
+I'm thinking about the text position and centering it. Maybe I should center the face as well to weight it properly? There's a possibility that the candidate floor is better served with two support faces around the pocket instead of just one focusing on the floor. I wonder if this will enhance the overall design. Let's explore these layout options a bit more to see what works best!
+
+Generated script:
+def my_cad_function(args):
+    input_file = os.path.expanduser(args["input_file"])
+    imported = cq.importers.importStep(input_file)
+
+    solids = imported.solids().vals()
+    if not solids:
+        raise ValueError("The imported STEP file contains no solid bodies")
+
+    shape = solids[0]
+    if len(solids) > 1:
+        shape = solids[0].fuse(*solids[1:])
+
+    bbox = shape.BoundingBox()
+    tol = max(bbox.xlen, bbox.ylen, bbox.zlen) * 1.0e-5
+
+    # Locate the existing recessed/lowered plateau. Its floor is expected to
+    # be a planar ZX-parallel face lying inward from one of the Y extremes.
+    plateau_candidates = []
+    parallel_faces = []
+    for face in shape.Faces():
+        try:
+            if face.geomType() != "PLANE":
+                continue
+            normal = face.normalAt()
+            if abs(normal.y) < 0.95:
+                continue
+            center = face.Center()
+            parallel_faces.append(face)
+            inward_from_both_extremes = (
+                center.y > bbox.ymin + tol and center.y < bbox.ymax - tol
+            )
+            if inward_from_both_extremes:
+                plateau_candidates.append(face)
+        except Exception:
+            continue
+
+    if plateau_candidates:
+        plateau_face = max(plateau_candidates, key=lambda f: f.Area())
+    elif parallel_faces:
+        # Fallback for STEP models whose recessed floor is nearly coincident
+        # with the bounding box because of numerical tolerances.
+        plateau_face = max(parallel_faces, key=lambda f: f.Area())
+    else:
+        raise ValueError("Could not identify a planar lowered plateau parallel to the ZX plane")
+
+    plateau_center = plateau_face.Center()
+    plateau_bbox = plateau_face.BoundingBox()
+    top_sign = 1.0 if plateau_center.y >= 0.0 else -1.0
+
+    # Propagate the existing top-side recess to the opposite side. The common
+    # volume of the part and its reflection about ZX (Y=0) retains the original
+    # recess and introduces its exact counterpart on the bottom.
+    mirrored = shape.mirror("XZ", (0.0, 0.0, 0.0))
+    symmetric_shape = shape.intersect(mirrored).clean()
+    if not symmetric_shape.isValid():
+        raise ValueError("ZX-symmetrization produced an invalid solid")
+
+    # Align the word with the longer in-plane direction of the plateau.
+    if plateau_bbox.xlen >= plateau_bbox.zlen:
+        text_x_dir = (1.0, 0.0, 0.0)
+    else:
+        text_x_dir = (0.0, 0.0, 1.0)
+
+    text_normal = (0.0, top_sign, 0.0)
+
+    # Start the lettering 0.02 mm inside the plateau to make the union robust,
+    # while keeping its exposed upper surface exactly 1 mm above the plateau.
+    overlap = 0.02
+    text_origin = (
+        plateau_center.x,
+        plateau_center.y - top_sign * overlap,
+        plateau_center.z,
+    )
+    text_plane = cq.Plane(
+        origin=text_origin,
+        xDir=text_x_dir,
+        normal=text_normal,
+    )
+
+    text_wp = (
+        cq.Workplane(text_plane)
+        .text(
+            "TOP",
+            10.0,
+            1.0 + overlap,
+            font="Arial",
+            kind="regular",
+            halign="center",
+            valign="center",
+            combine=False,
+            clean=True,
+        )
+    )
+
+    text_solids = text_wp.solids().vals()
+    if not text_solids:
+        raise ValueError("CadQuery failed to create the embossed TOP lettering")
+
+    result = symmetric_shape
+    for text_solid in text_solids:
+        result = result.fuse(text_solid)
+    result = result.clean()
+
+    print("EDIT SUMMARY")
+    print(f"Original bbox Y: {bbox.ymin:.6f} to {bbox.ymax:.6f} mm")
+    print(
+        "Selected plateau center: "
+        f"({plateau_center.x:.6f}, {plateau_center.y:.6f}, {plateau_center.z:.6f})"
+    )
+    print(f"Selected plateau area: {plateau_face.Area():.6f} mm^2")
+    print(f"Top outward Y direction: {top_sign:+.0f}")
+    print(f"Embossed text height: 10 mm; exposed raise: 1 mm; font: Arial")
+    print(f"Result valid: {result.isValid()}; solids: {len(result.Solids())}")
+
+    return cq.Workplane("XY").newObject([result])
+
+Program output:
+stdout: Loading function from: /home/adml/Research/Hackathon2026/IDETC26-Hackathon-Autodesk-neuralCAD-Edit/output/gpt-5.6-ontologies/gpt-5.6-sol-ontologies_cadquery-script_1787181223.020974/brep_end/1787181223.020974/temp_script.py
+EDIT SUMMARY
+Original bbox Y: 0.000000 to 15.000000 mm
+Selected plateau center: (-0.272962, 14.000000, -51.776050)
+Selected plateau area: 1316.425066 mm^2
+Top outward Y direction: +1
+Embossed text height: 10 mm; exposed raise: 1 mm; font: Arial
+Result valid: True; solids: 3
+Exported shape to: /home/adml/Research/Hackathon2026/IDETC26-Hackathon-Autodesk-neuralCAD-Edit/output/gpt-5.6-ontologies/gpt-5.6-sol-ontologies_cadquery-script_1787181223.020974/brep_end/1787181223.020974/tmp.step
+Exported STL to: /home/adml/Research/Hackathon2026/IDETC26-Hackathon-Autodesk-neuralCAD-Edit/output/gpt-5.6-ontologies/gpt-5.6-sol-ontologies_cadquery-script_1787181223.020974/brep_end/1787181223.020974/tmp.stl
+Exported PNG image to: /home/adml/Research/Hackathon2026/IDETC26-Hackathon-Autodesk-neuralCAD-Edit/output/gpt-5.6-ontologies/gpt-5.6-sol-ontologies_cadquery-script_1787181223.020974/brep_end/1787181223.020974/tmp.png
+Script completed.
+
+stderr: 
+
+Exported this iteration:
+tmp.step, tmp.stl, tmp.png, tmp_+Z.png, tmp_-Z.png, tmp_-X.png, tmp_+X.png, tmp_+Y.png, tmp_-Y.png, tmp_iso1.png, tmp_iso2.png

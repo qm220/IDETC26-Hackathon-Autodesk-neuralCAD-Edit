@@ -1,0 +1,68 @@
+Thinking text:
+
+
+Generated script:
+def my_cad_function(args):
+    input_file = os.path.expanduser(args["input_file"])
+    imported = cq.importers.importStep(input_file)
+    base = imported.val() if hasattr(imported, "val") else imported
+
+    xz_plane = cq.Plane(
+        origin=(0.0, 16.0, 0.0),
+        xDir=(1.0, 0.0, 0.0),
+        normal=(0.0, -1.0, 0.0),
+    )
+
+    radius = 5.0
+    root_z = -120.0
+    tangent_z = root_z - radius
+    open_z = -160.0
+
+    straight = (
+        cq.Workplane(xz_plane)
+        .center(0.0, 0.5 * (open_z + tangent_z))
+        .rect(20.0, tangent_z - open_z)
+        .extrude(17.0)
+    )
+    root_core = (
+        cq.Workplane(xz_plane)
+        .center(0.0, 0.5 * (tangent_z + root_z))
+        .rect(10.0, root_z - tangent_z)
+        .extrude(17.0)
+    )
+    left_transition = (
+        cq.Workplane(xz_plane)
+        .center(-5.0, tangent_z)
+        .circle(radius)
+        .extrude(17.0)
+    )
+    right_transition = (
+        cq.Workplane(xz_plane)
+        .center(5.0, tangent_z)
+        .circle(radius)
+        .extrude(17.0)
+    )
+    revised_slot = (
+        straight.union(root_core)
+        .union(left_transition)
+        .union(right_transition)
+        .val()
+    )
+
+    healing_blank = (
+        cq.Workplane("XY")
+        .box(20.2, 15.0, 20.2)
+        .translate((0.0, 7.5, -120.0))
+        .val()
+    )
+
+    edited = base.fuse(healing_blank).cut(revised_slot)
+    try:
+        edited = edited.clean()
+    except Exception:
+        pass
+
+    return cq.Workplane(obj=edited)
+
+Program output:
+CadQuery skipped because complete=true.

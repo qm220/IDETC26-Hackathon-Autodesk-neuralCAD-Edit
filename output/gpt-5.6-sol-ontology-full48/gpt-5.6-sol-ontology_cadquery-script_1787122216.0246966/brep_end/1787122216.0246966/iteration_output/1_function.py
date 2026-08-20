@@ -1,0 +1,51 @@
+def my_cad_function(args):
+    input_file = os.path.expanduser(args["input_file"])
+    imported = cq.importers.importStep(input_file)
+    model = imported.val() if hasattr(imported, "val") else imported
+
+    faces = model.Faces()
+
+    def is_target_exterior(face, target_y):
+        b = face.BoundingBox()
+        try:
+            planar = face.geomType() == "PLANE"
+        except Exception:
+            planar = False
+        return (
+            planar
+            and abs(b.ymin - target_y) < 0.02
+            and abs(b.ymax - target_y) < 0.02
+            and b.xmin < -25.35 and b.xmax > 25.35
+            and b.zmin < -25.35 and b.zmax > 25.35
+        )
+
+    def bind_face(planned_index, target_y, label):
+        if planned_index < len(faces) and is_target_exterior(faces[planned_index], target_y):
+            print("Bound {} to grounded FACE {}".format(label, planned_index))
+            return faces[planned_index]
+        candidates = [f for f in faces if is_target_exterior(f, target_y)]
+        if not candidates:
+            raise ValueError("Could not locate {} at y={}".format(label, target_y))
+        selected = max(candidates, key=lambda f: f.Area())
+        actual_index = next(i for i, f in enumerate(faces) if f.isSame(selected))
+        print("Bound {} geometrically to FACE {}".format(label, actual_index))
+        return selected
+
+    positive_face = bind_face(53, 27.94, "positive-Y cover mating face")
+    negative_face = bind_face(72, -15.24, "negative-Y cover mating face")
+
+    thickness = 2.54
+    positive_cover = cq.Solid.extrudeLinear(
+        positive_face.outerWire(), [], cq.Vector(0.0, thickness, 0.0)
+    )
+    negative_cover = cq.Solid.extrudeLinear(
+        negative_face.outerWire(), [], cq.Vector(0.0, -thickness, 0.0)
+    )
+
+    result = cq.Compound.makeCompound(
+        list(model.Solids()) + [positive_cover, negative_cover]
+    )
+    print("Final compound: solids={}, valid={}".format(
+        len(result.Solids()), result.isValid()
+    ))
+    return result

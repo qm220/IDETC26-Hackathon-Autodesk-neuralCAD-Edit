@@ -1,0 +1,11 @@
+=== thinking_text ===
+**Evaluating image assessment requirements**
+
+I need to judge the images, specifically looking at the front view labeled +Z with weird axes. It shows three horizontal bars on the left, centered at y 340, which looks equally spaced. I want to confirm their placement: yes, they seem to be on the front panel. I need to ensure the function is valid, making sure to use proper JSON escaping. I'll need to check imports and the environment to validate everything correctly.
+
+=== response_text ===
+{
+  "complete": true,
+  "my_cad_function": "def my_cad_function(args):\n    input_file = os.path.expanduser(args[\"input_file\"])\n    model = cq.importers.importStep(input_file)\n    shape = model.val()\n\n    solids = list(shape.Solids())\n    if not solids:\n        raise ValueError(\"The imported model contains no solids.\")\n\n    expected_center = cq.Vector(-237.0, 340.0, 318.5)\n    candidates = []\n    for solid in solids:\n        bb = solid.BoundingBox()\n        c = solid.Center()\n        if bb.xlen > 30.0 and bb.xlen > 3.0 * bb.ylen and 5.0 <= bb.ylen <= 16.0 and bb.zlen < 8.0:\n            distance = ((c.x - expected_center.x) ** 2 + (c.y - expected_center.y) ** 2 + (c.z - expected_center.z) ** 2) ** 0.5\n            candidates.append((distance, solid))\n\n    if not candidates:\n        raise ValueError(\"Could not identify the existing horizontal front-panel button.\")\n\n    candidates.sort(key=lambda item: item[0])\n    existing_button = candidates[0][1]\n    spacing = 28.0\n\n    upper_button = existing_button.moved(cq.Location(cq.Vector(0.0, spacing, 0.0)))\n    lower_button = existing_button.moved(cq.Location(cq.Vector(0.0, -spacing, 0.0)))\n\n    edited_shape = cq.Compound.makeCompound(solids + [upper_button, lower_button])\n    return cq.Workplane(\"XY\").newObject([edited_shape])",
+  "error": ""
+}

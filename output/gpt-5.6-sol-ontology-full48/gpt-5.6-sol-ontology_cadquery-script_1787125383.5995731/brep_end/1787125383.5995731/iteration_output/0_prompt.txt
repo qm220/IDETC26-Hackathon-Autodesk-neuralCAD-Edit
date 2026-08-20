@@ -1,0 +1,1868 @@
+The planning stage produced model.json (hierarchical part → sections → features
+→ B-rep faces), aim.json (desired final state from the edit request), and
+operation.json (grounded edit operations, parameters, constraints, targets,
+and modeling plans). Use those artifacts when writing my_cad_function.
+
+Section ids look like R01. Feature ids look like F001. FACE N values are
+CadQuery Faces() indices from the STEP analysis. Bind them to actual STEP
+geometry by inspecting the loaded model (print faces and coordinates) before
+editing. If an operation needs boundary topology such as a chamfer or fillet
+edge, derive it in CadQuery from the grounded face(s).
+
+Implement each operation's modeling_plan steps. Load the start model from
+args["input_file"].
+
+model.json from the planning stage:
+
+{
+  "part": {
+    "id": "P001",
+    "name": "Elongated mechanical handle or latch body",
+    "description": "Single-piece elongated mechanical body with a rectangular main shank, an enlarged rounded end region, a deep blind cylindrical bore opening at the opposite end, a rectangular side pocket, and extensive edge rounding. The exact application is uncertain; the geometry is consistent with a handle, latch body, or socketed lever component.",
+    "source_views": [
+      "+X",
+      "-X",
+      "+Y",
+      "-Y",
+      "+Z",
+      "-Z",
+      "iso1"
+    ],
+    "solid_ids": [
+      "SOLID 0"
+    ],
+    "symmetry_note": "No complete global symmetry is evident. The long body is approximately prismatic along the CAD X direction, while the enlarged end uses repeated rounded transitions around several outer edges. The blind bore is longitudinal and has an axis parallel to CAD X.",
+    "semantic_orientation": {
+      "status": "inferred",
+      "description": "The bore-opening end is interpreted as the functional front, the enlarged rounded block as the rear or grip end, and the broad planar face at CAD z=-340 as the top. Camera labels are mapped independently from this inferred object orientation.",
+      "confidence": 0.72,
+      "view_sides": {
+        "+X": "front",
+        "-X": "back",
+        "+Y": "left",
+        "-Y": "right",
+        "+Z": "top",
+        "-Z": "bottom"
+      }
+    },
+    "sections": [
+      {
+        "id": "R01",
+        "name": "Main shank and socket region",
+        "ontology_class": "cad:MainBodySection",
+        "description": "The elongated structural portion extending primarily from CAD x=100 mm to x=300 mm. It contains the longitudinal blind bore, rectangular side pocket, end interface, and perimeter transitions.",
+        "location": "Between the enlarged rounded end and the bore-opening end; predominantly the positive-CAD-X portion of SOLID 0.",
+        "solid_ids": [
+          "SOLID 0"
+        ],
+        "colour": {
+          "R": 64,
+          "G": 135,
+          "B": 210
+        },
+        "section_functions": [
+          {
+            "ontology_class": "cad:TransferLoadFunction",
+            "name": "Transfer structural load",
+            "description": "Transfers forces between the enlarged end region and the bore or socket interface.",
+            "primary": true,
+            "confidence": 0.84
+          },
+          {
+            "ontology_class": "cad:ConnectFunction",
+            "name": "Connect end regions",
+            "description": "Provides the continuous structural connection between the rounded end and the socketed end.",
+            "primary": false,
+            "confidence": 0.87
+          }
+        ],
+        "section_behaviors": [
+          {
+            "ontology_class": "cad:ResistBendingBehavior",
+            "name": "Resist bending",
+            "description": "The elongated, relatively deep rectangular section resists bending between its end regions.",
+            "confidence": 0.84
+          },
+          {
+            "ontology_class": "cad:CarryShearBehavior",
+            "name": "Carry shear",
+            "description": "The continuous solid walls carry transverse loads around the bore and pocket.",
+            "confidence": 0.8
+          }
+        ],
+        "feature_groups": [],
+        "features": [
+          {
+            "id": "F001",
+            "name": "Main prismatic body",
+            "ontology_class": "cad:BaseFeature",
+            "parent_feature_id": null,
+            "description": "Primary elongated material volume with broad planar top, bottom, and side walls.",
+            "interface_type": null,
+            "feature_functions": [
+              {
+                "ontology_class": "cad:TransferLoadFunction",
+                "name": "Transfer load",
+                "description": "Carries loads between the bore end and enlarged rounded end.",
+                "primary": true,
+                "confidence": 0.88
+              }
+            ],
+            "feature_behaviors": [
+              {
+                "ontology_class": "cad:ResistBendingBehavior",
+                "name": "Resist bending",
+                "description": "Its rectangular section provides bending stiffness along the elongated direction.",
+                "confidence": 0.86
+              }
+            ],
+            "relationships": [
+              {
+                "target_feature_id": "F002",
+                "category": "cad:GeometricFeatureRelationship",
+                "relation": "cad:surroundsFeature",
+                "description": "The main body material surrounds the longitudinal blind bore.",
+                "confidence": 0.97
+              },
+              {
+                "target_feature_id": "F003",
+                "category": "cad:StructuralFeatureRelationship",
+                "relation": "cad:containsFeature",
+                "description": "The rectangular side pocket is formed within the main body.",
+                "confidence": 0.95
+              },
+              {
+                "target_feature_id": "F006",
+                "category": "cad:FunctionalFeatureRelationship",
+                "relation": "cad:transmitsLoadTo",
+                "description": "The shank transmits structural load to the enlarged rounded end region.",
+                "confidence": 0.82
+              }
+            ],
+            "brep_faces": [
+              {
+                "brep_id": "FACE 5",
+                "face_code": "FACE 5",
+                "entity_type": "cad:Face",
+                "geometry_type": "cad:PlanarSurface",
+                "semantic_role": "cad:SideWallRole",
+                "name": "Main longitudinal side wall",
+                "description": "Large planar outer wall at CAD y=230 mm.",
+                "salience": "cad:PrimarySalience",
+                "confidence": 0.96,
+                "evidence": [
+                  "PLANE surface",
+                  "area 11326.517103 mm^2",
+                  "bbox x=100.000000..233.230464 mm",
+                  "plane normal parallel to CAD Y"
+                ]
+              },
+              {
+                "brep_id": "FACE 10",
+                "face_code": "FACE 10",
+                "entity_type": "cad:Face",
+                "geometry_type": "cad:PlanarSurface",
+                "semantic_role": "cad:OuterWallRole",
+                "name": "Broad top face",
+                "description": "Largest broad planar face, spanning the overall part at CAD z=-340 mm.",
+                "salience": "cad:PrimarySalience",
+                "confidence": 0.98,
+                "evidence": [
+                  "PLANE surface",
+                  "area 22525.152861 mm^2",
+                  "bbox x=0..300 mm, y=200..320 mm",
+                  "constant z=-340 mm",
+                  "visual correspondence with the broad upper surface"
+                ]
+              },
+              {
+                "brep_id": "FACE 11",
+                "face_code": "FACE 11",
+                "entity_type": "cad:Face",
+                "geometry_type": "cad:PlanarSurface",
+                "semantic_role": "cad:SideWallRole",
+                "name": "Opposite longitudinal side wall",
+                "description": "Large planar side wall at CAD y=294.336015 mm.",
+                "salience": "cad:PrimarySalience",
+                "confidence": 0.96,
+                "evidence": [
+                  "PLANE surface",
+                  "area 19950.000000 mm^2",
+                  "bbox x=100..290 mm and z=-445..-340 mm"
+                ]
+              },
+              {
+                "brep_id": "FACE 12",
+                "face_code": "FACE 12",
+                "entity_type": "cad:Face",
+                "geometry_type": "cad:PlanarSurface",
+                "semantic_role": "cad:OuterWallRole",
+                "name": "Main lower face",
+                "description": "Broad planar lower exterior face of the shank at CAD z=-445 mm.",
+                "salience": "cad:PrimarySalience",
+                "confidence": 0.96,
+                "evidence": [
+                  "PLANE surface",
+                  "area 10910.648136 mm^2",
+                  "constant z=-445 mm",
+                  "bbox x=100..295 mm"
+                ]
+              },
+              {
+                "brep_id": "FACE 13",
+                "face_code": "FACE 13",
+                "entity_type": "cad:Face",
+                "geometry_type": "cad:PlanarSurface",
+                "semantic_role": "cad:SideWallRole",
+                "name": "Shank step wall",
+                "description": "Planar exterior wall at the CAD x=100 mm transition between the shank and enlarged end geometry.",
+                "salience": "cad:SecondarySalience",
+                "confidence": 0.88,
+                "evidence": [
+                  "PLANE surface",
+                  "constant x=100 mm",
+                  "bbox y=294.336015..315 mm and z=-445..-340 mm"
+                ]
+              },
+              {
+                "brep_id": "FACE 14",
+                "face_code": "FACE 14",
+                "entity_type": "cad:Face",
+                "geometry_type": "cad:PlanarSurface",
+                "semantic_role": "cad:SideWallRole",
+                "name": "Bore-end lower side wall",
+                "description": "Planar outer wall adjacent to the rounded bore-end perimeter.",
+                "salience": "cad:SecondarySalience",
+                "confidence": 0.91,
+                "evidence": [
+                  "PLANE surface",
+                  "area 3442.269056 mm^2",
+                  "constant y=250.211192 mm",
+                  "bbox x=259.332018..297.500000 mm"
+                ]
+              }
+            ],
+            "confidence": 0.91
+          },
+          {
+            "id": "F002",
+            "name": "Longitudinal blind socket bore",
+            "ontology_class": "cad:BlindHoleFeature",
+            "parent_feature_id": null,
+            "description": "Deep cylindrical blind hole opening through the end face at CAD x=300 mm and terminating at a planar bottom at CAD x=100 mm. The bore radius is 14.142136 mm and its axis is parallel to CAD X.",
+            "interface_type": "cad:PinInterface",
+            "feature_functions": [
+              {
+                "ontology_class": "cad:ReceivePinFunction",
+                "name": "Receive a pin or shaft",
+                "description": "Provides a deep cylindrical socket for insertion of a mating pin, rod, or shaft.",
+                "primary": true,
+                "confidence": 0.79
+              },
+              {
+                "ontology_class": "cad:LocateFunction",
+                "name": "Locate inserted member",
+                "description": "The cylindrical wall radially locates a mating cylindrical member.",
+                "primary": false,
+                "confidence": 0.82
+              }
+            ],
+            "feature_behaviors": [
+              {
+                "ontology_class": "cad:ReactBearingLoadBehavior",
+                "name": "React bearing load",
+                "description": "The cylindrical bore wall can react radial contact or bearing loads from an inserted member.",
+                "confidence": 0.82
+              },
+              {
+                "ontology_class": "cad:ConstrainTranslationBehavior",
+                "name": "Constrain radial translation",
+                "description": "The bore constrains translation transverse to its longitudinal axis.",
+                "confidence": 0.84
+              }
+            ],
+            "relationships": [
+              {
+                "target_feature_id": "F001",
+                "category": "cad:GeometricFeatureRelationship",
+                "relation": "cad:insideFeature",
+                "description": "The blind bore lies inside the main prismatic body.",
+                "confidence": 0.98
+              },
+              {
+                "target_feature_id": "F003",
+                "category": "cad:GeometricFeatureRelationship",
+                "relation": "cad:offsetFrom",
+                "description": "The bore and rectangular side pocket occupy distinct, offset regions of the main body.",
+                "confidence": 0.83
+              }
+            ],
+            "brep_faces": [
+              {
+                "brep_id": "FACE 7",
+                "face_code": "FACE 7",
+                "entity_type": "cad:Face",
+                "geometry_type": "cad:PlanarSurface",
+                "semantic_role": "cad:InterfaceFaceRole",
+                "name": "Bore-opening end face",
+                "description": "Planar end face at CAD x=300 mm containing an inner wire associated with the circular bore opening.",
+                "salience": "cad:PrimarySalience",
+                "confidence": 0.94,
+                "evidence": [
+                  "PLANE surface at x=300 mm",
+                  "n_wires=2",
+                  "adjacent visual circular opening in +X and isometric views",
+                  "bbox surrounds the bore-axis location"
+                ]
+              },
+              {
+                "brep_id": "FACE 20",
+                "face_code": "FACE 20",
+                "entity_type": "cad:Face",
+                "geometry_type": "cad:CylindricalSurface",
+                "semantic_role": "cad:BoreWallRole",
+                "name": "Blind bore cylindrical wall",
+                "description": "Internal cylindrical wall extending from CAD x=100 mm to x=300 mm.",
+                "salience": "cad:PrimarySalience",
+                "confidence": 0.99,
+                "evidence": [
+                  "CYLINDER surface",
+                  "radius 14.142136 mm",
+                  "axis (1,0,0)",
+                  "cylinder origin (100,270,-400) mm",
+                  "bbox x=100..300 mm",
+                  "visual circular opening at the bore end"
+                ]
+              },
+              {
+                "brep_id": "FACE 24",
+                "face_code": "FACE 24",
+                "entity_type": "cad:Face",
+                "geometry_type": "cad:PlanarSurface",
+                "semantic_role": "cad:SeatingFaceRole",
+                "name": "Blind bore bottom",
+                "description": "Circular planar termination of the bore at CAD x=100 mm.",
+                "salience": "cad:PrimarySalience",
+                "confidence": 0.99,
+                "evidence": [
+                  "PLANE surface at x=100 mm",
+                  "area 628.318531 mm^2",
+                  "bbox diameter 28.284272 mm in Y and Z",
+                  "center (100,270,-400) mm",
+                  "area matches a radius-14.142136 mm circular disk"
+                ]
+              }
+            ],
+            "confidence": 0.92
+          },
+          {
+            "id": "F003",
+            "name": "Rectangular side pocket",
+            "ontology_class": "cad:PocketFeature",
+            "parent_feature_id": null,
+            "description": "Rectangular recessed cavity opening from the side at CAD y=230 mm, bounded by two X-normal walls, two Z-normal walls, and an inner wall at CAD y=280 mm.",
+            "interface_type": "cad:ContactInterface",
+            "feature_functions": [
+              {
+                "ontology_class": "cad:ProvideClearanceFunction",
+                "name": "Provide component clearance",
+                "description": "Provides a recessed volume that may clear or receive a mating component.",
+                "primary": true,
+                "confidence": 0.67
+              },
+              {
+                "ontology_class": "cad:LocateFunction",
+                "name": "Locate a rectangular element",
+                "description": "The opposed pocket walls could laterally locate an inserted rectangular element.",
+                "primary": false,
+                "confidence": 0.6
+              }
+            ],
+            "feature_behaviors": [
+              {
+                "ontology_class": "cad:ConstrainTranslationBehavior",
+                "name": "Constrain inserted element",
+                "description": "If occupied by a mating element, the pocket walls constrain transverse translation.",
+                "confidence": 0.62
+              }
+            ],
+            "relationships": [
+              {
+                "target_feature_id": "F001",
+                "category": "cad:GeometricFeatureRelationship",
+                "relation": "cad:insideFeature",
+                "description": "The pocket is recessed into the main body.",
+                "confidence": 0.97
+              },
+              {
+                "target_feature_id": "F002",
+                "category": "cad:GeometricFeatureRelationship",
+                "relation": "cad:offsetFrom",
+                "description": "The pocket is spatially offset from the longitudinal bore axis.",
+                "confidence": 0.83
+              }
+            ],
+            "brep_faces": [
+              {
+                "brep_id": "FACE 15",
+                "face_code": "FACE 15",
+                "entity_type": "cad:Face",
+                "geometry_type": "cad:PlanarSurface",
+                "semantic_role": "cad:CavityWallRole",
+                "name": "Pocket first end wall",
+                "description": "Planar pocket wall at CAD x=168.336333 mm.",
+                "salience": "cad:PrimarySalience",
+                "confidence": 0.97,
+                "evidence": [
+                  "PLANE surface",
+                  "constant x=168.336333 mm",
+                  "bbox y=230..280 mm"
+                ]
+              },
+              {
+                "brep_id": "FACE 16",
+                "face_code": "FACE 16",
+                "entity_type": "cad:Face",
+                "geometry_type": "cad:PlanarSurface",
+                "semantic_role": "cad:CavityWallRole",
+                "name": "Pocket inner wall",
+                "description": "Inner termination wall of the side pocket at CAD y=280 mm.",
+                "salience": "cad:PrimarySalience",
+                "confidence": 0.97,
+                "evidence": [
+                  "PLANE surface",
+                  "constant y=280 mm",
+                  "bbox x=125.350920..168.336333 mm"
+                ]
+              },
+              {
+                "brep_id": "FACE 17",
+                "face_code": "FACE 17",
+                "entity_type": "cad:Face",
+                "geometry_type": "cad:PlanarSurface",
+                "semantic_role": "cad:CavityWallRole",
+                "name": "Pocket upper wall",
+                "description": "Broad planar pocket wall at CAD z=-374.121747 mm.",
+                "salience": "cad:PrimarySalience",
+                "confidence": 0.97,
+                "evidence": [
+                  "PLANE surface",
+                  "constant z=-374.121747 mm",
+                  "bbox x=125.350920..168.336333 mm and y=230..280 mm"
+                ]
+              },
+              {
+                "brep_id": "FACE 18",
+                "face_code": "FACE 18",
+                "entity_type": "cad:Face",
+                "geometry_type": "cad:PlanarSurface",
+                "semantic_role": "cad:CavityWallRole",
+                "name": "Pocket second end wall",
+                "description": "Planar pocket wall opposite FACE 15 at CAD x=125.350920 mm.",
+                "salience": "cad:PrimarySalience",
+                "confidence": 0.97,
+                "evidence": [
+                  "PLANE surface",
+                  "constant x=125.350920 mm",
+                  "bbox y=230..280 mm"
+                ]
+              },
+              {
+                "brep_id": "FACE 19",
+                "face_code": "FACE 19",
+                "entity_type": "cad:Face",
+                "geometry_type": "cad:PlanarSurface",
+                "semantic_role": "cad:CavityWallRole",
+                "name": "Pocket lower wall",
+                "description": "Planar pocket wall opposite FACE 17 at CAD z=-405.071245 mm.",
+                "salience": "cad:PrimarySalience",
+                "confidence": 0.96,
+                "evidence": [
+                  "PLANE surface",
+                  "constant z=-405.071245 mm",
+                  "bbox x=125.350920..168.336333 mm"
+                ]
+              }
+            ],
+            "confidence": 0.86
+          },
+          {
+            "id": "F004",
+            "name": "Bore-end chamfered transitions",
+            "ontology_class": "cad:ChamferFeature",
+            "parent_feature_id": null,
+            "description": "Set of planar and conical transition surfaces around the bore-end perimeter. These surfaces soften otherwise sharp changes between the main walls and adjacent rounded geometry.",
+            "interface_type": null,
+            "feature_functions": [
+              {
+                "ontology_class": "cad:DistributeStressFunction",
+                "name": "Reduce edge concentration",
+                "description": "Transitions reduce abrupt geometric discontinuities at the bore-end perimeter.",
+                "primary": true,
+                "confidence": 0.74
+              }
+            ],
+            "feature_behaviors": [
+              {
+                "ontology_class": "cad:DistributeStressBehavior",
+                "name": "Distribute edge stress",
+                "description": "Sloped and conical surfaces spread contact and structural stress over a wider transition.",
+                "confidence": 0.73
+              }
+            ],
+            "relationships": [
+              {
+                "target_feature_id": "F001",
+                "category": "cad:StructuralFeatureRelationship",
+                "relation": "cad:blendsInto",
+                "description": "The chamfered surfaces transition into the main body walls.",
+                "confidence": 0.93
+              },
+              {
+                "target_feature_id": "F005",
+                "category": "cad:StructuralFeatureRelationship",
+                "relation": "cad:adjacentTo",
+                "description": "The chamfers border cylindrical edge-rounding surfaces at the bore end.",
+                "confidence": 0.86
+              }
+            ],
+            "brep_faces": [
+              {
+                "brep_id": "FACE 0",
+                "face_code": "FACE 0",
+                "entity_type": "cad:Face",
+                "geometry_type": "cad:ConicalSurface",
+                "semantic_role": "cad:ChamferSurfaceRole",
+                "name": "Lower conical corner transition",
+                "description": "Conical transition with 45-degree semi-angle near the bore-end perimeter.",
+                "salience": "cad:SecondarySalience",
+                "confidence": 0.86,
+                "evidence": [
+                  "CONE surface",
+                  "semi-angle 0.785398 rad",
+                  "cone radius 32.5 mm",
+                  "bbox z=-445..-440 mm"
+                ]
+              },
+              {
+                "brep_id": "FACE 1",
+                "face_code": "FACE 1",
+                "entity_type": "cad:Face",
+                "geometry_type": "cad:PlanarSurface",
+                "semantic_role": "cad:ChamferSurfaceRole",
+                "name": "Lower longitudinal chamfer",
+                "description": "Five-millimetre diagonal planar transition between longitudinal exterior faces.",
+                "salience": "cad:SecondarySalience",
+                "confidence": 0.95,
+                "evidence": [
+                  "PLANE surface",
+                  "normal (0,-0.707107,-0.707107)",
+                  "bbox y=230..235 mm and z=-445..-440 mm"
+                ]
+              },
+              {
+                "brep_id": "FACE 3",
+                "face_code": "FACE 3",
+                "entity_type": "cad:Face",
+                "geometry_type": "cad:PlanarSurface",
+                "semantic_role": "cad:ChamferSurfaceRole",
+                "name": "Upper longitudinal chamfer",
+                "description": "Five-millimetre diagonal planar transition near the broad top face.",
+                "salience": "cad:SecondarySalience",
+                "confidence": 0.95,
+                "evidence": [
+                  "PLANE surface",
+                  "normal (0,-0.707107,0.707107)",
+                  "bbox y=230..235 mm and z=-345..-340 mm"
+                ]
+              },
+              {
+                "brep_id": "FACE 4",
+                "face_code": "FACE 4",
+                "entity_type": "cad:Face",
+                "geometry_type": "cad:ConicalSurface",
+                "semantic_role": "cad:ChamferSurfaceRole",
+                "name": "Upper conical corner transition",
+                "description": "Conical 45-degree transition paired geometrically with FACE 0 at the opposite Z edge.",
+                "salience": "cad:SecondarySalience",
+                "confidence": 0.86,
+                "evidence": [
+                  "CONE surface",
+                  "semi-angle 0.785398 rad",
+                  "cone radius 32.5 mm",
+                  "bbox z=-345..-340 mm"
+                ]
+              },
+              {
+                "brep_id": "FACE 8",
+                "face_code": "FACE 8",
+                "entity_type": "cad:Face",
+                "geometry_type": "cad:PlanarSurface",
+                "semantic_role": "cad:ChamferSurfaceRole",
+                "name": "End-edge chamfer",
+                "description": "Diagonal planar transition at the x=295..300 mm lower end edge.",
+                "salience": "cad:SecondarySalience",
+                "confidence": 0.94,
+                "evidence": [
+                  "PLANE surface",
+                  "normal (0.707107,0,-0.707107)",
+                  "bbox x=295..300 mm and z=-445..-440 mm"
+                ]
+              }
+            ],
+            "confidence": 0.86
+          },
+          {
+            "id": "F005",
+            "name": "Bore-end rounded perimeter",
+            "ontology_class": "cad:FilletFeature",
+            "parent_feature_id": null,
+            "description": "Cylindrical edge-rounding surfaces of differing radii around the bore-opening end and adjoining shank edges.",
+            "interface_type": null,
+            "feature_functions": [
+              {
+                "ontology_class": "cad:DistributeStressFunction",
+                "name": "Smooth perimeter transitions",
+                "description": "Reduces sharp external corners and distributes local stress.",
+                "primary": true,
+                "confidence": 0.82
+              }
+            ],
+            "feature_behaviors": [
+              {
+                "ontology_class": "cad:DistributeStressBehavior",
+                "name": "Distribute stress",
+                "description": "Rounded perimeter surfaces reduce geometric stress concentrations.",
+                "confidence": 0.83
+              }
+            ],
+            "relationships": [
+              {
+                "target_feature_id": "F001",
+                "category": "cad:StructuralFeatureRelationship",
+                "relation": "cad:blendsInto",
+                "description": "The rounded surfaces blend into the planar main-body walls.",
+                "confidence": 0.94
+              },
+              {
+                "target_feature_id": "F002",
+                "category": "cad:GeometricFeatureRelationship",
+                "relation": "cad:surroundsFeature",
+                "description": "The rounded end perimeter lies outside and around the bore opening.",
+                "confidence": 0.82
+              }
+            ],
+            "brep_faces": [
+              {
+                "brep_id": "FACE 2",
+                "face_code": "FACE 2",
+                "entity_type": "cad:Face",
+                "geometry_type": "cad:CylindricalSurface",
+                "semantic_role": "cad:FilletSurfaceRole",
+                "name": "Large longitudinal edge round",
+                "description": "Large-radius cylindrical transition extending over most of the shank depth.",
+                "salience": "cad:PrimarySalience",
+                "confidence": 0.91,
+                "evidence": [
+                  "CYLINDER surface",
+                  "radius 35 mm",
+                  "axis parallel to CAD Z",
+                  "bbox z=-440..-345 mm"
+                ]
+              },
+              {
+                "brep_id": "FACE 6",
+                "face_code": "FACE 6",
+                "entity_type": "cad:Face",
+                "geometry_type": "cad:CylindricalSurface",
+                "semantic_role": "cad:FilletSurfaceRole",
+                "name": "Small end-edge round",
+                "description": "Small-radius cylindrical rounding at the extreme bore-end edge.",
+                "salience": "cad:SecondarySalience",
+                "confidence": 0.95,
+                "evidence": [
+                  "CYLINDER surface",
+                  "radius 2.5 mm",
+                  "axis parallel to CAD Z",
+                  "bbox x=297.5..300 mm"
+                ]
+              },
+              {
+                "brep_id": "FACE 9",
+                "face_code": "FACE 9",
+                "entity_type": "cad:Face",
+                "geometry_type": "cad:CylindricalSurface",
+                "semantic_role": "cad:FilletSurfaceRole",
+                "name": "Outer end corner round",
+                "description": "Ten-millimetre cylindrical outer-corner transition near the bore end.",
+                "salience": "cad:SecondarySalience",
+                "confidence": 0.93,
+                "evidence": [
+                  "CYLINDER surface",
+                  "radius 10 mm",
+                  "axis parallel to CAD Z",
+                  "bbox x=290..300 mm"
+                ]
+              }
+            ],
+            "confidence": 0.89
+          }
+        ],
+        "unclassified_brep_faces": [],
+        "relationships": [],
+        "confidence": 0.91
+      },
+      {
+        "id": "R02",
+        "name": "Enlarged rounded end region",
+        "ontology_class": "cad:EndSection",
+        "description": "Enlarged block-like end occupying primarily CAD x=0 mm to x=100 mm. It combines planar walls with large 30 mm rounds and smaller 5 mm edge rounds, forming a smooth grip, support, or contact end.",
+        "location": "At the end opposite the longitudinal blind-bore opening; attached to the main shank around CAD x=100 mm.",
+        "solid_ids": [
+          "SOLID 0"
+        ],
+        "colour": {
+          "R": 230,
+          "G": 132,
+          "B": 62
+        },
+        "section_functions": [
+          {
+            "ontology_class": "cad:GripFunction",
+            "name": "Provide enlarged grip or contact region",
+            "description": "The enlarged and strongly rounded end is visually consistent with a hand-contact or broad reaction region.",
+            "primary": true,
+            "confidence": 0.66
+          },
+          {
+            "ontology_class": "cad:SupportFunction",
+            "name": "Support applied load",
+            "description": "Provides a broad structural end that can react or distribute load into the shank.",
+            "primary": false,
+            "confidence": 0.78
+          }
+        ],
+        "section_behaviors": [
+          {
+            "ontology_class": "cad:ReactContactLoadBehavior",
+            "name": "React contact load",
+            "description": "The broad planar and rounded surfaces spread external contact over the enlarged end.",
+            "confidence": 0.78
+          },
+          {
+            "ontology_class": "cad:SpreadLoadBehavior",
+            "name": "Spread load",
+            "description": "The enlarged cross-section distributes applied load before it enters the narrower shank.",
+            "confidence": 0.8
+          }
+        ],
+        "feature_groups": [],
+        "features": [
+          {
+            "id": "F006",
+            "name": "Enlarged end block",
+            "ontology_class": "cad:SupportFeature",
+            "parent_feature_id": null,
+            "description": "Primary material volume of the enlarged end, represented by its remaining planar exterior walls.",
+            "interface_type": "cad:ContactInterface",
+            "feature_functions": [
+              {
+                "ontology_class": "cad:SupportFunction",
+                "name": "Support or react external load",
+                "description": "Provides a broad end region for contact, gripping, or load reaction.",
+                "primary": true,
+                "confidence": 0.77
+              }
+            ],
+            "feature_behaviors": [
+              {
+                "ontology_class": "cad:ReactContactLoadBehavior",
+                "name": "React contact load",
+                "description": "Its larger area reduces localized pressure under contact.",
+                "confidence": 0.77
+              }
+            ],
+            "relationships": [
+              {
+                "target_feature_id": "F001",
+                "category": "cad:StructuralFeatureRelationship",
+                "relation": "cad:attachedTo",
+                "description": "The enlarged end block is integrally attached to the main shank within SOLID 0.",
+                "confidence": 0.98
+              },
+              {
+                "target_feature_id": "F007",
+                "category": "cad:StructuralFeatureRelationship",
+                "relation": "cad:containsFeature",
+                "description": "The large rounded transitions are formed around the enlarged end block.",
+                "confidence": 0.92
+              }
+            ],
+            "brep_faces": [
+              {
+                "brep_id": "FACE 26",
+                "face_code": "FACE 26",
+                "entity_type": "cad:Face",
+                "geometry_type": "cad:PlanarSurface",
+                "semantic_role": "cad:OuterWallRole",
+                "name": "Enlarged-end side face",
+                "description": "Planar exterior wall at CAD y=200 mm.",
+                "salience": "cad:PrimarySalience",
+                "confidence": 0.96,
+                "evidence": [
+                  "PLANE surface",
+                  "area 3200 mm^2",
+                  "bbox x=30..70 mm and z=-420..-340 mm"
+                ]
+              },
+              {
+                "brep_id": "FACE 31",
+                "face_code": "FACE 31",
+                "entity_type": "cad:Face",
+                "geometry_type": "cad:PlanarSurface",
+                "semantic_role": "cad:OuterWallRole",
+                "name": "Opposite enlarged-end side face",
+                "description": "Large planar exterior face at CAD y=320 mm.",
+                "salience": "cad:PrimarySalience",
+                "confidence": 0.96,
+                "evidence": [
+                  "PLANE surface",
+                  "area 6825 mm^2",
+                  "bbox x=30..95 mm and z=-445..-340 mm"
+                ]
+              },
+              {
+                "brep_id": "FACE 32",
+                "face_code": "FACE 32",
+                "entity_type": "cad:Face",
+                "geometry_type": "cad:OuterWallRole",
+                "semantic_role": "cad:OuterWallRole",
+                "name": "Rear planar end face",
+                "description": "Planar end face at CAD x=0 mm between surrounding 30 mm rounds.",
+                "salience": "cad:PrimarySalience",
+                "confidence": 0.97,
+                "evidence": [
+                  "PLANE surface",
+                  "area 4800 mm^2",
+                  "constant x=0 mm",
+                  "bbox y=230..290 mm and z=-420..-340 mm"
+                ]
+              },
+              {
+                "brep_id": "FACE 34",
+                "face_code": "FACE 34",
+                "entity_type": "cad:Face",
+                "geometry_type": "cad:PlanarSurface",
+                "semantic_role": "cad:OuterWallRole",
+                "name": "Enlarged-end lower face",
+                "description": "Broad planar exterior face at CAD z=-450 mm.",
+                "salience": "cad:PrimarySalience",
+                "confidence": 0.97,
+                "evidence": [
+                  "PLANE surface",
+                  "area 5525 mm^2",
+                  "bbox x=30..95 mm and y=230..315 mm",
+                  "constant z=-450 mm"
+                ]
+              }
+            ],
+            "confidence": 0.86
+          },
+          {
+            "id": "F007",
+            "name": "Large rounded end transitions",
+            "ontology_class": "cad:FilletFeature",
+            "parent_feature_id": null,
+            "description": "Network of radius-30 mm cylindrical, spherical, and B-spline transition surfaces forming the dominant rounded shape of the enlarged end.",
+            "interface_type": null,
+            "feature_functions": [
+              {
+                "ontology_class": "cad:DistributeStressFunction",
+                "name": "Distribute contact and structural stress",
+                "description": "Large rounds remove sharp corners and distribute load over the enlarged end.",
+                "primary": true,
+                "confidence": 0.85
+              },
+              {
+                "ontology_class": "cad:GripFunction",
+                "name": "Improve handling",
+                "description": "Rounded exterior corners provide a smoother likely hand-contact surface.",
+                "primary": false,
+                "confidence": 0.64
+              }
+            ],
+            "feature_behaviors": [
+              {
+                "ontology_class": "cad:DistributeStressBehavior",
+                "name": "Distribute stress",
+                "description": "Large-radius transitions reduce stress concentration between adjoining exterior walls.",
+                "confidence": 0.87
+              },
+              {
+                "ontology_class": "cad:ReactContactLoadBehavior",
+                "name": "React broad contact",
+                "description": "Curved surfaces permit gradual contact rather than sharp-edge contact.",
+                "confidence": 0.73
+              }
+            ],
+            "relationships": [
+              {
+                "target_feature_id": "F006",
+                "category": "cad:StructuralFeatureRelationship",
+                "relation": "cad:blendsInto",
+                "description": "The large-radius surfaces blend between the planar walls of the enlarged end block.",
+                "confidence": 0.97
+              },
+              {
+                "target_feature_id": "F008",
+                "category": "cad:StructuralFeatureRelationship",
+                "relation": "cad:adjacentTo",
+                "description": "Large and small edge rounds meet around the enlarged end perimeter.",
+                "confidence": 0.84
+              }
+            ],
+            "brep_faces": [
+              {
+                "brep_id": "FACE 21",
+                "face_code": "FACE 21",
+                "entity_type": "cad:Face",
+                "geometry_type": "cad:BSplineSurface",
+                "semantic_role": "cad:TransitionSurfaceRole",
+                "name": "First blended corner patch",
+                "description": "B-spline corner patch joining rounded surfaces near the x=0, y=320, z=-450 corner region.",
+                "salience": "cad:SecondarySalience",
+                "confidence": 0.9,
+                "evidence": [
+                  "BSPLINE surface",
+                  "bbox dimensions 30 by 30 by 30 mm",
+                  "bbox x=0..30 mm, y=290..320 mm, z=-450..-420 mm"
+                ]
+              },
+              {
+                "brep_id": "FACE 22",
+                "face_code": "FACE 22",
+                "entity_type": "cad:Face",
+                "geometry_type": "cad:BSplineSurface",
+                "semantic_role": "cad:TransitionSurfaceRole",
+                "name": "Second blended corner patch",
+                "description": "B-spline corner patch joining rounded surfaces near x=70..100 mm and y=200..230 mm.",
+                "salience": "cad:SecondarySalience",
+                "confidence": 0.9,
+                "evidence": [
+                  "BSPLINE surface",
+                  "bbox dimensions 30 by 30 by 30 mm",
+                  "visual correspondence with compound rounded corner"
+                ]
+              },
+              {
+                "brep_id": "FACE 25",
+                "face_code": "FACE 25",
+                "entity_type": "cad:Face",
+                "geometry_type": "cad:CylindricalSurface",
+                "semantic_role": "cad:FilletSurfaceRole",
+                "name": "Large side edge round",
+                "description": "Radius-30 mm cylindrical transition adjacent to the main shank.",
+                "salience": "cad:PrimarySalience",
+                "confidence": 0.96,
+                "evidence": [
+                  "CYLINDER surface",
+                  "radius 30 mm",
+                  "axis parallel to CAD Z",
+                  "bbox x=70..100 mm and y=200..235 mm"
+                ]
+              },
+              {
+                "brep_id": "FACE 27",
+                "face_code": "FACE 27",
+                "entity_type": "cad:Face",
+                "geometry_type": "cad:CylindricalSurface",
+                "semantic_role": "cad:FilletSurfaceRole",
+                "name": "Rear side edge round",
+                "description": "Radius-30 mm cylindrical transition along the enlarged rear end.",
+                "salience": "cad:PrimarySalience",
+                "confidence": 0.96,
+                "evidence": [
+                  "CYLINDER surface",
+                  "radius 30 mm",
+                  "axis parallel to CAD Z",
+                  "bbox x=0..30 mm and y=200..230 mm"
+                ]
+              },
+              {
+                "brep_id": "FACE 28",
+                "face_code": "FACE 28",
+                "entity_type": "cad:Face",
+                "geometry_type": "cad:CylindricalSurface",
+                "semantic_role": "cad:FilletSurfaceRole",
+                "name": "Lower lateral edge round",
+                "description": "Radius-30 mm cylindrical transition with axis parallel to CAD X.",
+                "salience": "cad:PrimarySalience",
+                "confidence": 0.96,
+                "evidence": [
+                  "CYLINDER surface",
+                  "radius 30 mm",
+                  "axis (1,0,0)",
+                  "bbox x=30..95 mm, y=200..230 mm, z=-450..-420 mm"
+                ]
+              },
+              {
+                "brep_id": "FACE 33",
+                "face_code": "FACE 33",
+                "entity_type": "cad:Face",
+                "geometry_type": "cad:SphericalSurface",
+                "semantic_role": "cad:FilletSurfaceRole",
+                "name": "Large spherical corner",
+                "description": "Radius-30 mm spherical corner patch centered at (30,230,-420) mm.",
+                "salience": "cad:PrimarySalience",
+                "confidence": 0.98,
+                "evidence": [
+                  "SPHERE surface",
+                  "radius 30 mm",
+                  "sphere center (30,230,-420) mm",
+                  "bbox dimensions 30 by 30 by 30 mm"
+                ]
+              },
+              {
+                "brep_id": "FACE 36",
+                "face_code": "FACE 36",
+                "entity_type": "cad:Face",
+                "geometry_type": "cad:CylindricalSurface",
+                "semantic_role": "cad:FilletSurfaceRole",
+                "name": "Opposite rear side round",
+                "description": "Radius-30 mm cylindrical transition at the y=290..320 mm side of the enlarged end.",
+                "salience": "cad:PrimarySalience",
+                "confidence": 0.96,
+                "evidence": [
+                  "CYLINDER surface",
+                  "radius 30 mm",
+                  "axis parallel to CAD Z",
+                  "bbox x=0..30 mm and y=290..320 mm"
+                ]
+              },
+              {
+                "brep_id": "FACE 37",
+                "face_code": "FACE 37",
+                "entity_type": "cad:Face",
+                "geometry_type": "cad:CylindricalSurface",
+                "semantic_role": "cad:FilletSurfaceRole",
+                "name": "Rear lower edge round",
+                "description": "Radius-30 mm cylindrical transition with axis parallel to CAD Y.",
+                "salience": "cad:PrimarySalience",
+                "confidence": 0.96,
+                "evidence": [
+                  "CYLINDER surface",
+                  "radius 30 mm",
+                  "axis (0,-1,0)",
+                  "bbox x=0..30 mm, y=230..315 mm, z=-450..-420 mm"
+                ]
+              }
+            ],
+            "confidence": 0.91
+          },
+          {
+            "id": "F008",
+            "name": "Small enlarged-end edge rounds",
+            "ontology_class": "cad:FilletFeature",
+            "parent_feature_id": null,
+            "description": "Radius-5 mm cylindrical and spherical edge transitions around the lower and side perimeter of the enlarged end.",
+            "interface_type": null,
+            "feature_functions": [
+              {
+                "ontology_class": "cad:DistributeStressFunction",
+                "name": "Remove sharp minor edges",
+                "description": "Small rounds reduce localized edge stress and sharpness.",
+                "primary": true,
+                "confidence": 0.86
+              }
+            ],
+            "feature_behaviors": [
+              {
+                "ontology_class": "cad:DistributeStressBehavior",
+                "name": "Distribute local edge stress",
+                "description": "The 5 mm rounds smooth minor transitions between planar and large-radius surfaces.",
+                "confidence": 0.87
+              }
+            ],
+            "relationships": [
+              {
+                "target_feature_id": "F006",
+                "category": "cad:StructuralFeatureRelationship",
+                "relation": "cad:blendsInto",
+                "description": "The small edge rounds blend into the enlarged end block walls.",
+                "confidence": 0.96
+              },
+              {
+                "target_feature_id": "F007",
+                "category": "cad:StructuralFeatureRelationship",
+                "relation": "cad:adjacentTo",
+                "description": "The small rounds terminate against or continue into the large-radius transition network.",
+                "confidence": 0.84
+              }
+            ],
+            "brep_faces": [
+              {
+                "brep_id": "FACE 23",
+                "face_code": "FACE 23",
+                "entity_type": "cad:Face",
+                "geometry_type": "cad:CylindricalSurface",
+                "semantic_role": "cad:FilletSurfaceRole",
+                "name": "Small vertical edge round",
+                "description": "Radius-5 mm cylindrical round near x=95..100 mm and y=315..320 mm.",
+                "salience": "cad:SecondarySalience",
+                "confidence": 0.96,
+                "evidence": [
+                  "CYLINDER surface",
+                  "radius 5 mm",
+                  "axis parallel to CAD Z",
+                  "bbox z=-445..-340 mm"
+                ]
+              },
+              {
+                "brep_id": "FACE 29",
+                "face_code": "FACE 29",
+                "entity_type": "cad:Face",
+                "geometry_type": "cad:CylindricalSurface",
+                "semantic_role": "cad:FilletSurfaceRole",
+                "name": "Small lower side round",
+                "description": "Radius-5 mm cylindrical transition with axis parallel to CAD Y.",
+                "salience": "cad:SecondarySalience",
+                "confidence": 0.95,
+                "evidence": [
+                  "CYLINDER surface",
+                  "radius 5 mm",
+                  "axis (0,1,0)",
+                  "bbox x=95..100 mm and z=-450..-443.559696 mm"
+                ]
+              },
+              {
+                "brep_id": "FACE 30",
+                "face_code": "FACE 30",
+                "entity_type": "cad:Face",
+                "geometry_type": "cad:SphericalSurface",
+                "semantic_role": "cad:FilletSurfaceRole",
+                "name": "Small spherical corner",
+                "description": "Radius-5 mm spherical corner joining the small cylindrical rounds.",
+                "salience": "cad:SecondarySalience",
+                "confidence": 0.98,
+                "evidence": [
+                  "SPHERE surface",
+                  "radius 5 mm",
+                  "sphere center (95,315,-445) mm",
+                  "bbox dimensions 5 by 5 by 5 mm"
+                ]
+              },
+              {
+                "brep_id": "FACE 35",
+                "face_code": "FACE 35",
+                "entity_type": "cad:Face",
+                "geometry_type": "cad:CylindricalSurface",
+                "semantic_role": "cad:FilletSurfaceRole",
+                "name": "Small transverse edge round",
+                "description": "Radius-5 mm cylindrical transition extending along CAD X.",
+                "salience": "cad:SecondarySalience",
+                "confidence": 0.96,
+                "evidence": [
+                  "CYLINDER surface",
+                  "radius 5 mm",
+                  "axis (-1,0,0)",
+                  "bbox x=30..95 mm, y=315..320 mm, z=-450..-445 mm"
+                ]
+              }
+            ],
+            "confidence": 0.9
+          }
+        ],
+        "unclassified_brep_faces": [],
+        "relationships": [],
+        "confidence": 0.86
+      }
+    ]
+  }
+}
+
+aim.json from the planning stage:
+
+{
+  "request": "Let's make this part symmetric. There is a step on one of the sides of the whistle. Move the protruding surface so that it is level with the surface next to it. Delete all chamfers and radii and new ones following rules: Horizontal edges in the area where the narrow and bigger part of the whistle meet have a radius R=20mm. Other edges have R=5mm applied to them",
+  "request_wording": {
+    "action_words": [
+      "make",
+      "Move",
+      "level",
+      "Delete",
+      "all",
+      "new",
+      "have",
+      "radius",
+      "R=20mm",
+      "have",
+      "R=5mm",
+      "applied"
+    ],
+    "referenced_feature_words": [
+      "this",
+      "part",
+      "step",
+      "on",
+      "one",
+      "sides",
+      "whistle",
+      "protruding",
+      "surface",
+      "it",
+      "with",
+      "surface",
+      "next",
+      "to",
+      "it",
+      "chamfers",
+      "radii",
+      "ones",
+      "Horizontal",
+      "edges",
+      "in",
+      "area",
+      "where",
+      "narrow",
+      "bigger",
+      "part",
+      "whistle",
+      "meet",
+      "Other",
+      "edges",
+      "them"
+    ],
+    "intention_words": [
+      "symmetric"
+    ],
+    "grammatical_words": [
+      "Let's",
+      "There",
+      "is",
+      "a",
+      "of",
+      "the",
+      "of",
+      "the",
+      "the",
+      "so",
+      "that",
+      "is",
+      "the",
+      "and",
+      "and",
+      "following",
+      "rules",
+      "the",
+      "the",
+      "and",
+      "of",
+      "the",
+      "a",
+      "to"
+    ]
+  },
+  "actions": [
+    {
+      "operation": "Move the protruding surface on the stepped side until it is level, or coplanar, with the adjacent surface.",
+      "parameters": {},
+      "target": "The protruding surface associated with the step on one side of the whistle.",
+      "relational_constraint": "The moved surface must be level with the surface next to it.",
+      "unresolved_reference": "Identify the side containing the step, the protruding surface to move, the adjacent reference surface, and the required movement direction and distance."
+    },
+    {
+      "operation": "Delete existing chamfers.",
+      "parameters": {
+        "scope": "all"
+      },
+      "target": "All existing chamfers on the part.",
+      "relational_constraint": "",
+      "unresolved_reference": "Identify every existing chamfer feature or chamfered edge in the CAD model."
+    },
+    {
+      "operation": "Delete existing radii or fillets.",
+      "parameters": {
+        "scope": "all"
+      },
+      "target": "All existing radii or fillets on the part.",
+      "relational_constraint": "",
+      "unresolved_reference": "Identify every existing radius or fillet feature in the CAD model."
+    },
+    {
+      "operation": "Apply edge fillets.",
+      "parameters": {
+        "radius": "20 mm"
+      },
+      "target": "Horizontal edges in the area where the narrow and bigger parts of the whistle meet.",
+      "relational_constraint": "The selected edges must be horizontal and located at the meeting area between the narrow and bigger portions of the whistle.",
+      "unresolved_reference": "Identify the narrow portion, the bigger portion, their meeting area, the model orientation that defines horizontal, and all qualifying horizontal edges in that area."
+    },
+    {
+      "operation": "Apply edge fillets.",
+      "parameters": {
+        "radius": "5 mm"
+      },
+      "target": "All other edges.",
+      "relational_constraint": "Apply to edges other than the horizontal edges in the meeting area assigned the 20 mm radius.",
+      "unresolved_reference": "Identify the remaining edge set after resolving the edges that receive the 20 mm radius."
+    }
+  ],
+  "intention": [
+    "Make the part symmetric by eliminating the side step and using a consistent rule-based edge-radius scheme."
+  ]
+}
+
+operation.json from the planning stage:
+
+{
+  "request": "Let's make this part symmetric. There is a step on one of the sides of the whistle. Move the protruding surface so that it is level with the surface next to it. Delete all chamfers and radii and new ones following rules: Horizontal edges in the area where the narrow and bigger part of the whistle meet have a radius R=20mm. Other edges have R=5mm applied to them",
+  "request_wording": {
+    "action_words": [
+      "make",
+      "Move",
+      "level",
+      "Delete",
+      "all",
+      "new",
+      "have",
+      "radius",
+      "R=20mm",
+      "have",
+      "R=5mm",
+      "applied"
+    ],
+    "referenced_feature_words": [
+      "this",
+      "part",
+      "step",
+      "on",
+      "one",
+      "sides",
+      "whistle",
+      "protruding",
+      "surface",
+      "it",
+      "with",
+      "surface",
+      "next",
+      "to",
+      "it",
+      "chamfers",
+      "radii",
+      "ones",
+      "Horizontal",
+      "edges",
+      "in",
+      "area",
+      "where",
+      "narrow",
+      "bigger",
+      "part",
+      "whistle",
+      "meet",
+      "Other",
+      "edges",
+      "them"
+    ],
+    "intention_words": [
+      "symmetric"
+    ],
+    "grammatical_words": [
+      "Let's",
+      "There",
+      "is",
+      "a",
+      "of",
+      "the",
+      "of",
+      "the",
+      "the",
+      "so",
+      "that",
+      "is",
+      "the",
+      "and",
+      "and",
+      "following",
+      "rules",
+      "the",
+      "the",
+      "and",
+      "of",
+      "the",
+      "a",
+      "to"
+    ]
+  },
+  "actions": [
+    {
+      "operation": "Move the protruding surface on the stepped side until it is level, or coplanar, with the adjacent surface.",
+      "parameters": {},
+      "target": "The protruding surface associated with the step on one side of the whistle.",
+      "relational_constraint": "The moved surface must be level with the surface next to it.",
+      "unresolved_reference": "Identify the side containing the step, the protruding surface to move, the adjacent reference surface, and the required movement direction and distance.",
+      "target section code": [
+        "R01",
+        "R02"
+      ],
+      "target face code": [
+        "F001",
+        "F006",
+        "FACE 11",
+        "FACE 13",
+        "FACE 5",
+        "FACE 31"
+      ],
+      "steps": [
+        "Localize the asymmetric side step at the junction near CAD x=100 mm between the main shank R01 and enlarged end R02. FACE 11 is the anomalously offset longitudinal shank side wall at CAD y=294.336015 mm; FACE 13 is the resulting step wall at x=100 mm. The opposite shank wall FACE 5 is at y=230 mm.",
+        "Use the enlarged-end lateral limits, FACE 26 at y=200 mm and FACE 31 at y=320 mm, to establish the intended lateral symmetry plane at CAD y=260 mm.",
+        "Derive the symmetric location of the side opposite FACE 5 by reflecting y=230 mm about y=260 mm. The required coplanar side-wall location is therefore y=290 mm.",
+        "Replace the existing offset condition on FACE 11 with a move-face, direct-edit, or reconstructed-sketch constraint that moves it from y=294.336015 mm to y=290 mm, a displacement of 4.336015 mm in the negative CAD-Y direction.",
+        "Extend or trim the adjacent planar faces of F001 as required so that the moved side wall forms a valid closed solid. Rebuild the transition at x=100 mm, removing the unintended portion of FACE 13 generated by the original offset.",
+        "If direct face movement fails because FACE 11 is bounded by chamfers and fillets, first suppress or remove F004, F005, F007, and F008, reconstruct the sharp-sided base volumes F001 and F006, and then impose the y=290 mm symmetric shank boundary.",
+        "Preserve the blind bore F002 and rectangular side pocket F003. Confirm that the completed shank is laterally symmetric about y=260 mm and that the side wall opposite FACE 5 is planar at y=290 mm."
+      ]
+    },
+    {
+      "operation": "Delete existing chamfers.",
+      "parameters": {
+        "scope": "all"
+      },
+      "target": "All existing chamfers on the part.",
+      "relational_constraint": "",
+      "unresolved_reference": "Identify every existing chamfer feature or chamfered edge in the CAD model.",
+      "target section code": [
+        "R01"
+      ],
+      "target face code": [
+        "F004",
+        "FACE 0",
+        "FACE 1",
+        "FACE 3",
+        "FACE 4",
+        "FACE 8"
+      ],
+      "steps": [
+        "Suppress, delete, or roll back the complete Bore-end chamfered transitions feature F004 before creating the replacement edge treatments.",
+        "Remove the lower conical corner transition FACE 0, lower longitudinal chamfer FACE 1, upper longitudinal chamfer FACE 3, upper conical corner transition FACE 4, and end-edge chamfer FACE 8.",
+        "Heal the deleted chamfer regions by extending their adjacent planar and cylindrical parent faces to their sharp theoretical intersections. Do not replace these chamfers with new chamfers.",
+        "Verify that no planar face with a diagonal 45-degree chamfer orientation and no conical chamfer surface remains on the exterior bore-end perimeter.",
+        "Retain the functional geometry of bore-opening face FACE 7, bore wall FACE 20, bore bottom FACE 24, and the pocket faces FACE 15 through FACE 19."
+      ]
+    },
+    {
+      "operation": "Delete existing radii or fillets.",
+      "parameters": {
+        "scope": "all"
+      },
+      "target": "All existing radii or fillets on the part.",
+      "relational_constraint": "",
+      "unresolved_reference": "Identify every existing radius or fillet feature in the CAD model.",
+      "target section code": [
+        "R01",
+        "R02"
+      ],
+      "target face code": [
+        "F005",
+        "F007",
+        "F008",
+        "FACE 2",
+        "FACE 6",
+        "FACE 9",
+        "FACE 21",
+        "FACE 22",
+        "FACE 23",
+        "FACE 25",
+        "FACE 27",
+        "FACE 28",
+        "FACE 29",
+        "FACE 30",
+        "FACE 33",
+        "FACE 35",
+        "FACE 36",
+        "FACE 37"
+      ],
+      "steps": [
+        "Suppress or remove Bore-end rounded perimeter feature F005, including the radius-35 surface FACE 2, radius-2.5 surface FACE 6, and radius-10 surface FACE 9.",
+        "Suppress or remove Large rounded end transitions feature F007, including transition patches FACE 21 and FACE 22 and the radius-30 surfaces FACE 25, FACE 27, FACE 28, FACE 33, FACE 36, and FACE 37.",
+        "Suppress or remove Small enlarged-end edge rounds feature F008, including the radius-5 surfaces FACE 23, FACE 29, FACE 30, and FACE 35.",
+        "Restore the underlying sharp base geometry by extending the planar walls of F001 and F006 to their intersections. Where the original construction history is available, roll back to the state immediately before F005, F007, and F008 rather than deleting individual B-rep faces.",
+        "Complete the symmetry correction while the body is in this unfilleted state, because the existing transition surfaces depend on the asymmetric side-wall position.",
+        "Validate the healed result as one closed solid and confirm that no old cylindrical, spherical, or B-spline blend face remains before applying the new radius rules."
+      ]
+    },
+    {
+      "operation": "Apply edge fillets.",
+      "parameters": {
+        "radius": "20 mm"
+      },
+      "target": "Horizontal edges in the area where the narrow and bigger parts of the whistle meet.",
+      "relational_constraint": "The selected edges must be horizontal and located at the meeting area between the narrow and bigger portions of the whistle.",
+      "unresolved_reference": "Identify the narrow portion, the bigger portion, their meeting area, the model orientation that defines horizontal, and all qualifying horizontal edges in that area.",
+      "target section code": [
+        "R01",
+        "R02"
+      ],
+      "target face code": [
+        "F001",
+        "F006",
+        "FACE 13",
+        "FACE 5",
+        "FACE 11",
+        "FACE 26",
+        "FACE 31",
+        "FACE 23",
+        "FACE 25",
+        "FACE 29",
+        "FACE 30"
+      ],
+      "steps": [
+        "Define the meeting area as the shoulder region around CAD x=100 mm where narrow main shank R01/F001 joins enlarged end R02/F006. FACE 13 and the former transition faces FACE 23, FACE 25, FACE 29, and FACE 30 localize this junction in the original B-rep.",
+        "Use the part coordinate system rather than screen direction to classify edges. Treat the transverse shoulder edges running horizontally across the part width, parallel to CAD Y, as the requested horizontal edges.",
+        "After chamfer and fillet removal and the side-wall symmetry correction, query the regenerated sharp edges at the x=100 mm junction. Select only the external shoulder edges parallel to CAD Y that bound the size transition between F001 and F006.",
+        "Exclude longitudinal edges away from the junction, vertical side-transition edges, bore edges, pocket edges, tangent seams, and any edge that does not separate the narrow and enlarged portions.",
+        "Apply a constant-radius edge fillet of 20 mm to the complete qualifying shoulder-edge set in one operation where possible so that intersecting corner patches are solved consistently.",
+        "Use rolling-ball, tangent-continuous fillets with tangent propagation restricted to the intended shoulder edges. Do not allow propagation onto the remaining exterior perimeter.",
+        "If a nominal R20 fillet cannot fit because a local shoulder is smaller than 20 mm, preserve the specified radius and reconstruct the shoulder transition with an equivalent tangent arc in the generating profile rather than silently reducing the radius.",
+        "Recompute the solid and verify that each selected transition has a measured radius of 20 mm and remains symmetric about the CAD y=260 mm plane.",
+        "The source report does not provide brep_edges entries or stable EDGE indices, so final edge selection must be made from the regenerated sharp-body topology using location near x=100 mm and direction parallel to CAD Y."
+      ]
+    },
+    {
+      "operation": "Apply edge fillets.",
+      "parameters": {
+        "radius": "5 mm"
+      },
+      "target": "All other edges.",
+      "relational_constraint": "Apply to edges other than the horizontal edges in the meeting area assigned the 20 mm radius.",
+      "unresolved_reference": "Identify the remaining edge set after resolving the edges that receive the 20 mm radius.",
+      "target section code": [
+        "R01",
+        "R02"
+      ],
+      "target face code": [
+        "F001",
+        "F002",
+        "F003",
+        "F006",
+        "FACE 5",
+        "FACE 7",
+        "FACE 10",
+        "FACE 11",
+        "FACE 12",
+        "FACE 13",
+        "FACE 14",
+        "FACE 15",
+        "FACE 16",
+        "FACE 17",
+        "FACE 18",
+        "FACE 19",
+        "FACE 20",
+        "FACE 24",
+        "FACE 26",
+        "FACE 31",
+        "FACE 32",
+        "FACE 34"
+      ],
+      "steps": [
+        "Apply the R20 junction fillets first, then collect the remaining sharp, non-tangent edges of the completed solid.",
+        "Subtract from this edge collection every edge already consumed by or bounding the specified R20 shoulder transitions at the R01-to-R02 meeting area.",
+        "Apply constant-radius 5 mm fillets to all remaining geometrically eligible edges, replacing the former mixed 2.5 mm, 5 mm, 10 mm, 30 mm, and 35 mm treatments with the uniform R5 rule.",
+        "Include the remaining exterior perimeter edges of base features F001 and F006. Include bore-opening and pocket edges only where a true 5 mm edge fillet fits without eliminating the associated functional face or breaking through adjacent geometry.",
+        "Preserve FACE 20 as the cylindrical blind-bore wall, FACE 24 as the bore bottom, and FACE 15 through FACE 19 as the pocket-defining walls. Where an internal edge cannot accept R5 because of local wall thickness or feature size, report it as geometrically ineligible rather than changing the nominal radius.",
+        "Create the R5 fillets in logical groups: exterior longitudinal edges, exterior end edges, pocket edges, and bore-opening edges. This grouping makes any failed edge chain identifiable and avoids invalidating the entire operation.",
+        "Use tangent propagation only along continuous intended edge chains. Exclude construction seams, tangent edges introduced by the R20 fillets, and degenerate edges that do not represent a sharp material corner.",
+        "Inspect all R5-to-R20 intersections and generate smooth corner patches without adding chamfers. Confirm that the final model remains one watertight solid and that the corrected side symmetry is retained.",
+        "Measure the completed model to verify that the junction's qualifying horizontal edges are R20 and every other successfully filleted edge is R5. The source model contains no brep_edges list, so new EDGE indices must be obtained from the regenerated topology after the base geometry is healed."
+      ]
+    }
+  ],
+  "intention": [
+    "Make the part symmetric by eliminating the side step and using a consistent rule-based edge-radius scheme."
+  ]
+}
+
+
+        Given the instructions and task information in operation.json, generate a CadQuery Python function that execute the modeling tasks you designed. First use CadQuery to extract information you need regarding the model, such as surfaces you want to use as reference faces. Then write CadQuery code with correct dimensions and coordinates to perform the edit.
+
+        The script that runs the function is provided for reference, as well as an example function, but you should only create your version of the function my_cad_function. Do not include any of the rest of the script.
+
+        Once you have generated the function, it will be executed in CadQuery. You will then be provided with a rendering of the CAD model created by your function, and any prints, debug or error messages. You will then have the opportunity to refine your function based on this feedback, and it will be re-executed. Continue this process until the task is complete, or you reach the maximum number of iterations.
+
+        If the task involves editing an existing model, the path to that model's .step file is passed to your function as args["input_file"], and is also listed as brep_start_path_step in the task information. Load it from args["input_file"] rather than hard-coding a path. For these cases, you might need to print out debug information once the model is loaded in your first iteration.
+
+        Return a json object with two fields. Do not include any other text outside of the json object in your response:
+        'complete': true if the task has been completed. IMPORTANT: This should only be judged by looking at the output from the last iteration, not whether a function has been returned this iteration. If there is no valid output that corresponds to the instruction, the task is not complete. The first iteration can never be complete. If this is true, then the current function will NOT be executed, and the function from the last iteration will be used.
+        'my_cad_function': CadQuery python function as a string. Use the same definition and arguments as the example.
+        Script example:
+
+        
+
+#!/usr/bin/env python3
+
+import cadquery as cq
+from cadquery import exporters
+import os
+import sys
+
+###
+# Function definitions
+###
+
+def _shape_from_result(result):
+    if hasattr(result, "val"):
+        return result.val()
+    if isinstance(result, cq.Assembly):
+        return result.toCompound()
+    return result
+
+
+def export_as_step(result, output_dir):
+    """Export CadQuery result as STEP file"""
+    try:
+        output_path = os.path.join(output_dir, "tmp.step")
+        if isinstance(result, cq.Assembly):
+            result.save(output_path)
+            print(f"Exported assembly to: {output_path}")
+            return
+        exporters.export(_shape_from_result(result), output_path, exportType="STEP")
+        print(f"Exported shape to: {output_path}")
+    except Exception as e:
+        print(f"Error exporting STEP file: {e}")
+        import traceback
+        traceback.print_exc()
+
+
+def export_as_stl(result, output_dir):
+    """Export CadQuery result as STL file"""
+    try:
+        output_path = os.path.join(output_dir, "tmp.stl")
+        exporters.export(_shape_from_result(result), output_path, exportType="STL")
+        print(f"Exported STL to: {output_path}")
+    except Exception as e:
+        print(f"Error exporting STL file: {e}")
+        import traceback
+        traceback.print_exc()
+
+
+def export_as_image(result, output_dir):
+    """Export CadQuery result as an image (SVG or PNG if VTK available)"""
+    try:
+        # Get the shape from result
+        if hasattr(result, 'val'):
+            shape = result.val()
+        elif isinstance(result, cq.Assembly):
+            # For assemblies, try to get combined shape
+            shape = result.toCompound()
+        else:
+            shape = result
+        
+        # Try PNG export using VTK (requires cadquery with ocp/vtk support)
+        png_path = os.path.join(output_dir, "tmp.png")
+        try:
+            from cadquery.vis import show
+            # Use show() with screenshot parameter instead of vis.screenshot()
+            show(
+                shape,
+                screenshot=png_path,
+                width=1920,
+                height=1080,
+                interact=False  # Don't open interactive GUI
+            )
+            print(f"Exported PNG image to: {png_path}")
+            return
+        except Exception as e:
+            print(f"Error exporting PNG image: {e}")
+            pass
+        
+        # Try using ocp_vscode or jupyter_cadquery for rendering
+        try:
+            from ocp_tessellate.convert import to_svg
+            svg_path = os.path.join(output_dir, "tmp.svg")
+            svg_content = to_svg(shape)
+            with open(svg_path, 'w') as f:
+                f.write(svg_content)
+            print(f"Exported SVG image to: {svg_path}")
+            return
+        except ImportError:
+            pass
+        
+        # Fallback: export SVG using CadQuery's built-in SVG exporter
+        svg_path = os.path.join(output_dir, "tmp.svg")
+        exporters.export(shape, svg_path, exportType="SVG")
+        print(f"Exported SVG image to: {svg_path}")
+        
+    except Exception as e:
+        print(f"Error exporting image: {e}")
+        import traceback
+        traceback.print_exc()
+
+
+def parse_cadquery_args(argv, required_args=None):
+    """
+    Parses command line arguments passed to CadQuery scripts.
+    Args will be passed as --passkey value(s)
+    Only required args are processed
+    """
+    if required_args is None:
+        required_args = ['--output_dir', '--input_file', '--function_file']
+    
+    args = {}
+    i = 0
+    while i < len(argv):
+        arg = argv[i]
+        if arg in required_args:
+            if i + 1 < len(argv):
+                args[arg.lstrip('-')] = argv[i + 1]
+                i += 1  # skip next since it's a value
+            else:
+                print(f"Warning: No value provided for argument {arg}")
+        i += 1
+    return args
+
+
+def load_and_execute_function(function_string, args):
+    """
+    Load a my_cad_function function from a string and execute it.
+    
+    Args:
+        function_string (str): The complete function definition as a string
+        args (dict): Arguments to pass to the function
+    
+    Returns:
+        CadQuery Workplane, Shape, or Assembly, or None
+    """
+    try:
+        # Create a safe execution environment with necessary imports
+        exec_globals = {
+            'cq': cq,
+            'cadquery': cq,
+            'Workplane': cq.Workplane,
+            'Assembly': cq.Assembly,
+            'exporters': exporters,
+            'os': os,
+            'sys': sys,
+            '__builtins__': __builtins__
+        }
+        
+        # Execute the function definition
+        exec(function_string, exec_globals)
+        
+        # Get the function from the execution environment
+        if 'my_cad_function' not in exec_globals:
+            raise ValueError("Function 'my_cad_function' not found in provided code")
+        
+        my_cad_function = exec_globals['my_cad_function']
+        
+        # Execute the function with arguments
+        return my_cad_function(args)
+        
+    except Exception as e:
+        print(f"Error executing LLM-provided function: {e}")
+        import traceback
+        traceback.print_exc()
+        return None
+
+
+###
+# Example my_cad_function that creates three boxes.
+###
+# def my_cad_function(args):
+#     boxes = []
+#     for translation in [(100, 0, 0), (0, 100, 0), (0, 0, 100)]:
+#         box = cq.Workplane("XY").box(10, 20, 30).translate(translation)
+#         boxes.append(box)
+#     # Combine all boxes into a compound
+#     result = boxes[0]
+#     for box in boxes[1:]:
+#         result = result.union(box)
+#     print(f"Created compound with multiple boxes at different locations.")
+#     return result
+
+###
+# Example my_cad_function that loads a STEP file and prints information.
+###
+# def my_cad_function(args):
+#     if "input_file" in args:
+#         input_file = os.path.expanduser(args["input_file"])
+#         shape = cq.importers.importStep(input_file)
+#         # Get the underlying OCC shape for analysis
+#         if hasattr(shape, 'val'):
+#             occ_shape = shape.val()
+#         else:
+#             occ_shape = shape
+#         print(f"Is Valid: {occ_shape.isValid()}")
+#         print(f"Volume: {occ_shape.Volume():.6f} mm^3")
+#         print(f"Number of faces: {len(occ_shape.Faces())}")
+#         bbox = occ_shape.BoundingBox()
+#         center = bbox.center
+#         print(f"Bbox Center: ({center.x:.4f}, {center.y:.4f}, {center.z:.4f})")
+#         return shape
+#     return None
+
+
+###
+# Main script execution
+###
+
+if __name__ == "__main__":
+    # Process command line arguments
+    argv = sys.argv
+    args = parse_cadquery_args(argv)
+    output_dir = args.get("output_dir", "~/Desktop")
+    output_dir = os.path.expanduser(output_dir)
+    if not os.path.exists(output_dir):
+        os.makedirs(output_dir)
+
+    # Do not delete tmp.step / tmp.stl from a previous successful iteration.
+    # A later failed or timed-out run must leave the last good solid in place
+    # so ingest/eval still have geometry. Preview files can be replaced.
+    for stale_name in ("tmp.png", "tmp.svg"):
+        stale_path = os.path.join(output_dir, stale_name)
+        if os.path.exists(stale_path):
+            os.remove(stale_path)
+
+    # Load function from file or use default
+    result = None
+    if "function_file" in args:
+        function_file = os.path.expanduser(args["function_file"])
+        if os.path.exists(function_file):
+            try:
+                with open(function_file, 'r') as f:
+                    function_string = f.read()
+                print(f"Loading function from: {function_file}")
+                result = load_and_execute_function(function_string, args)
+            except Exception as e:
+                print(f"Error loading function from file: {e}")
+        else:
+            print(f"Function file not found: {function_file}")
+    else:
+        print("No function file provided")
+
+    # Export results if a result was returned
+    if result is not None:
+        export_as_step(result, output_dir)
+        export_as_stl(result, output_dir)
+        export_as_image(result, output_dir)
+    else:
+        print("No CadQuery result returned; skipped STEP/STL/image export.")
+    
+    print("Script completed.")
+
+Instruction:
+
+Edit the existing model according to the provided instructions.
+
+Task information:
+
+request_text:
+
+Let's make this part symmetric. There is a step on one of the sides of the whistle. Move the protruding surface so that it is level with the surface next to it. Delete all chamfers and radii and new ones following rules: Horizontal edges in the area where the narrow and bigger part of the whistle meet have a radius R=20mm. Other edges have R=5mm applied to them
+
+brep_start_path_step:
+
+/home/adml/Research/Hackathon2026/IDETC26-Hackathon-Autodesk-neuralCAD-Edit/data/edit_192_external/breps/F332D3FXML85WLR2_1770208405.1848786.step
+
+Last output rendering: None (this is the first iteration)
+
+Iterations remaining: 10
