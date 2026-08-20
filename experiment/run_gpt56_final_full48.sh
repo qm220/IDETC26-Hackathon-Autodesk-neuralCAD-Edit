@@ -12,10 +12,12 @@ cd "$ROOT"
 export PYTHONPATH="$ROOT"
 export LIBGL_ALWAYS_SOFTWARE="${LIBGL_ALWAYS_SOFTWARE:-1}"
 export MPLBACKEND="${MPLBACKEND:-Agg}"
+export PYTHONUNBUFFERED=1
 
 CONFIG="src/config/edit_192_external.json"
 USER_ID="gpt-5.6-sol-final_cadquery-script"
 OUTPUT_DIR="output/gpt-5.6-sol-final-full48"
+SUBMISSION_DIR="add-ons/submission outputs"
 LOG="$OUTPUT_DIR/run_full48.log"
 
 mkdir -p "$OUTPUT_DIR"
@@ -34,6 +36,10 @@ mkdir -p "$OUTPUT_DIR"
 
   echo "=== $(date -Is) convert ==="
   uv run python src/scripts_preprocess/cadquery_convert.py "$OUTPUT_DIR"
+
+  echo "=== $(date -Is) copy submission artifacts -> $SUBMISSION_DIR ==="
+  mkdir -p "$SUBMISSION_DIR"
+  uv run python experiment/copy_submission_outputs.py "$OUTPUT_DIR" --dest "$SUBMISSION_DIR"
 
   echo "=== $(date -Is) ingest $OUTPUT_DIR ==="
   uv run python - <<PY
@@ -58,6 +64,7 @@ PY
   echo "=== $(date -Is) DONE ==="
   echo "userId: $USER_ID"
   echo "output: $OUTPUT_DIR"
+  echo "submission: $SUBMISSION_DIR"
   echo "log: $LOG"
   echo "Plots:"
   echo "  data/edit_192_external/results/leaderboard_fig1.png"

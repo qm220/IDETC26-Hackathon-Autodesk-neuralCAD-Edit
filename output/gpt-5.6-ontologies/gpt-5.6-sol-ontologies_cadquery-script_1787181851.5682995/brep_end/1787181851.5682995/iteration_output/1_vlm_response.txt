@@ -1,9 +1,0 @@
-=== thinking_text ===
-
-
-=== response_text ===
-{
-  "complete": true,
-  "my_cad_function": "def my_cad_function(args):\n    input_file = os.path.expanduser(args[\"input_file\"])\n    imported = cq.importers.importStep(input_file)\n    source_shape = imported.val() if hasattr(imported, \"val\") else imported\n\n    faces = source_shape.Faces()\n    if len(faces) <= 7:\n        raise ValueError(f\"Expected FACE 7, but imported shape only has {len(faces)} faces\")\n\n    terminal_face = faces[7]\n    if terminal_face.geomType() != \"PLANE\":\n        raise ValueError(\n            f\"Grounded FACE 7 is not planar after import; geomType={terminal_face.geomType()}\"\n        )\n\n    plane_origin = terminal_face.Center()\n    plane_normal = terminal_face.normalAt(plane_origin).normalized()\n\n    mirrored_shape = source_shape.mirror(plane_normal, plane_origin)\n    unified_shape = source_shape.fuse(mirrored_shape)\n    try:\n        unified_shape = unified_shape.clean()\n    except Exception:\n        pass\n\n    if not unified_shape.isValid():\n        raise ValueError(\"The resulting mirrored and fused shape is invalid\")\n    if len(unified_shape.Solids()) != 1:\n        raise ValueError(\n            f\"Mirror union did not produce exactly one solid; got {len(unified_shape.Solids())}\"\n        )\n\n    return cq.Workplane(\"XY\").newObject([unified_shape])",
-  "error": ""
-}
